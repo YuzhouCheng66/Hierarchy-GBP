@@ -1,7 +1,0 @@
-Package: suitesparse-colamd
-Version: 3.3.4
-Depends: suitesparse-config, vcpkg-cmake, vcpkg-cmake-config
-Architecture: x64-windows
-Multi-Arch: same
-Abi: 2b5ce9dbf1c60ddfc8670e8abfcb79f045dfbf213c78e3301731bf017ea5dbb9
-Description: COLAMD: Routines for column approximate minimum degree ordering algorithm in SuiteSparse

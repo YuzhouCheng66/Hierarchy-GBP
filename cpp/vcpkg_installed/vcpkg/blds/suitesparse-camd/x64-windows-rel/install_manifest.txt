@@ -1,7 +1,0 @@
-C:/Users/27118/Desktop/Imperial/abstraction-recovery/cpp/vcpkg_installed/vcpkg/pkgs/suitesparse-camd_x64-windows/lib/camd.lib
-C:/Users/27118/Desktop/Imperial/abstraction-recovery/cpp/vcpkg_installed/vcpkg/pkgs/suitesparse-camd_x64-windows/bin/camd.dll
-C:/Users/27118/Desktop/Imperial/abstraction-recovery/cpp/vcpkg_installed/vcpkg/pkgs/suitesparse-camd_x64-windows/include/suitesparse/camd.h
-C:/Users/27118/Desktop/Imperial/abstraction-recovery/cpp/vcpkg_installed/vcpkg/pkgs/suitesparse-camd_x64-windows/lib/cmake/CAMD/CAMDTargets.cmake
-C:/Users/27118/Desktop/Imperial/abstraction-recovery/cpp/vcpkg_installed/vcpkg/pkgs/suitesparse-camd_x64-windows/lib/cmake/CAMD/CAMDTargets-release.cmake
-C:/Users/27118/Desktop/Imperial/abstraction-recovery/cpp/vcpkg_installed/vcpkg/pkgs/suitesparse-camd_x64-windows/lib/cmake/CAMD/CAMDConfig.cmake
-C:/Users/27118/Desktop/Imperial/abstraction-recovery/cpp/vcpkg_installed/vcpkg/pkgs/suitesparse-camd_x64-windows/lib/cmake/CAMD/CAMDConfigVersion.cmake

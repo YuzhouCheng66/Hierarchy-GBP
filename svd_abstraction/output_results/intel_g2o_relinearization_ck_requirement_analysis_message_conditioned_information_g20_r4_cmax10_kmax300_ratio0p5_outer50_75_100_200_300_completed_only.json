@@ -1,9 +1,0 @@
-{
-  "note": "cleaned subset containing only fully completed outer samples before manual stop",
-  "completed_outer_samples": [
-    50,
-    75,
-    100,
-    200
-  ]
-}

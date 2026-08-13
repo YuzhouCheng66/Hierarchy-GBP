@@ -1,9 +1,0 @@
-libdir=C:/Users/27118/Desktop/Imperial/abstraction-recovery/cpp/vcpkg_installed/vcpkg/pkgs/lapack-reference_x64-windows/lib
-includedir=C:/Users/27118/Desktop/Imperial/abstraction-recovery/cpp/vcpkg_installed/vcpkg/pkgs/lapack-reference_x64-windows/include
-
-Name: LAPACK
-Description: FORTRAN reference implementation of LAPACK Linear Algebra PACKage
-Version: 3.12.0
-URL: http://www.netlib.org/lapack/
-Libs: -L${libdir} -llapack  
-Requires.private: blas

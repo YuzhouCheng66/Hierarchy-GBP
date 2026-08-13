@@ -1,5 +1,0 @@
-# ninja log v6
-7	80	7903601882046944	CMakeFiles/SuiteSparseConfig.dir/SuiteSparse_config.c.obj	32ae2036b3ca31a5
-84	279	7903601884437720	suitesparseconfig.dll	b4ae4094c9fb9283
-84	279	7903601884437720	suitesparseconfig.lib	b4ae4094c9fb9283
-279	409	7903601884701656	CMakeFiles/install.util	14feeaca62ad9be0

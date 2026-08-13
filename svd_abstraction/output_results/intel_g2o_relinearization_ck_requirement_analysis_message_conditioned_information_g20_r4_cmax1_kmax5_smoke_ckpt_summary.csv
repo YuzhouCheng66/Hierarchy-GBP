@@ -1,2 +1,0 @@
-outer_sample,ratio_target,base_objective,gap_to_direct_opt,exact_after_objective,exact_step_norm,success,success_cycle,success_objective,best_cycle_objective,best_cycle_index,cycles_ran,max_sweeps_cap,max_cycles_cap
-0,1.0,3350168.410825497,3350060.491764923,902153322.0538718,699.3488142897845,False,None,None,250506989216.08548,1,1,5,1

@@ -1,47 +1,0 @@
-Elapsed Time: 0.556s
-    CPU Time: 0.524s
-        Effective Time: 0.524s
-        Spin Time: 0s
-            Imbalance or Serial Spinning: 0s
-            Lock Contention: 0s
-            Other: 0s
-        Overhead Time: 0s
-            Creation: 0s
-            Scheduling: 0s
-            Reduction: 0s
-            Atomics: 0s
-            Other: 0s
-    Total Thread Count: 1
-    Paused Time: 0s
-
-Top Hotspots
-Function                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     Module                         CPU Time  % of CPU Time(%)
--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  -----------------------------  --------  ----------------
-gbp::Factor::computeMessages                                                                                                                                                                                                                                                                                                                                                                                                                                                                 test_synthetic_se2_mg_svd.exe    0.100s             19.1%
-Eigen::internal::redux_impl<struct Eigen::internal::scalar_sum_op<double,double>,class Eigen::internal::redux_evaluator<class Eigen::CwiseUnaryOp<struct Eigen::internal::scalar_abs_op<double>,class Eigen::Block<class Eigen::Block<class Eigen::Matrix<double,3,3,0,3,3>,3,1,1>,-1,1,0> const > >,3,0>::run<class Eigen::CwiseUnaryOp<struct Eigen::internal::scalar_abs_op<double>,class Eigen::Block<class Eigen::Block<class Eigen::Matrix<double,3,3,0,3,3>,3,1,1>,-1,1,0> const > >  test_synthetic_se2_mg_svd.exe    0.051s              9.8%
-Eigen::internal::triangular_solver_unroller<Eigen::Matrix<double,3,3,0,3,3> const ,Eigen::Matrix<double,3,1,0,3,1>,1,0,3,0>::run                                                                                                                                                                                                                                                                                                                                                             test_synthetic_se2_mg_svd.exe    0.033s              6.2%
-Eigen::LLT<class Eigen::Matrix<double,3,3,0,3,3>,1>::compute<class Eigen::Matrix<double,3,3,0,3,3> >                                                                                                                                                                                                                                                                                                                                                                                         test_synthetic_se2_mg_svd.exe    0.033s              6.2%
-Eigen::NoAlias<Eigen::Matrix<double,3,1,0,3,1>,Eigen::MatrixBase>::operator+=                                                                                                                                                                                                                                                                                                                                                                                                                test_synthetic_se2_mg_svd.exe    0.032s              6.1%
-[Others]                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     N/A                              0.275s             52.6%
-Collection and Platform Info
-    Application Command Line: C:\Users\27118\Desktop\Imperial\abstraction-recovery\cpp\build\test_synthetic_se2_mg_svd.exe "--problem-file" "C:\Users\27118\Desktop\Imperial\abstraction-recovery\cpp\tmp\synthetic_se2_n512_seed0.problem" "--num-outer" "3" "--inner-cycles" "3" "--pre-sweeps" "100" "--group-size" "20" "--r-reduced" "4" "--sync-threads" "1" 
-    Operating System: Microsoft Windows 11
-    Computer Name: CHENG
-    Result Size: 4.0 MB 
-    Collection start time: 08:44:37 15/04/2026 UTC
-    Collection stop time: 08:44:37 15/04/2026 UTC
-    Collector Type: User-mode sampling and tracing
-    CPU
-        Name: Intel(R) microarchitecture code named Raptorlake-DT
-        Frequency: 2.419 GHz
-        Logical CPU Count: 32
-        Cache Allocation Technology
-            Level 2 capability: not detected
-            Level 3 capability: not detected
-
-If you want to skip descriptions of detected performance issues in the report,
-enter: vtune -report summary -report-knob show-issues=false -r <my_result_dir>.
-Alternatively, you may view the report in the csv format: vtune -report
-<report_name> -format=csv.
-vtune: Using result path `C:\Users\27118\Desktop\Imperial\abstraction-recovery\cpp\tmp\vtune_hotspots_script_check'
-vtune: Executing actions  0 %                                                  vtune: Executing actions  0 % Finalizing results                               vtune: Executing actions 50 % Finalizing results                               vtune: Executing actions 50 % Generating a report                              vtune: Executing actions 50 % Setting data model parameters                    vtune: Executing actions 75 % Setting data model parameters                    vtune: Executing actions 75 % Generating a report                              vtune: Executing actions 100 % Generating a report                             vtune: Executing actions 100 % done

@@ -1,2 +1,0 @@
-base_label,c,k,cycle,cycle_start_linear_residual,pre_linear_residual,post_linear_residual,pre_residual_ratio_vs_cycle_start,post_residual_ratio_vs_cycle_start,cycle_start_objective,pre_objective,post_objective,delta_z_norm,delta_e_norm,e_post_norm,e_rel_to_exact
-initial,1,20,1,1540574.2553971887,3825246852784.699,3825246113765.885,2483000.6339411917,2483000.154237723,3350168.410825496,1318188279851.335,1427296706206.2122,1078.8856940099347,1078.8856940099347,1167.5461923263433,1.7612275182050188

@@ -1,8 +1,0 @@
-Checking patch cmake/prebuild.cmake...
-Hunk #2 succeeded at 1421 (offset 48 lines).
-Hunk #3 succeeded at 1474 (offset 50 lines).
-Hunk #4 succeeded at 1494 (offset 50 lines).
-Hunk #5 succeeded at 1518 (offset 50 lines).
-Checking patch cmake/system.cmake...
-Applied patch cmake/prebuild.cmake cleanly.
-Applied patch cmake/system.cmake cleanly.

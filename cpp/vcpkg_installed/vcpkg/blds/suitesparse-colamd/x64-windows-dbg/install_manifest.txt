@@ -1,7 +1,0 @@
-C:/Users/27118/Desktop/Imperial/abstraction-recovery/cpp/vcpkg_installed/vcpkg/pkgs/suitesparse-colamd_x64-windows/debug/lib/colamd.lib
-C:/Users/27118/Desktop/Imperial/abstraction-recovery/cpp/vcpkg_installed/vcpkg/pkgs/suitesparse-colamd_x64-windows/debug/bin/colamd.dll
-C:/Users/27118/Desktop/Imperial/abstraction-recovery/cpp/vcpkg_installed/vcpkg/pkgs/suitesparse-colamd_x64-windows/debug/include/suitesparse/colamd.h
-C:/Users/27118/Desktop/Imperial/abstraction-recovery/cpp/vcpkg_installed/vcpkg/pkgs/suitesparse-colamd_x64-windows/debug/lib/cmake/COLAMD/COLAMDTargets.cmake
-C:/Users/27118/Desktop/Imperial/abstraction-recovery/cpp/vcpkg_installed/vcpkg/pkgs/suitesparse-colamd_x64-windows/debug/lib/cmake/COLAMD/COLAMDTargets-debug.cmake
-C:/Users/27118/Desktop/Imperial/abstraction-recovery/cpp/vcpkg_installed/vcpkg/pkgs/suitesparse-colamd_x64-windows/debug/lib/cmake/COLAMD/COLAMDConfig.cmake
-C:/Users/27118/Desktop/Imperial/abstraction-recovery/cpp/vcpkg_installed/vcpkg/pkgs/suitesparse-colamd_x64-windows/debug/lib/cmake/COLAMD/COLAMDConfigVersion.cmake

@@ -1,7 +1,0 @@
-# ninja log v6
-18	94	7903602115934367	CMakeFiles/CCOLAMD.dir/Source/ccolamd_version.c.obj	b2fca81304fa1630
-11	259	7903602115862549	CMakeFiles/CCOLAMD.dir/Source/ccolamd_l.c.obj	13be71a1d4e63e2
-7	273	7903602115822310	CMakeFiles/CCOLAMD.dir/Source/ccolamd.c.obj	dd9440eedd3d2a29
-273	487	7903602120388033	ccolamd.dll	9c20d2395a5da9b7
-273	487	7903602120388033	ccolamd.lib	9c20d2395a5da9b7
-487	581	7903602120622537	CMakeFiles/install.util	3a3f52d6266f3042

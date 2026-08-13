@@ -1,8 +1,27 @@
-# CMake / build artifacts
-cpp/build/
-cpp/build-*/
-*.lib
+# Local dependencies and benchmark inputs are intentionally not vendored.
+/data/
+/third_party/
+
+# Build products and local profiling output.
+/build*/
+/Testing/
+/.vs/
+/.vscode/
 *.dll
 *.exe
+*.ilk
+*.lib
 *.obj
 *.pdb
+*.profraw
+*.vtune
+
+# Reproduction runs are machine-specific; publication references are tracked.
+/results/reproduction/
+/results/publish_validation/
+
+# Python and editor noise.
+**/__pycache__/
+*.py[cod]
+*.swp
+.DS_Store

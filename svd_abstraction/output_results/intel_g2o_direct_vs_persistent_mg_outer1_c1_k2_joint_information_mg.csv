@@ -1,3 +1,0 @@
-outer,nonlinear_objective,inner_cycles,pre_sweeps,basis_source,e_hat_norm,e_star_norm,e_rel_to_exact,linear_residual_exact,linear_residual_approx,next_pose_gap_to_exact,next_objective_gap_to_exact,num_groups,coarse_dim,exact_next_objective
-0,3350168.410825497,,,,,,,,,,,,,
-1,5410672906.737389,1,2,joint_information,253.46043462894255,699.3488142897845,0.9365178668568394,0.001431575703154367,865211596.5205494,14.710257983475232,4508519584.6835165,61,244,902153322.0538718

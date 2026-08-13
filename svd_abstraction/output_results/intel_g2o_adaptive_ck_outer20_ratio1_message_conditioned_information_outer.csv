@@ -1,3 +1,0 @@
-outer,objective_start,objective_end,objective_improved,accepted,c_used,total_sweeps,status,accepted_e_norm
-0,3350168.410825497,3350168.410825497,False,True,0,0,initial,
-1,3350168.410825497,3350168.410825497,False,False,20,2638,no_improvement,0.0

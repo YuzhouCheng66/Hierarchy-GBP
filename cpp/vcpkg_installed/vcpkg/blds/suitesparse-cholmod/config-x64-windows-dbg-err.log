@@ -1,8 +1,0 @@
-CMake Warning:
-  Manually-specified variables were not used by the project:
-
-    FETCHCONTENT_FULLY_DISCONNECTED
-    SUITESPARSE_USE_64BIT_BLAS
-    _VCPKG_ROOT_DIR
-
-

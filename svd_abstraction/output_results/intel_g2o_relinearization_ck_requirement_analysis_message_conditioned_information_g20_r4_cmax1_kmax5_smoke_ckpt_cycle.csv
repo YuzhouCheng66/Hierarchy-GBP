@@ -1,2 +1,0 @@
-cycle,k_used,cycle_start_residual,pre_coarse_residual,post_coarse_residual,pre_residual_ratio,post_residual_ratio,post_cycle_objective,objective_ratio_to_start,objective_delta_to_start,delta_e_norm,e_post_norm,e_rel_to_exact,num_groups,coarse_dim,outer_sample,ratio_target
-1,5,1540574.2553971887,11417780358.850624,11417440822.06962,7411.379437797309,7411.159041552328,250506989216.08548,74774.44668352042,250503639047.67465,336.30205156866265,1522.3364413092972,2.323839147673371,61,244,0,1.0

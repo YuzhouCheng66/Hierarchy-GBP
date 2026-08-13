@@ -1,0 +1,79 @@
+{
+  "description": "Map the latest H-GBP timings to the machine configuration used by the supplied publication table.",
+  "formula": "old_equivalent(method) = old_table_hgbp16 * current_method / current_old_hgbp16_path",
+  "current_old_hgbp16_source": "legacy benchmark artifact cpp/tmp/current_ratio_check_20260725/summary.json",
+  "datasets": {
+    "FR079": {
+      "old_table_hgbp16_sec": 0.193012,
+      "current_old_hgbp16_sec": 0.1933943,
+      "current_hgbp1_sec": 0.7857034,
+      "current_hgbp16_sec": 0.1828605,
+      "old_equivalent_hgbp1_sec": 0.784150229043979,
+      "old_equivalent_hgbp16_sec": 0.182499023114952
+    },
+    "FRH": {
+      "old_table_hgbp16_sec": 0.204990,
+      "current_old_hgbp16_sec": 0.200173,
+      "current_hgbp1_sec": 0.2691748,
+      "current_hgbp16_sec": 0.1266065,
+      "old_equivalent_hgbp1_sec": 0.275652272044681,
+      "old_equivalent_hgbp16_sec": 0.129653182172421
+    },
+    "M3500": {
+      "old_table_hgbp16_sec": 0.427617,
+      "current_old_hgbp16_sec": 0.4185648,
+      "current_hgbp1_sec": 0.7061989,
+      "current_hgbp16_sec": 0.2763522,
+      "old_equivalent_hgbp1_sec": 0.721471693322754,
+      "old_equivalent_hgbp16_sec": 0.282328802391888
+    },
+    "ParkingGarage": {
+      "old_table_hgbp16_sec": 1.908245,
+      "current_old_hgbp16_sec": 1.8136105,
+      "current_hgbp1_sec": 6.0480039,
+      "current_hgbp16_sec": 1.7563537,
+      "old_equivalent_hgbp1_sec": 6.36358975764394,
+      "old_equivalent_hgbp16_sec": 1.84800053057506
+    },
+    "Sphere": {
+      "old_table_hgbp16_sec": 1.476121,
+      "current_old_hgbp16_sec": 0.9796344,
+      "current_hgbp1_sec": 2.86941,
+      "current_hgbp16_sec": 1.0015342,
+      "old_equivalent_hgbp1_sec": 4.3236500868181,
+      "old_equivalent_hgbp16_sec": 1.50911979493391
+    },
+    "Cubicle": {
+      "old_table_hgbp16_sec": 5.263111,
+      "current_old_hgbp16_sec": 5.0912031,
+      "current_hgbp1_sec": 19.1678319,
+      "current_hgbp16_sec": 4.7728609,
+      "old_equivalent_hgbp1_sec": 19.8150466476266,
+      "old_equivalent_hgbp16_sec": 4.93401976131337
+    },
+    "Grid": {
+      "old_table_hgbp16_sec": 5.225579,
+      "current_old_hgbp16_sec": 4.7921579,
+      "current_hgbp1_sec": 15.0759708,
+      "current_hgbp16_sec": 4.3335085,
+      "old_equivalent_hgbp1_sec": 16.43949929469,
+      "old_equivalent_hgbp16_sec": 4.7254475930189
+    },
+    "Globe10k": {
+      "old_table_hgbp16_sec": 8.121072,
+      "current_old_hgbp16_sec": 7.4980551,
+      "current_hgbp1_sec": 16.9271467,
+      "current_hgbp16_sec": 7.0756945,
+      "old_equivalent_hgbp1_sec": 18.3336312246175,
+      "old_equivalent_hgbp16_sec": 7.66361726049519
+    },
+    "Globe100k": {
+      "old_table_hgbp16_sec": 71.313966,
+      "current_old_hgbp16_sec": 69.8880395,
+      "current_hgbp1_sec": 161.4458456,
+      "current_hgbp16_sec": 53.4038264,
+      "old_equivalent_hgbp1_sec": 164.739827105318,
+      "old_equivalent_hgbp16_sec": 54.4934253043327
+    }
+  }
+}

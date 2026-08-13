@@ -1,6 +1,0 @@
-set(CMAKE_RC_COMPILER "C:/Users/27118/AppData/Local/vcpkg/downloads/tools/msys2/b2ad05bc5351fe51/mingw64/bin/windres.exe")
-set(CMAKE_RC_COMPILER_ARG1 "")
-set(CMAKE_RC_COMPILER_LOADED 1)
-set(CMAKE_RC_SOURCE_FILE_EXTENSIONS rc;RC)
-set(CMAKE_RC_OUTPUT_EXTENSION .obj)
-set(CMAKE_RC_COMPILER_ENV_VAR "RC")

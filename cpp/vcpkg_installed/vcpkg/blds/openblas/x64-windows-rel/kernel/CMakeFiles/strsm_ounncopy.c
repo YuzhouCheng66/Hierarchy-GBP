@@ -1,8 +1,0 @@
-#define OUTER
-#define ASMNAME _strsm_ounncopy
-#define ASMFNAME _strsm_ounncopy_
-#define NAME strsm_ounncopy_
-#define CNAME strsm_ounncopy
-#define CHAR_NAME "strsm_ounncopy_"
-#define CHAR_CNAME "strsm_ounncopy"
-#include "C:/Users/27118/Desktop/Imperial/abstraction-recovery/cpp/vcpkg_installed/vcpkg/blds/openblas/src/v0.3.29-abfa9cf6a4.clean/kernel/generic/trsm_uncopy_2.c"

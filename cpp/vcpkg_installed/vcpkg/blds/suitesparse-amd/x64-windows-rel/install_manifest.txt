@@ -1,7 +1,0 @@
-C:/Users/27118/Desktop/Imperial/abstraction-recovery/cpp/vcpkg_installed/vcpkg/pkgs/suitesparse-amd_x64-windows/lib/amd.lib
-C:/Users/27118/Desktop/Imperial/abstraction-recovery/cpp/vcpkg_installed/vcpkg/pkgs/suitesparse-amd_x64-windows/bin/amd.dll
-C:/Users/27118/Desktop/Imperial/abstraction-recovery/cpp/vcpkg_installed/vcpkg/pkgs/suitesparse-amd_x64-windows/include/suitesparse/amd.h
-C:/Users/27118/Desktop/Imperial/abstraction-recovery/cpp/vcpkg_installed/vcpkg/pkgs/suitesparse-amd_x64-windows/lib/cmake/AMD/AMDTargets.cmake
-C:/Users/27118/Desktop/Imperial/abstraction-recovery/cpp/vcpkg_installed/vcpkg/pkgs/suitesparse-amd_x64-windows/lib/cmake/AMD/AMDTargets-release.cmake
-C:/Users/27118/Desktop/Imperial/abstraction-recovery/cpp/vcpkg_installed/vcpkg/pkgs/suitesparse-amd_x64-windows/lib/cmake/AMD/AMDConfig.cmake
-C:/Users/27118/Desktop/Imperial/abstraction-recovery/cpp/vcpkg_installed/vcpkg/pkgs/suitesparse-amd_x64-windows/lib/cmake/AMD/AMDConfigVersion.cmake

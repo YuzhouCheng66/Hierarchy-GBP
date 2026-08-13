@@ -1,0 +1,220 @@
+{
+  "schema_version": 1,
+  "roots": {
+    "pgo": {
+      "environment": "HGBP_PGO_DATA_ROOT",
+      "default": "data\\pgo"
+    },
+    "ba": {
+      "environment": "HGBP_BA_DATA_ROOT",
+      "default": "data\\ba"
+    },
+    "rootba_runtime": {
+      "environment": "HGBP_ROOTBA_RUNTIME",
+      "default": "third_party\\rootba\\conda_env"
+    }
+  },
+  "datasets": {
+    "FR079": {
+      "suite": "pgo",
+      "space": "SE2",
+      "path": "FR079.g2o",
+      "nodes": 989,
+      "factors": 1217,
+      "sha256": "e9e0a83d45cdf9ebb55f1fdbd137999dc8f176b7ada98194cf71f62b35d4a62f",
+      "preprocessing": "TORO EDGE2 converted to g2o EDGE_SE2 information order"
+    },
+    "FRH": {
+      "suite": "pgo",
+      "space": "SE2",
+      "path": "FRH.g2o",
+      "nodes": 1316,
+      "factors": 2820,
+      "sha256": "7643e97c77bb5f7be9bb00f518fb46f09c57234e0c150aca2e4a8e522396343c",
+      "preprocessing": "TORO EDGE2 converted to g2o EDGE_SE2 information order"
+    },
+    "M3500": {
+      "suite": "pgo",
+      "space": "SE2",
+      "path": "M3500.g2o",
+      "nodes": 3500,
+      "factors": 5453,
+      "sha256": "1883593980e602b11bd0ba95799c969e59ee8a6892bdb2a3a48f495459efe9d8",
+      "preprocessing": "none"
+    },
+    "ParkingGarage": {
+      "suite": "pgo",
+      "space": "SE3",
+      "path": "ParkingGarage.g2o",
+      "nodes": 1661,
+      "factors": 6275,
+      "sha256": "3ac0a31bfb601d7455d451e2546655cb5dececf51a7823f57c8a7e0fe1ca6527",
+      "preprocessing": "none"
+    },
+    "Sphere": {
+      "suite": "pgo",
+      "space": "SE3",
+      "path": "Sphere.g2o",
+      "nodes": 2500,
+      "factors": 4949,
+      "sha256": "104ab57593394f24351d9f692f3b923f8b98fff1eb638c64356cf5049e06cf3c",
+      "preprocessing": "none"
+    },
+    "Cubicle": {
+      "suite": "pgo",
+      "space": "SE3",
+      "path": "Cubicle.g2o",
+      "nodes": 5750,
+      "factors": 16869,
+      "sha256": "f3965db26b97ff860e0dbcecd790495629324abc971f5e2dc89dff33b8bf6539",
+      "preprocessing": "offline eigendecomposition of every 6x6 information matrix; eigenvalues floored at 1"
+    },
+    "Grid": {
+      "suite": "pgo",
+      "space": "SE3",
+      "path": "Grid.g2o",
+      "nodes": 8000,
+      "factors": 22236,
+      "sha256": "f5dd7a17bf8b9c39890b14f9bb0c1e8366a7490f01714e43e3bc03f52cf414e7",
+      "preprocessing": "none"
+    },
+    "Globe10k": {
+      "suite": "pgo",
+      "space": "SE3",
+      "path": "Globe10k.g2o",
+      "nodes": 10000,
+      "factors": 20899,
+      "sha256": "3f0b6f2747a1cfbee82500f707c7000b8d404e2cd76e057f5184c94236749c52",
+      "preprocessing": "measurements preserved; odometry ordered first; initial poses rebuilt by odometry integration"
+    },
+    "Globe100k": {
+      "suite": "pgo",
+      "space": "SE3",
+      "path": "Globe100k.g2o",
+      "nodes": 99856,
+      "factors": 200395,
+      "sha256": "86045ecc9355c0bf91b87b1dd82fe6391a216bf6baf6d2123f6cf3dad1a56b8d",
+      "preprocessing": "measurements preserved; odometry ordered first; initial poses rebuilt by odometry integration"
+    },
+    "Ladybug49": {
+      "suite": "ba",
+      "path": "ladybug\\problem-49-7776-pre.txt",
+      "cameras": 49,
+      "points": 7776,
+      "observations": 31843,
+      "bytes": 1785529,
+      "sha256": "96ca2845519d89d0727953d983427ab38a42c54991cd4d73e46a4221da3c61b4",
+      "preprocessing": "BAL pre file"
+    },
+    "Venice89": {
+      "suite": "ba",
+      "path": "venice\\problem-89-110973-pre.txt",
+      "cameras": 89,
+      "points": 110973,
+      "observations": 562976,
+      "bytes": 30229388,
+      "sha256": "a66fbb4e4c3c8fcd59a4842331734895517928b67f8bff41dd494e50abc46f33",
+      "preprocessing": "BAL pre file"
+    },
+    "Final93": {
+      "suite": "ba",
+      "path": "final\\problem-93-61203-pre.txt",
+      "cameras": 93,
+      "points": 61203,
+      "observations": 287451,
+      "bytes": 15665746,
+      "sha256": "90dda36d202d43221e4f8e3c969d1820e421b315cfe29f99159e5bcddf67436a",
+      "preprocessing": "BAL pre file"
+    },
+    "Ladybug138": {
+      "suite": "ba",
+      "path": "ladybug\\problem-138-19878-pre.txt",
+      "cameras": 138,
+      "points": 19878,
+      "observations": 85217,
+      "bytes": 4787841,
+      "sha256": "0921d835d31752af15cec103866535290cb40a9a7aa50102bda47c57ebd387f2",
+      "preprocessing": "BAL pre file"
+    },
+    "Trafalgar257": {
+      "suite": "ba",
+      "path": "trafalgar\\problem-257-65132-pre.txt",
+      "cameras": 257,
+      "points": 65132,
+      "observations": 225911,
+      "bytes": 13642939,
+      "sha256": "dbc87437328a3a94936584a49656f3f6f095d2df71eadd831a1885e482dbb90a",
+      "preprocessing": "BAL pre file"
+    },
+    "Dubrovnik356": {
+      "suite": "ba",
+      "path": "dubrovnik\\problem-356-226730-pre.txt",
+      "cameras": 356,
+      "points": 226730,
+      "observations": 1255268,
+      "bytes": 67607349,
+      "sha256": "c2d5dce6ebd8e11c3c7e42cab612b746a3a4aa91f3c5bc53e7aaef739ede9abd",
+      "preprocessing": "BAL pre file"
+    },
+    "Final394": {
+      "suite": "ba",
+      "path": "final\\problem-394-100368-pre.txt",
+      "cameras": 394,
+      "points": 100368,
+      "observations": 534408,
+      "bytes": 28794426,
+      "sha256": "bb0623bcc14fed2eecd7b4f3487d6b7b621981a36e88d9c2a5be3c520e46ea47",
+      "preprocessing": "BAL pre file"
+    },
+    "Ladybug1723": {
+      "suite": "ba",
+      "path": "ladybug\\problem-1723-156502-pre.txt",
+      "cameras": 1723,
+      "points": 156502,
+      "observations": 678718,
+      "bytes": 39527370,
+      "sha256": "a85156db95e9b55fa30831e2a10155243cfd34e830a0828760270be129e0b902",
+      "preprocessing": "BAL pre file"
+    },
+    "Venice1778": {
+      "suite": "ba",
+      "path": "venice\\problem-1778-993923-pre.txt",
+      "cameras": 1778,
+      "points": 993923,
+      "observations": 5001946,
+      "bytes": 280190302,
+      "sha256": "4f3f4d12f5872a8c593d35b60e00f447e1e1e5aee797445dfbb3f3e8e1b9b2a0",
+      "preprocessing": "BAL pre file"
+    },
+    "Final1936": {
+      "suite": "ba",
+      "path": "final\\problem-1936-649673-pre.txt",
+      "cameras": 1936,
+      "points": 649673,
+      "observations": 5213733,
+      "bytes": 262239363,
+      "sha256": "46e039c2a5f5715f48450ca74bce19bf4d1b26ac6daf2c14bf188508b0e39313",
+      "preprocessing": "BAL pre file"
+    },
+    "Final3068": {
+      "suite": "ba",
+      "path": "final\\problem-3068-310854-pre.txt",
+      "cameras": 3068,
+      "points": 310854,
+      "observations": 1653812,
+      "bytes": 90952578,
+      "sha256": "f6bd559b2e0316e177742ebf73bd5311766e8a40ccca2628bfe29cd5989de481",
+      "preprocessing": "BAL pre file"
+    },
+    "Final4585": {
+      "suite": "ba",
+      "path": "final\\problem-4585-1324582-pre.txt",
+      "cameras": 4585,
+      "points": 1324582,
+      "observations": 9125125,
+      "bytes": 483747054,
+      "sha256": "d5e0ea06a364d7a7b5b087ab3c9d53c97dbbcd6c7d3984b62428185e66b9dd54",
+      "preprocessing": "BAL pre file"
+    }
+  }
+}

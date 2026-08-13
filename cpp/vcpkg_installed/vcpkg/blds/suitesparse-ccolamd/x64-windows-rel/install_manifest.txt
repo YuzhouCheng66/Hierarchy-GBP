@@ -1,7 +1,0 @@
-C:/Users/27118/Desktop/Imperial/abstraction-recovery/cpp/vcpkg_installed/vcpkg/pkgs/suitesparse-ccolamd_x64-windows/lib/ccolamd.lib
-C:/Users/27118/Desktop/Imperial/abstraction-recovery/cpp/vcpkg_installed/vcpkg/pkgs/suitesparse-ccolamd_x64-windows/bin/ccolamd.dll
-C:/Users/27118/Desktop/Imperial/abstraction-recovery/cpp/vcpkg_installed/vcpkg/pkgs/suitesparse-ccolamd_x64-windows/include/suitesparse/ccolamd.h
-C:/Users/27118/Desktop/Imperial/abstraction-recovery/cpp/vcpkg_installed/vcpkg/pkgs/suitesparse-ccolamd_x64-windows/lib/cmake/CCOLAMD/CCOLAMDTargets.cmake
-C:/Users/27118/Desktop/Imperial/abstraction-recovery/cpp/vcpkg_installed/vcpkg/pkgs/suitesparse-ccolamd_x64-windows/lib/cmake/CCOLAMD/CCOLAMDTargets-release.cmake
-C:/Users/27118/Desktop/Imperial/abstraction-recovery/cpp/vcpkg_installed/vcpkg/pkgs/suitesparse-ccolamd_x64-windows/lib/cmake/CCOLAMD/CCOLAMDConfig.cmake
-C:/Users/27118/Desktop/Imperial/abstraction-recovery/cpp/vcpkg_installed/vcpkg/pkgs/suitesparse-ccolamd_x64-windows/lib/cmake/CCOLAMD/CCOLAMDConfigVersion.cmake

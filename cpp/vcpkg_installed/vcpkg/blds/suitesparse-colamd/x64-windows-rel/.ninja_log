@@ -1,7 +1,0 @@
-# ninja log v6
-14	95	7903602000437138	CMakeFiles/COLAMD.dir/Source/colamd_version.c.obj	1867616b7e6eac28
-12	194	7903602000407135	CMakeFiles/COLAMD.dir/Source/colamd_l.c.obj	42d0ffa85eef37cd
-8	208	7903602000373140	CMakeFiles/COLAMD.dir/Source/colamd.c.obj	5a6320e83781afb8
-208	399	7903602004051084	colamd.dll	fd50f7f30144c943
-208	399	7903602004051084	colamd.lib	fd50f7f30144c943
-399	511	7903602004218428	CMakeFiles/install.util	f1be7638b788fc63

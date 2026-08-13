@@ -1,6 +1,0 @@
-CRTLinkage: dynamic
-LibraryLinkage: dynamic
-PolicyDLLsWithoutLIBs: enabled
-PolicyAllowObsoleteMsvcrt: enabled
-PolicyEmptyIncludeFolder: enabled
-PolicySkipDumpbinChecks: enabled

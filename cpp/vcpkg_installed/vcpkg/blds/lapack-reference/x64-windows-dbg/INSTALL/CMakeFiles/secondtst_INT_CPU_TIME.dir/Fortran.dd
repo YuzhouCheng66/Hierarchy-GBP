@@ -1,5 +1,0 @@
-ninja_dyndep_version = 1.0
-build CMakeFiles//secondtst_INT_CPU_TIME.dir//second_INT_CPU_TIME.f.obj: dyndep
-
-build CMakeFiles//secondtst_INT_CPU_TIME.dir//secondtst.f.obj: dyndep
-

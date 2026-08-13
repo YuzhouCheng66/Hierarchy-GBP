@@ -1,7 +1,0 @@
-ninja_dyndep_version = 1.0
-build SRC//CMakeFiles//mod_files.dir//la_xisnan.F90.obj | SRC/la_xisnan.mod: dyndep | SRC/la_constants.mod
-  restat = 1
-
-build SRC//CMakeFiles//mod_files.dir//la_constants.f90.obj | SRC/la_constants.mod: dyndep
-  restat = 1
-

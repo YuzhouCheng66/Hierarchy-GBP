@@ -1,4 +1,0 @@
-actual_outer,start_objective,selected_objective,gap_to_direct_optimum,accepted,status,selected_c,selected_k,selected_beta,selected_ck_cost,improvement
-0,3350168.410825497,3350168.410825497,3350060.491764923,True,initial,,,,,
-1,3350168.410825497,2914639.230668818,2914531.311608244,True,accepted,2,100,0.1,200,435529.1801566789
-2,2914639.230668818,2394531.020929354,2394423.10186878,True,accepted,2,100,0.1,200,520108.20973946434

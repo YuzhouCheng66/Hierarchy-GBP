@@ -1,9 +1,0 @@
-#define USE_ABS
-#define ASMNAME _icamax
-#define ASMFNAME _icamax_
-#define NAME icamax_
-#define CNAME icamax
-#define CHAR_NAME "icamax_"
-#define CHAR_CNAME "icamax"
-#define COMPLEX
-#include "C:/Users/27118/Desktop/Imperial/abstraction-recovery/cpp/vcpkg_installed/vcpkg/blds/openblas/src/v0.3.29-abfa9cf6a4.clean/interface/imax.c"

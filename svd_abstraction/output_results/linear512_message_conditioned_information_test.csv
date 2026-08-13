@@ -1,3 +1,0 @@
-case,basis_source,full_dim,coarse_dim,compression_ratio,proj_rel,build_time_sec,lam_warmup_sweeps,lam_final_delta
-linear512_fixed_residual,message_conditioned_information_initial,1024,100,0.09765625,0.082510972756776,0.007784843444824219,0,nan
-linear512_fixed_residual,message_conditioned_information_lam_converged,1024,100,0.09765625,0.594881461981763,0.007848024368286133,127,8.19513323868648e-09

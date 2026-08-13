@@ -1,6 +1,0 @@
-case,basis_source,full_dim,coarse_dim,compression_ratio,proj_rel
-synthetic_se2_n64,joint_covariance,192,12,0.0625,0.16992428373989524
-synthetic_se2_n64,joint_information,192,12,0.0625,0.6595926136328081
-synthetic_se2_n512,joint_covariance,1536,100,0.06510416666666667,0.030175640955456693
-synthetic_se2_n512,joint_information,1536,100,0.06510416666666667,0.629721426762239
-intel_se2_initial,joint_information,3684,244,0.06623235613463627,0.586915747077848

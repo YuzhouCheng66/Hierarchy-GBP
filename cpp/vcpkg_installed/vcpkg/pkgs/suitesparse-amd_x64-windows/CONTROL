@@ -1,7 +1,0 @@
-Package: suitesparse-amd
-Version: 3.3.3
-Depends: suitesparse-config, vcpkg-cmake, vcpkg-cmake-config
-Architecture: x64-windows
-Multi-Arch: same
-Abi: 54c05f3557fe83eb2d4d318128744dfb18e0f05a09f0464b0e1a537e68c74d50
-Description: AMD: Routines for permuting sparse matrices prior to factorization in SuiteSparse

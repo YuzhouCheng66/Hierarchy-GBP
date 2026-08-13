@@ -1,6 +1,0 @@
-case,basis_source,full_dim,coarse_dim,compression_ratio,proj_rel,build_time_sec,patch_hops,mean_patch_vars,max_patch_vars,min_patch_vars,mean_patch_dofs,max_patch_dofs,min_patch_dofs
-linear512_fixed_residual,patch_schur_h0,1024,100,0.09765625,0.6557595945002256,0.004950046539306641,0,20.48,32,20,40.96,64,40
-linear512_fixed_residual,patch_schur_h1,1024,100,0.09765625,0.5550421631270571,0.21534466743469238,1,45.48,68,21,90.96,136,42
-linear512_fixed_residual,patch_schur_h2,1024,100,0.09765625,0.4320834301177961,0.0979621410369873,2,92.76,158,22,185.52,316,44
-linear512_fixed_residual,patch_schur_h3,1024,100,0.09765625,0.3220393622141235,0.14020180702209473,3,134.68,218,23,269.36,436,46
-linear512_fixed_residual,patch_schur_h4,1024,100,0.09765625,0.2659531313161208,0.743027925491333,4,165.76,256,25,331.52,512,50

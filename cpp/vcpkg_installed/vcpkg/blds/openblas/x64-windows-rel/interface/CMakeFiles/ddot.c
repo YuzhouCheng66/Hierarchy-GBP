@@ -1,8 +1,0 @@
-#define ASMNAME _ddot
-#define ASMFNAME _ddot_
-#define NAME ddot_
-#define CNAME ddot
-#define CHAR_NAME "ddot_"
-#define CHAR_CNAME "ddot"
-#define DOUBLE
-#include "C:/Users/27118/Desktop/Imperial/abstraction-recovery/cpp/vcpkg_installed/vcpkg/blds/openblas/src/v0.3.29-abfa9cf6a4.clean/interface/dot.c"

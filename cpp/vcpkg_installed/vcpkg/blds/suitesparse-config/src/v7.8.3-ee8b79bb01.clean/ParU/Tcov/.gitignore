@@ -1,7 +1,0 @@
-# Ignore these files:
-*.o
-*.out
-paru_brutal_test
-paru_c_test
-paru_quick_test
-*out.txt

@@ -1,0 +1,67 @@
+% Each entry is computation time [s] / final cost.
+% H-GBP-1 times use the same per-dataset calibration as H-GBP-16:
+% old-equivalent H-GBP-1 = table H-GBP-16 * current H-GBP-1 / current H-GBP-16.
+{\scriptsize\setlength{\tabcolsep}{2pt}
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 12\tabcolsep) * \real{0.1300}}
+  >{\raggedleft\arraybackslash}p{(\columnwidth - 12\tabcolsep) * \real{0.1450}}
+  >{\raggedleft\arraybackslash}p{(\columnwidth - 12\tabcolsep) * \real{0.1450}}
+  >{\raggedleft\arraybackslash}p{(\columnwidth - 12\tabcolsep) * \real{0.1450}}
+  >{\raggedleft\arraybackslash}p{(\columnwidth - 12\tabcolsep) * \real{0.1450}}
+  >{\raggedleft\arraybackslash}p{(\columnwidth - 12\tabcolsep) * \real{0.1450}}
+  >{\raggedleft\arraybackslash}p{(\columnwidth - 12\tabcolsep) * \real{0.1450}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Dataset
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
+Ceres Sparse-16
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
+Ceres Iterative-16
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
+H-GBP-1
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
+RootBA-QR-16
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
+PowerBA-16
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
+H-GBP-16
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+Ladybug49 & 0.297/\newline 26,690.470 & 0.476/\newline 26,691.212 &
+0.164/\newline 26,942.349 & 0.587/\newline 26,691.016 &
+0.215/\newline 27,299.285 & 0.080/\newline 26,942.349 \\
+Venice89 & 5.148/\newline 567,243.004 & 4.264/\newline 567,054.687 &
+2.051/\newline 580,007.058 & 5.592/\newline 572,780.312 &
+1.765/\newline 580,415.984 & 0.538/\newline 580,007.058 \\
+Final93 & 2.172/\newline 291,090.128 & 3.199/\newline 291,090.128 &
+1.306/\newline 291,102.495 & 6.174/\newline 291,090.128 &
+1.811/\newline 291,159.258 & 0.322/\newline 291,102.495 \\
+Trafalgar257 & 2.283/\newline 193,577.290 & 10.771/\newline 193,865.457 &
+1.024/\newline 201,643.286 & 28.039/\newline 193,575.721 &
+1.014/\newline 205,426.616 & 0.304/\newline 201,643.286 \\
+Dubrovnik356 & 13.513/\newline 987,859.387 & 53.479/\newline 987,859.381 &
+7.671/\newline 1,040,079.485 & 116.614/\newline 987,898.693 &
+3.424/\newline 1,059,445.986 & 1.170/\newline 1,040,079.485 \\
+Final394 & 8.479/\newline 596,506.230 & 7.440/\newline 596,536.292 &
+3.719/\newline 603,152.715 & 29.026/\newline 596,577.758 &
+2.160/\newline 611,100.526 & 0.739/\newline 603,152.776 \\
+Ladybug1723 & 16.934/\newline 778,095.470 & 4.527/\newline 770,443.913 &
+3.086/\newline 771,223.262 & 10.350/\newline 763,070.408 &
+2.234/\newline 797,704.285 & 0.755/\newline 771,223.392 \\
+Venice1778 & 78.035/\newline 3,277,386.555 &
+30.633/\newline 6,932,820.914 & 37.340/\newline 3,390,248.697 &
+99.357/\newline 3,369,975.534 & 17.867/\newline 3,391,088.939 &
+4.764/\newline 3,390,248.697 \\
+Final3068 & 164.855/\newline 3,348,655.262 &
+11.747/\newline 3,452,710.683 & 9.960/\newline 3,496,404.581 &
+122.502/\newline 3,254,156.221 & 5.074/\newline 3,520,615.186 &
+1.439/\newline 3,496,404.585 \\
+Final4585 & 799.854/\newline 10,783,988.224 &
+64.693/\newline 13,021,323.891 & 53.361/\newline 10,447,354.890 &
+701.034/\newline 10,243,014.887 & 28.564/\newline 10,441,192.281 &
+6.391/\newline 10,447,354.890 \\
+\end{longtable}
+}

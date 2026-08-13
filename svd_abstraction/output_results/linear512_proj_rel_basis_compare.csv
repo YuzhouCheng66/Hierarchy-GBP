@@ -1,6 +1,0 @@
-case,basis_source,full_dim,coarse_dim,compression_ratio,proj_rel,build_time_sec
-linear512_fixed_residual,joint_covariance,1024,100,0.09765625,0.09583173614973987,0.02572488784790039
-linear512_fixed_residual,joint_information,1024,100,0.09765625,0.6557595945002256,0.00215911865234375
-linear512_fixed_residual,local_sub_covariance,1024,100,0.09765625,0.6557595945002256,0.0031566619873046875
-linear512_fixed_residual,local_sub_information,1024,100,0.09765625,0.6557595945002256,0.0020067691802978516
-linear512_fixed_residual,local_boundary_modes,1024,96,0.09375,0.5612475936533015,0.005120992660522461

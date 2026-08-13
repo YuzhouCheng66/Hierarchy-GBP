@@ -1,3 +1,0 @@
-case,basis_source,seconds,full_dim,coarse_dim,proj_rel
-intel_initial_residual,joint_information,0.02916574478149414,3684,244,0.586915747077848
-intel_initial_residual,joint_covariance,2.7090377807617188,3684,244,0.06286898909896964

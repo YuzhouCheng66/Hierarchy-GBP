@@ -1,0 +1,80 @@
+{
+  "description": "H-GBP-1 times normalized to the machine state used by the existing BA table",
+  "formula": "table_hgbp1 = table_hgbp16 * current_hgbp1_median / current_hgbp16_representative",
+  "thread_scope": {
+    "hgbp1": "build_threads=1, gbp_threads=1, TBB/OpenMP/BLAS capped at 1",
+    "hgbp16": "per-dataset build_threads capped at 16, gbp_threads=16, TBB/OpenMP/BLAS capped at 16"
+  },
+  "datasets": {
+    "Ladybug49": {
+      "current_hgbp1_median_sec": 0.2070224,
+      "current_hgbp16_representative_sec": 0.1008666,
+      "hgbp1_over_hgbp16": 2.052438,
+      "table_hgbp16_sec": 0.080,
+      "table_hgbp1_sec": 0.164195
+    },
+    "Venice89": {
+      "current_hgbp1_median_sec": 2.0415066,
+      "current_hgbp16_representative_sec": 0.5355437,
+      "hgbp1_over_hgbp16": 3.812026,
+      "table_hgbp16_sec": 0.538,
+      "table_hgbp1_sec": 2.050870
+    },
+    "Final93": {
+      "current_hgbp1_median_sec": 1.329496,
+      "current_hgbp16_representative_sec": 0.3277261,
+      "hgbp1_over_hgbp16": 4.056729,
+      "table_hgbp16_sec": 0.322,
+      "table_hgbp1_sec": 1.306267
+    },
+    "Trafalgar257": {
+      "current_hgbp1_median_sec": 1.0828575,
+      "current_hgbp16_representative_sec": 0.3215477,
+      "hgbp1_over_hgbp16": 3.367642,
+      "table_hgbp16_sec": 0.304,
+      "table_hgbp1_sec": 1.023763
+    },
+    "Dubrovnik356": {
+      "current_hgbp1_median_sec": 8.417697,
+      "current_hgbp16_representative_sec": 1.2839004,
+      "hgbp1_over_hgbp16": 6.556347,
+      "table_hgbp16_sec": 1.170,
+      "table_hgbp1_sec": 7.670926
+    },
+    "Final394": {
+      "current_hgbp1_median_sec": 3.8490986,
+      "current_hgbp16_representative_sec": 0.764902,
+      "hgbp1_over_hgbp16": 5.032146,
+      "table_hgbp16_sec": 0.739,
+      "table_hgbp1_sec": 3.718756
+    },
+    "Ladybug1723": {
+      "current_hgbp1_median_sec": 3.0751105,
+      "current_hgbp16_representative_sec": 0.752244,
+      "hgbp1_over_hgbp16": 4.087916,
+      "table_hgbp16_sec": 0.755,
+      "table_hgbp1_sec": 3.086377
+    },
+    "Venice1778": {
+      "current_hgbp1_median_sec": 37.8178095,
+      "current_hgbp16_representative_sec": 4.8249114,
+      "hgbp1_over_hgbp16": 7.838032,
+      "table_hgbp16_sec": 4.764,
+      "table_hgbp1_sec": 37.340384
+    },
+    "Final3068": {
+      "current_hgbp1_median_sec": 10.763374,
+      "current_hgbp16_representative_sec": 1.5551317,
+      "hgbp1_over_hgbp16": 6.921198,
+      "table_hgbp16_sec": 1.439,
+      "table_hgbp1_sec": 9.959604
+    },
+    "Final4585": {
+      "current_hgbp1_median_sec": 51.2433636,
+      "current_hgbp16_representative_sec": 6.137337,
+      "hgbp1_over_hgbp16": 8.349446,
+      "table_hgbp16_sec": 6.391,
+      "table_hgbp1_sec": 53.361309
+    }
+  }
+}
