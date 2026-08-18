@@ -18,6 +18,7 @@ reproduction metadata.
 - `configs/ba.json`: all formal BA parameters and reference results.
 - `configs/datasets.json`: input paths, dimensions, preprocessing, and SHA-256.
 - `scripts/run_benchmarks.py`: the only formal reproduction driver.
+- `scripts/datasets/README.md`: exact Globe10k/Globe100k generation commands.
 
 Dataset-specific choices live in JSON rather than filename checks or
 dataset-specific branches in C++.

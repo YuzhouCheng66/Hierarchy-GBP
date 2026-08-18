@@ -85,7 +85,7 @@
       "nodes": 10000,
       "factors": 20899,
       "sha256": "3f0b6f2747a1cfbee82500f707c7000b8d404e2cd76e057f5184c94236749c52",
-      "preprocessing": "measurements preserved; odometry ordered first; initial poses rebuilt by odometry integration"
+      "preprocessing": "synthetic 100x100 globe grid; medium-chord loops; smooth-distortion initialization; seed 7"
     },
     "Globe100k": {
       "suite": "pgo",
@@ -94,7 +94,7 @@
       "nodes": 99856,
       "factors": 200395,
       "sha256": "86045ecc9355c0bf91b87b1dd82fe6391a216bf6baf6d2123f6cf3dad1a56b8d",
-      "preprocessing": "measurements preserved; odometry ordered first; initial poses rebuilt by odometry integration"
+      "preprocessing": "synthetic 316x316 globe grid; local-diagonal loops; smooth-distortion initialization; seed 7"
     },
     "Ladybug49": {
       "suite": "ba",
