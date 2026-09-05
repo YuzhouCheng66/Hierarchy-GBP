@@ -10,13 +10,16 @@
 namespace {
 
 struct HGBPConfig {
-    int full_lambda_outers = 1;
     int min_pair_observations = 1;
+    double pair_backbone_min_coverage = 0.9;
     int pair_sample_cap = 0;
     bool pair_sample_rescale = true;
     bool unreduced_unary = false;
     bool no_pose_scaling = false;
     double initial_lambda = 1e-4;
+    double pair_factor_scale = 0.3;
+    int krylov_start_outer = 1;
+    bool use_jacobi_smoother = false;
 };
 
 HGBPConfig parseHGBPConfig(
@@ -32,19 +35,12 @@ HGBPConfig parseHGBPConfig(
         const std::string arg = argv[i];
         if (arg == "--initial-lambda" && i + 1 < argc) {
             parseDouble(argv[++i], config.initial_lambda);
-        } else if (arg == "--exact-refinement-policy" &&
-                   i + 1 < argc) {
-            const std::string policy = argv[++i];
-            if (policy != "cost-first") {
-                throw std::runtime_error(
-                    "--exact-refinement-policy must be cost-first");
-            }
-        } else if (arg == "--full-lambda-outers" &&
-                   i + 1 < argc) {
-            parseInt(argv[++i], config.full_lambda_outers);
         } else if (arg == "--min-pair-observations" &&
                    i + 1 < argc) {
             parseInt(argv[++i], config.min_pair_observations);
+        } else if (arg == "--pair-backbone-min-coverage" &&
+                   i + 1 < argc) {
+            parseDouble(argv[++i], config.pair_backbone_min_coverage);
         } else if (arg == "--pair-sample-cap" && i + 1 < argc) {
             parseInt(argv[++i], config.pair_sample_cap);
         } else if (arg == "--pair-sample-no-rescale") {
@@ -53,6 +49,20 @@ HGBPConfig parseHGBPConfig(
             config.unreduced_unary = true;
         } else if (arg == "--no-pose-scaling") {
             config.no_pose_scaling = true;
+        } else if (arg == "--pair-factor-scale" && i + 1 < argc) {
+            parseDouble(argv[++i], config.pair_factor_scale);
+        } else if (arg == "--krylov-start-outer" && i + 1 < argc) {
+            parseInt(argv[++i], config.krylov_start_outer);
+        } else if (arg == "--fine-smoother" && i + 1 < argc) {
+            const std::string smoother = argv[++i];
+            if (smoother == "gbp") {
+                config.use_jacobi_smoother = false;
+            } else if (smoother == "jacobi") {
+                config.use_jacobi_smoother = true;
+            } else {
+                throw std::runtime_error(
+                    "--fine-smoother must be gbp or jacobi");
+            }
         } else if (arg == "--help" || arg == "-h") {
             std::cout
                 << "Usage: ba_solver --problem-file <BAL.txt> "
@@ -61,8 +71,11 @@ HGBPConfig parseHGBPConfig(
                    "--gbp-full-sweeps K\n"
                 << "  --group-size G --build-threads T "
                    "--gbp-threads T --message-damping X\n"
-                << "  --initial-lambda X --full-lambda-outers N\n"
+                << "  --initial-lambda X --pair-factor-scale X\n"
                 << "  --min-pair-observations N --pair-sample-cap N\n"
+                << "  --pair-backbone-min-coverage X "
+                   "--krylov-start-outer N\n"
+                << "  --fine-smoother gbp|jacobi\n"
                 << "  [--pair-sample-no-rescale] [--unreduced-unary] "
                    "[--no-pose-scaling]\n";
             std::exit(0);
@@ -70,14 +83,18 @@ HGBPConfig parseHGBPConfig(
             filtered_storage.push_back(arg);
         }
     }
-    config.full_lambda_outers =
-        std::max(0, config.full_lambda_outers);
     config.min_pair_observations =
         std::max(1, config.min_pair_observations);
+    config.pair_backbone_min_coverage = std::clamp(
+        config.pair_backbone_min_coverage, 0.0, 1.0);
     config.pair_sample_cap =
         std::max(0, config.pair_sample_cap);
     config.initial_lambda =
         std::max(1e-16, config.initial_lambda);
+    config.pair_factor_scale =
+        std::max(1e-16, config.pair_factor_scale);
+    config.krylov_start_outer =
+        std::max(1, config.krylov_start_outer);
     filtered_argv.reserve(filtered_storage.size());
     for (std::string& arg : filtered_storage) {
         filtered_argv.push_back(arg.data());
@@ -135,6 +152,12 @@ struct RootHGBPBuildPlan {
 struct RootHGBPTopology {
     PackedBlockSchurPattern pattern;
     RootHGBPBuildPlan build_plan;
+    int strong_camera_pairs = 0;
+    int strong_active_cameras = 0;
+    int selected_active_cameras = 0;
+    int selected_components = 0;
+    int selected_largest_component = 0;
+    bool spanning_backbone_used = false;
 };
 
 void compactRootPairEdges(
@@ -161,6 +184,7 @@ RootHGBPTopology buildRootHGBPTopology(
     const BALProblem& problem,
     const RootProblem& root_problem,
     int min_pair_observations,
+    double pair_backbone_min_coverage,
     int requested_threads
 ) {
     const auto t0 = Clock::now();
@@ -278,17 +302,173 @@ RootHGBPTopology buildRootHGBPTopology(
     }
     pair_count_by_thread.clear();
 
+    std::vector<unsigned char> strong_active(static_cast<size_t>(n), 0);
+    for (int row = 0; row < n; ++row) {
+        const size_t base =
+            static_cast<size_t>(row) * static_cast<size_t>(n);
+        for (int col = row + 1; col < n; ++col) {
+            if (pair_count[base + static_cast<size_t>(col)] >=
+                min_pair_observations) {
+                ++topology.strong_camera_pairs;
+                strong_active[static_cast<size_t>(row)] = 1;
+                strong_active[static_cast<size_t>(col)] = 1;
+            }
+        }
+    }
+    topology.strong_active_cameras = static_cast<int>(std::count(
+        strong_active.begin(), strong_active.end(),
+        static_cast<unsigned char>(1)));
+    const double strong_coverage = n > 0
+        ? static_cast<double>(topology.strong_active_cameras) /
+              static_cast<double>(n)
+        : 1.0;
+    topology.spanning_backbone_used =
+        pair_backbone_min_coverage > 0.0 &&
+        strong_coverage < pair_backbone_min_coverage;
+
+    std::vector<unsigned char> selected_pair;
+    if (topology.spanning_backbone_used) {
+        selected_pair.assign(dense_size, 0);
+        for (int row = 0; row < n; ++row) {
+            const size_t base =
+                static_cast<size_t>(row) * static_cast<size_t>(n);
+            selected_pair[base + static_cast<size_t>(row)] = 1;
+            for (int col = row + 1; col < n; ++col) {
+                if (pair_count[base + static_cast<size_t>(col)] >=
+                    min_pair_observations) {
+                    selected_pair[base + static_cast<size_t>(col)] = 1;
+                    selected_pair[
+                        static_cast<size_t>(col) * static_cast<size_t>(n) +
+                        static_cast<size_t>(row)] = 1;
+                }
+            }
+        }
+
+        // Preserve a strongest path through every covisibility component
+        // while adding only O(num_cameras) pair factors.
+        std::vector<int> best_weight(static_cast<size_t>(n), 0);
+        std::vector<int> parent(static_cast<size_t>(n), -1);
+        std::vector<unsigned char> in_forest(static_cast<size_t>(n), 0);
+        int inserted = 0;
+        while (inserted < n) {
+            int vertex = -1;
+            int weight = 0;
+            for (int camera = 0; camera < n; ++camera) {
+                if (!in_forest[static_cast<size_t>(camera)] &&
+                    best_weight[static_cast<size_t>(camera)] > weight) {
+                    vertex = camera;
+                    weight = best_weight[static_cast<size_t>(camera)];
+                }
+            }
+            if (vertex < 0) {
+                for (int camera = 0; camera < n; ++camera) {
+                    if (!in_forest[static_cast<size_t>(camera)]) {
+                        vertex = camera;
+                        break;
+                    }
+                }
+            }
+            if (vertex < 0) {
+                break;
+            }
+            in_forest[static_cast<size_t>(vertex)] = 1;
+            ++inserted;
+            const int predecessor = parent[static_cast<size_t>(vertex)];
+            if (predecessor >= 0) {
+                selected_pair[
+                    static_cast<size_t>(vertex) * static_cast<size_t>(n) +
+                    static_cast<size_t>(predecessor)] = 1;
+                selected_pair[
+                    static_cast<size_t>(predecessor) * static_cast<size_t>(n) +
+                    static_cast<size_t>(vertex)] = 1;
+            }
+            const size_t base =
+                static_cast<size_t>(vertex) * static_cast<size_t>(n);
+            for (int neighbor = 0; neighbor < n; ++neighbor) {
+                if (in_forest[static_cast<size_t>(neighbor)]) {
+                    continue;
+                }
+                const int candidate =
+                    pair_count[base + static_cast<size_t>(neighbor)];
+                if (candidate > best_weight[static_cast<size_t>(neighbor)]) {
+                    best_weight[static_cast<size_t>(neighbor)] = candidate;
+                    parent[static_cast<size_t>(neighbor)] = vertex;
+                }
+            }
+        }
+    }
+
+    auto pair_is_selected = [&](int row, int col) {
+        if (row == col) {
+            return true;
+        }
+        const size_t dense_index =
+            static_cast<size_t>(row) * static_cast<size_t>(n) +
+            static_cast<size_t>(col);
+        return topology.spanning_backbone_used
+            ? selected_pair[dense_index] != 0
+            : pair_count[dense_index] >= min_pair_observations;
+    };
+
+    std::vector<int> component_parent(static_cast<size_t>(n));
+    std::vector<int> component_size(static_cast<size_t>(n), 1);
+    std::vector<int> selected_degree(static_cast<size_t>(n), 0);
+    std::iota(component_parent.begin(), component_parent.end(), 0);
+    auto find_component = [&](int vertex) {
+        int root = vertex;
+        while (component_parent[static_cast<size_t>(root)] != root) {
+            root = component_parent[static_cast<size_t>(root)];
+        }
+        while (component_parent[static_cast<size_t>(vertex)] != vertex) {
+            const int next = component_parent[static_cast<size_t>(vertex)];
+            component_parent[static_cast<size_t>(vertex)] = root;
+            vertex = next;
+        }
+        return root;
+    };
+    for (int row = 0; row < n; ++row) {
+        for (int col = row + 1; col < n; ++col) {
+            if (!pair_is_selected(row, col)) {
+                continue;
+            }
+            ++selected_degree[static_cast<size_t>(row)];
+            ++selected_degree[static_cast<size_t>(col)];
+            int root_row = find_component(row);
+            int root_col = find_component(col);
+            if (root_row == root_col) {
+                continue;
+            }
+            if (component_size[static_cast<size_t>(root_row)] <
+                component_size[static_cast<size_t>(root_col)]) {
+                std::swap(root_row, root_col);
+            }
+            component_parent[static_cast<size_t>(root_col)] = root_row;
+            component_size[static_cast<size_t>(root_row)] +=
+                component_size[static_cast<size_t>(root_col)];
+        }
+    }
+    std::vector<unsigned char> counted_component(static_cast<size_t>(n), 0);
+    for (int camera = 0; camera < n; ++camera) {
+        if (selected_degree[static_cast<size_t>(camera)] == 0) {
+            continue;
+        }
+        ++topology.selected_active_cameras;
+        const int root = find_component(camera);
+        if (counted_component[static_cast<size_t>(root)] == 0) {
+            counted_component[static_cast<size_t>(root)] = 1;
+            ++topology.selected_components;
+            topology.selected_largest_component = std::max(
+                topology.selected_largest_component,
+                component_size[static_cast<size_t>(root)]);
+        }
+    }
+
     pattern.row_ptr.resize(static_cast<size_t>(n) + 1, 0);
     pattern.diag_slot.resize(static_cast<size_t>(n), -1);
     for (int row = 0; row < n; ++row) {
         int count = 0;
-        const size_t base =
-            static_cast<size_t>(row) * static_cast<size_t>(n);
         for (int col = 0; col < n; ++col) {
-            count +=
-                row == col ||
-                pair_count[base + static_cast<size_t>(col)] >=
-                    min_pair_observations;
+            count += pair_is_selected(row, col);
         }
         pattern.row_ptr[static_cast<size_t>(row) + 1] =
             pattern.row_ptr[static_cast<size_t>(row)] + count;
@@ -303,9 +483,7 @@ RootHGBPTopology buildRootHGBPTopology(
         const size_t base =
             static_cast<size_t>(row) * static_cast<size_t>(n);
         for (int col = 0; col < n; ++col) {
-            if (row != col &&
-                pair_count[base + static_cast<size_t>(col)] <
-                    min_pair_observations) {
+            if (!pair_is_selected(row, col)) {
                 continue;
             }
             pattern.col_idx[static_cast<size_t>(slot)] = col;
@@ -516,12 +694,6 @@ struct PackedRootLandmarks {
     std::vector<Eigen::VectorXd> thread_rhs;
     std::vector<Eigen::VectorXd> thread_matvec;
     Eigen::VectorXd schur_scaled_x;
-    Eigen::VectorXd pcg_rhs;
-    Eigen::VectorXd pcg_product;
-    Eigen::VectorXd pcg_residual;
-    Eigen::VectorXd pcg_preconditioned;
-    Eigen::VectorXd pcg_direction;
-    Mat9List pcg_fallback_inverse;
     std::vector<int> numerical_failures;
     bool camera_cache_valid = false;
 };
@@ -916,158 +1088,6 @@ void packedRootExactSchurMultiplyInto(
     y.noalias() += damping * x;
 }
 
-void applyPackedRootBlockPreconditioner(
-    const Mat9List& inverse_blocks,
-    const Eigen::VectorXd& rhs,
-    int requested_threads,
-    Eigen::VectorXd& solution
-) {
-    const int block_count =
-        static_cast<int>(inverse_blocks.size());
-    solution.resize(rhs.size());
-    const int threads = effectiveGBPThreads(
-        requested_threads, block_count, block_count);
-#if defined(_OPENMP)
-#pragma omp parallel for num_threads(threads) schedule(static) if(threads > 1)
-#endif
-    for (int block = 0; block < block_count; ++block) {
-        const double* source =
-            rhs.data() + 9 * static_cast<size_t>(block);
-        double* target =
-            solution.data() + 9 * static_cast<size_t>(block);
-        const double* inverse =
-            inverse_blocks[static_cast<size_t>(block)].data();
-        for (int row = 0; row < 9; ++row) {
-            double value = 0.0;
-            for (int col = 0; col < 9; ++col) {
-                value += inverse[row + 9 * col] * source[col];
-            }
-            target[row] = value;
-        }
-    }
-}
-
-int refinePackedRootSchurPCG(
-    FastHGBPSystem& sys,
-    PackedRootLandmarks& packed,
-    const Eigen::VectorXd& pose_scaling,
-    double damping,
-    int requested_steps,
-    int requested_threads,
-    Eigen::VectorXd& x,
-    double& relative_residual
-) {
-    relative_residual =
-        std::numeric_limits<double>::quiet_NaN();
-    if (requested_steps <= 0) {
-        return 0;
-    }
-
-    Eigen::VectorXd& rhs = packed.pcg_rhs;
-    Eigen::VectorXd& product = packed.pcg_product;
-    Eigen::VectorXd& residual = packed.pcg_residual;
-    Eigen::VectorXd& preconditioned =
-        packed.pcg_preconditioned;
-    Eigen::VectorXd& direction = packed.pcg_direction;
-    fastHGBPRhsVectorInto(sys, rhs);
-    packedRootExactSchurMultiplyInto(
-        packed,
-        pose_scaling,
-        damping,
-        x,
-        requested_threads,
-        product);
-    residual = rhs - product;
-    const double rhs_norm = std::max(1.0, rhs.norm());
-
-    const int block_count = sys.free_cameras;
-    Mat9List& fallback_inverse_blocks =
-        packed.pcg_fallback_inverse;
-    const Mat9List* inverse_blocks =
-        &sys.ws.belief_lam_inv;
-    if (!sys.ws.belief_lam_inv_valid) {
-        fallback_inverse_blocks.assign(
-            static_cast<size_t>(block_count), Mat9::Zero());
-        const Mat9 identity = Mat9::Identity();
-        const Vec9 zero = Vec9::Zero();
-        const int threads = effectiveGBPThreads(
-            requested_threads, block_count, block_count);
-#if defined(_OPENMP)
-#pragma omp parallel for num_threads(threads) schedule(static) if(threads > 1)
-#endif
-        for (int block = 0; block < block_count; ++block) {
-            Vec9 unused = Vec9::Zero();
-            solveRegularizedSpd9(
-                sys.ws.unary_lam[static_cast<size_t>(block)],
-                identity,
-                zero,
-                fallback_inverse_blocks[
-                    static_cast<size_t>(block)],
-                unused);
-        }
-        inverse_blocks = &fallback_inverse_blocks;
-    }
-
-    applyPackedRootBlockPreconditioner(
-        *inverse_blocks,
-        residual,
-        requested_threads,
-        preconditioned);
-    direction = preconditioned;
-    double residual_preconditioned =
-        residual.dot(preconditioned);
-    int completed_steps = 0;
-    for (int step = 0; step < requested_steps; ++step) {
-        if (!std::isfinite(residual_preconditioned) ||
-            residual_preconditioned <= 0.0) {
-            break;
-        }
-        packedRootExactSchurMultiplyInto(
-            packed,
-            pose_scaling,
-            damping,
-            direction,
-            requested_threads,
-            product);
-        const double denominator = direction.dot(product);
-        if (!std::isfinite(denominator) ||
-            denominator <= 0.0) {
-            break;
-        }
-        const double alpha =
-            residual_preconditioned / denominator;
-        x.noalias() += alpha * direction;
-        residual.noalias() -= alpha * product;
-        ++completed_steps;
-        relative_residual = residual.norm() / rhs_norm;
-        if (relative_residual <= 1e-10) {
-            break;
-        }
-        applyPackedRootBlockPreconditioner(
-            *inverse_blocks,
-            residual,
-            requested_threads,
-            preconditioned);
-        const double next_residual_preconditioned =
-            residual.dot(preconditioned);
-        if (!std::isfinite(next_residual_preconditioned) ||
-            next_residual_preconditioned <= 0.0) {
-            break;
-        }
-        const double beta =
-            next_residual_preconditioned /
-            residual_preconditioned;
-        direction =
-            preconditioned + beta * direction;
-        residual_preconditioned =
-            next_residual_preconditioned;
-    }
-    if (completed_steps == 0) {
-        relative_residual = residual.norm() / rhs_norm;
-    }
-    return completed_steps;
-}
-
 bool linearizePackedRootLandmark(
     RootProblem& problem,
     PackedRootLandmarks& packed,
@@ -1139,9 +1159,13 @@ GBP_FORCE_INLINE void accumulateRootPairBlock(
     int slot,
     int sample_cap,
     bool sample_rescale,
-    Mat9& block
+    Mat9& block,
+    Mat9& factor_lam_i,
+    Mat9& factor_lam_j
 ) {
     block.setZero();
+    factor_lam_i.setZero();
+    factor_lam_j.setZero();
     const int begin =
         pattern.slot_pair_row_ptr[static_cast<size_t>(slot)];
     const int end =
@@ -1176,7 +1200,9 @@ GBP_FORCE_INLINE void accumulateRootPairBlock(
             edge_EBinv[static_cast<size_t>(edge_a)].data();
         const double* GBP_RESTRICT b =
             edge_E[static_cast<size_t>(edge_b)].data();
-        if (pattern.slot_pair_transpose[static_cast<size_t>(ref)] == 0) {
+        const bool transpose =
+            pattern.slot_pair_transpose[static_cast<size_t>(ref)] != 0;
+        if (!transpose) {
             for (int col = 0; col < 9; ++col) {
                 const double b0 = b[col];
                 const double b1 = b[9 + col];
@@ -1207,7 +1233,19 @@ GBP_FORCE_INLINE void accumulateRootPairBlock(
                 }
             }
         }
+        const int edge_i = transpose ? edge_b : edge_a;
+        const int edge_j = transpose ? edge_a : edge_b;
+        factor_lam_i.noalias() += sample_weight *
+            edge_EBinv[static_cast<size_t>(edge_i)] *
+            edge_E[static_cast<size_t>(edge_i)].transpose();
+        factor_lam_j.noalias() += sample_weight *
+            edge_EBinv[static_cast<size_t>(edge_j)] *
+            edge_E[static_cast<size_t>(edge_j)].transpose();
     }
+    factor_lam_i =
+        0.5 * (factor_lam_i + factor_lam_i.transpose()).eval();
+    factor_lam_j =
+        0.5 * (factor_lam_j + factor_lam_j.transpose()).eval();
 }
 
 GBP_FORCE_INLINE void accumulateRootUnaryBlock(
@@ -1292,6 +1330,7 @@ void buildPackedHGBPSystemInto(
     int requested_threads,
     int pair_sample_cap,
     bool pair_sample_rescale,
+    double pair_factor_scale,
     bool unreduced_unary,
     bool reset_messages,
     bool fused_linearize_build,
@@ -1572,6 +1611,7 @@ void buildPackedHGBPSystemInto(
          ++eidx) {
         SchurGBPEdge& edge =
             sys.ws.edges[static_cast<size_t>(eidx)];
+        edge.factor_scale = pair_factor_scale;
         accumulateRootPairBlock(
             pattern,
             sys.edge_EBinv,
@@ -1579,7 +1619,9 @@ void buildPackedHGBPSystemInto(
             edge.slot_ij,
             pair_sample_cap,
             pair_sample_rescale,
-            edge.aij);
+            edge.aij,
+            edge.factor_lam_i,
+            edge.factor_lam_j);
         const auto scale_i =
             pose_scaling.segment<9>(9 * edge.i);
         const auto scale_j =
@@ -1591,6 +1633,16 @@ void buildPackedHGBPSystemInto(
             }
         }
         edge.aji = edge.aij.transpose();
+        for (int col = 0; col < 9; ++col) {
+            for (int row = 0; row < 9; ++row) {
+                edge.factor_lam_i(row, col) *=
+                    pair_factor_scale *
+                    scale_i[row] * scale_i[col];
+                edge.factor_lam_j(row, col) *=
+                    pair_factor_scale *
+                    scale_j[row] * scale_j[col];
+            }
+        }
         const int pos_i =
             sys.edge_row_pos_i[static_cast<size_t>(eidx)];
         const int pos_j =
@@ -1602,6 +1654,8 @@ void buildPackedHGBPSystemInto(
         matrix_norm_sq +=
             edge.aij.squaredNorm() +
             edge.aji.squaredNorm();
+        edge.aij *= pair_factor_scale;
+        edge.aji *= pair_factor_scale;
     }
     const auto pair_t1 = Clock::now();
     breakdown.pair_sec =
@@ -1610,6 +1664,34 @@ void buildPackedHGBPSystemInto(
     sys.matrix_fingerprint = std::sqrt(matrix_norm_sq);
     sys.rhs_fingerprint = std::sqrt(rhs_norm_sq);
     sys.build_sec = elapsed(t0, Clock::now());
+}
+
+void refreshPSDPairPreconditioner(
+    FastHGBPSystem& sys,
+    int requested_threads
+) {
+    SchurGBPWorkspace& ws = sys.ws;
+    ws.preconditioner_lam.resize(static_cast<size_t>(ws.n));
+    const int threads = effectiveGBPThreads(
+        requested_threads, static_cast<int>(ws.edges.size()), ws.n);
+#if defined(_OPENMP)
+#pragma omp parallel for num_threads(threads) schedule(static) if(threads > 1)
+#endif
+    for (int camera = 0; camera < ws.n; ++camera) {
+        Mat9 loaded = ws.unary_lam[static_cast<size_t>(camera)];
+        const int begin =
+            sys.row_edge_offsets[static_cast<size_t>(camera)];
+        const int end =
+            sys.row_edge_offsets[static_cast<size_t>(camera + 1)];
+        for (int pos = begin; pos < end; ++pos) {
+            const SchurGBPEdge& edge = ws.edges[static_cast<size_t>(
+                sys.row_edge_ids[static_cast<size_t>(pos)])];
+            loaded.noalias() += camera == edge.i
+                ? edge.factor_lam_i
+                : edge.factor_lam_j;
+        }
+        ws.preconditioner_lam[static_cast<size_t>(camera)] = loaded;
+    }
 }
 
 struct RootHGBPResult {
@@ -1623,6 +1705,12 @@ struct RootHGBPResult {
     int retained_camera_pairs = 0;
     long long retained_pair_references = 0;
     int retained_observations = 0;
+    int strong_camera_pairs = 0;
+    int strong_active_cameras = 0;
+    int pair_graph_active_cameras = 0;
+    int pair_graph_components = 0;
+    int pair_graph_largest_component = 0;
+    bool pair_spanning_backbone_used = false;
     double grouping_cut_ratio = 0.0;
     std::vector<double> costs;
     std::vector<double> outer_sec;
@@ -1634,7 +1722,6 @@ struct RootHGBPResult {
     std::vector<double> build_unary_reduce_sec;
     std::vector<double> build_pair_sec;
     std::vector<double> solve_sec;
-    std::vector<double> exact_refinement_sec;
     std::vector<double> backup_sec;
     std::vector<double> back_substitute_sec;
     std::vector<double> metric_sec;
@@ -1643,6 +1730,7 @@ struct RootHGBPResult {
     std::vector<double> gbp_eta_sec;
     std::vector<double> gbp_mean_sec;
     std::vector<double> gbp_coarse_residual_sec;
+    std::vector<double> gbp_exact_residual_sec;
     std::vector<double> gbp_coarse_solve_sec;
     std::vector<double> accepted_alpha;
     std::vector<double> lambda;
@@ -1651,7 +1739,6 @@ struct RootHGBPResult {
     std::vector<int> groups;
     std::vector<int> full_sweeps;
     std::vector<int> eta_sweeps;
-    std::vector<int> exact_refinement_steps;
 };
 
 void schurGBPFirstZeroMessageSweep(
@@ -1661,8 +1748,6 @@ void schurGBPFirstZeroMessageSweep(
 ) {
     const double omega =
         std::min(1.0, std::max(0.0, damping));
-    const Mat9 identity = Mat9::Identity();
-    const Vec9 zero = Vec9::Zero();
     const int edge_count =
         static_cast<int>(ws.edges.size());
     const int parallel_threads = effectiveGBPThreads(
@@ -1675,43 +1760,29 @@ void schurGBPFirstZeroMessageSweep(
 #if defined(_OPENMP)
 #pragma omp for schedule(static)
 #endif
-        for (int i = 0; i < ws.n; ++i) {
-            Mat9 inverse = Mat9::Zero();
-            Vec9 unused = Vec9::Zero();
-            solveRegularizedSpd9(
-                ws.unary_lam[static_cast<size_t>(i)],
-                identity,
-                zero,
-                inverse,
-                unused);
-            ws.belief_lam_inv[static_cast<size_t>(i)] =
-                inverse;
-            mat9VecRawInto(
-                inverse,
-                ws.unary_eta[static_cast<size_t>(i)],
-                ws.next_belief_eta[static_cast<size_t>(i)]);
-        }
-
-#if defined(_OPENMP)
-#pragma omp for schedule(static)
-#endif
         for (int eidx = 0; eidx < edge_count; ++eidx) {
             const SchurGBPEdge& edge =
                 ws.edges[static_cast<size_t>(eidx)];
             {
                 Mat9 solved_cross = Mat9::Zero();
-                solved_cross.noalias() =
-                    ws.belief_lam_inv[
-                        static_cast<size_t>(edge.j)] *
-                    edge.aji;
+                Vec9 solved_eta = Vec9::Zero();
+                Mat9 denominator = ws.unary_lam[
+                    static_cast<size_t>(edge.j)];
+                denominator.noalias() += edge.factor_lam_j;
+                solveRegularizedSpd9(
+                    denominator,
+                    edge.aji,
+                    ws.unary_eta[static_cast<size_t>(edge.j)],
+                    solved_cross,
+                    solved_eta);
                 Mat9 lam = Mat9::Zero();
                 lam.noalias() = -(edge.aij * solved_cross);
+                lam.noalias() += edge.factor_lam_i;
                 lam = 0.5 * (lam + lam.transpose());
                 Vec9 eta = Vec9::Zero();
                 mat9VecRawInto(
                     edge.aij,
-                    ws.next_belief_eta[
-                        static_cast<size_t>(edge.j)],
+                    solved_eta,
                     eta);
                 ws.next_msg_lam[
                     static_cast<size_t>(edge.msg_to_i)] =
@@ -1722,18 +1793,24 @@ void schurGBPFirstZeroMessageSweep(
             }
             {
                 Mat9 solved_cross = Mat9::Zero();
-                solved_cross.noalias() =
-                    ws.belief_lam_inv[
-                        static_cast<size_t>(edge.i)] *
-                    edge.aij;
+                Vec9 solved_eta = Vec9::Zero();
+                Mat9 denominator = ws.unary_lam[
+                    static_cast<size_t>(edge.i)];
+                denominator.noalias() += edge.factor_lam_i;
+                solveRegularizedSpd9(
+                    denominator,
+                    edge.aij,
+                    ws.unary_eta[static_cast<size_t>(edge.i)],
+                    solved_cross,
+                    solved_eta);
                 Mat9 lam = Mat9::Zero();
                 lam.noalias() = -(edge.aji * solved_cross);
+                lam.noalias() += edge.factor_lam_j;
                 lam = 0.5 * (lam + lam.transpose());
                 Vec9 eta = Vec9::Zero();
                 mat9VecRawInto(
                     edge.aji,
-                    ws.next_belief_eta[
-                        static_cast<size_t>(edge.i)],
+                    solved_eta,
                     eta);
                 ws.next_msg_lam[
                     static_cast<size_t>(edge.msg_to_j)] =
@@ -1780,103 +1857,16 @@ void schurGBPFirstZeroMessageSweep(
     ws.belief_lam_inv_valid = false;
 }
 
-void schurGBPFirstZeroEtaSweep(
-    SchurGBPWorkspace& ws,
-    double damping,
-    int threads
-) {
-    const double omega =
-        std::min(1.0, std::max(0.0, damping));
-    const Mat9 identity = Mat9::Identity();
-    const Vec9 zero = Vec9::Zero();
-    const int edge_count =
-        static_cast<int>(ws.edges.size());
-    const int parallel_threads = effectiveGBPThreads(
-        threads, edge_count, ws.n);
-
-#if defined(_OPENMP)
-#pragma omp parallel num_threads(parallel_threads) if(parallel_threads > 1)
-#endif
-    {
-#if defined(_OPENMP)
-#pragma omp for schedule(static)
-#endif
-        for (int i = 0; i < ws.n; ++i) {
-            Mat9 inverse = Mat9::Zero();
-            Vec9 unused = Vec9::Zero();
-            solveRegularizedSpd9(
-                ws.unary_lam[static_cast<size_t>(i)],
-                identity,
-                zero,
-                inverse,
-                unused);
-            ws.belief_lam_inv[static_cast<size_t>(i)] =
-                inverse;
-            mat9VecRawInto(
-                inverse,
-                ws.unary_eta[static_cast<size_t>(i)],
-                ws.next_belief_eta[static_cast<size_t>(i)]);
-        }
-
-#if defined(_OPENMP)
-#pragma omp for schedule(static)
-#endif
-        for (int eidx = 0; eidx < edge_count; ++eidx) {
-            const SchurGBPEdge& edge =
-                ws.edges[static_cast<size_t>(eidx)];
-            Vec9 eta = Vec9::Zero();
-            mat9VecRawInto(
-                edge.aij,
-                ws.next_belief_eta[
-                    static_cast<size_t>(edge.j)],
-                eta);
-            ws.next_msg_eta[
-                static_cast<size_t>(edge.msg_to_i)] =
-                -omega * eta;
-            mat9VecRawInto(
-                edge.aji,
-                ws.next_belief_eta[
-                    static_cast<size_t>(edge.i)],
-                eta);
-            ws.next_msg_eta[
-                static_cast<size_t>(edge.msg_to_j)] =
-                -omega * eta;
-        }
-
-#if defined(_OPENMP)
-#pragma omp for schedule(static)
-#endif
-        for (int i = 0; i < ws.n; ++i) {
-            Vec9 eta =
-                ws.unary_eta[static_cast<size_t>(i)];
-            const int begin =
-                ws.incoming_offsets[static_cast<size_t>(i)];
-            const int end =
-                ws.incoming_offsets[
-                    static_cast<size_t>(i + 1)];
-            for (int pos = begin; pos < end; ++pos) {
-                const int msg =
-                    ws.incoming_msg_ids[
-                        static_cast<size_t>(pos)];
-                eta.noalias() += ws.next_msg_eta[
-                    static_cast<size_t>(msg)];
-            }
-            ws.next_belief_eta[static_cast<size_t>(i)] =
-                eta;
-        }
-    }
-
-    ws.msg_eta.swap(ws.next_msg_eta);
-    ws.belief_eta.swap(ws.next_belief_eta);
-    ws.belief_lam_inv_valid = true;
-}
-
 Eigen::VectorXd solveFastHGBPWithFixedGroups(
     FastHGBPSystem& sys,
+    PackedRootLandmarks& exact_landmarks,
+    const Eigen::VectorXd& pose_scaling,
+    double exact_damping,
     const Args& args,
     const std::vector<std::vector<int>>& groups,
     FastHGBPCoarseWorkspace& coarse_workspace,
-    bool first_sweep_eta_only,
+    bool use_jacobi_smoother,
+    bool gcr_active,
     PackedGBPStats& stats
 ) {
     stats = PackedGBPStats{};
@@ -1888,6 +1878,18 @@ Eigen::VectorXd solveFastHGBPWithFixedGroups(
         requestedGBPThreads(args), stats.edges, ws.n);
     stats.threads = gbp_threads;
     stats.reused_workspace = true;
+
+    if (use_jacobi_smoother) {
+#if defined(_OPENMP)
+#pragma omp parallel for num_threads(gbp_threads) schedule(static) if(gbp_threads > 1)
+#endif
+        for (int camera = 0; camera < ws.n; ++camera) {
+            const Mat9& loaded = schurGBPPreconditionerLambda(ws, camera);
+            ws.belief_lam[static_cast<size_t>(camera)] = loaded;
+            ws.next_belief_lam[static_cast<size_t>(camera)] = loaded;
+        }
+        ws.belief_lam_inv_valid = false;
+    }
 
     Eigen::VectorXd x =
         Eigen::VectorXd::Zero(9 * sys.free_cameras);
@@ -1904,36 +1906,68 @@ Eigen::VectorXd solveFastHGBPWithFixedGroups(
 
     int remaining_full_sweeps = args.gbp_full_sweeps;
     bool fixed_maps_ready = false;
+    if (gcr_active && !use_jacobi_smoother) {
+        for (int sweep = 0; sweep < remaining_full_sweeps; ++sweep) {
+            const auto sweep_t0 = Clock::now();
+            if (sweep == 0) {
+                schurGBPFirstZeroMessageSweep(
+                    ws, args.message_damping, gbp_threads);
+            } else {
+                schurGBPSweep(
+                    ws, args.message_damping, gbp_threads);
+            }
+            stats.full_sec += elapsed(sweep_t0, Clock::now());
+            ++stats.full_sweeps;
+        }
+        remaining_full_sweeps = 0;
+        const auto map_t0 = Clock::now();
+        buildSchurGBPFixedEtaMaps(ws, gbp_threads);
+        buildSchurGBPBeliefLambdaInverses(ws, gbp_threads);
+        stats.fixed_map_sec += elapsed(map_t0, Clock::now());
+        fixed_maps_ready = true;
+    }
+
     Eigen::VectorXd cycle_delta;
     Eigen::VectorXd cycle_matvec;
     Eigen::VectorXd cycle_residual;
     Eigen::VectorXd coarse_delta;
     Eigen::VectorXd coarse_matvec;
+    Eigen::VectorXd exact_cycle_matvec;
+    std::vector<Eigen::VectorXd> gcr_directions;
+    std::vector<Eigen::VectorXd> gcr_products;
+    std::vector<double> gcr_curvature;
+    if (gcr_active) {
+        gcr_directions.reserve(static_cast<size_t>(args.mg_cycles));
+        gcr_products.reserve(static_cast<size_t>(args.mg_cycles));
+        gcr_curvature.reserve(static_cast<size_t>(args.mg_cycles));
+    }
     for (int cycle = 0; cycle < args.mg_cycles; ++cycle) {
-        if (cycle != 0) {
+        if (gcr_active || cycle != 0) {
             resetSchurGBPEtaMessages(
                 ws, residual, gbp_threads);
         }
-        const int full_this_cycle = std::min(
-            args.pre_sweeps, remaining_full_sweeps);
-        if (full_this_cycle > 0) {
+
+        if (gcr_active && !use_jacobi_smoother) {
+            const auto eta_t0 = Clock::now();
+            schurGBPFixedEtaSweeps(
+                ws,
+                args.message_damping,
+                args.pre_sweeps,
+                eta_threads);
+            stats.eta_sec += elapsed(eta_t0, Clock::now());
+            stats.eta_sweeps += args.pre_sweeps;
+        }
+
+        const int full_this_cycle =
+            use_jacobi_smoother || gcr_active
+                ? 0
+                : std::min(args.pre_sweeps, remaining_full_sweeps);
+        if (!use_jacobi_smoother && full_this_cycle > 0) {
             for (int sweep = 0;
                  sweep < full_this_cycle;
                  ++sweep) {
-                const bool use_eta_only =
-                    first_sweep_eta_only &&
-                    cycle == 0 &&
-                    sweep == 0;
                 const auto sweep_t0 = Clock::now();
-                if (use_eta_only) {
-                    schurGBPFirstZeroEtaSweep(
-                        ws,
-                        args.message_damping,
-                        gbp_threads);
-                    stats.eta_sec +=
-                        elapsed(sweep_t0, Clock::now());
-                    ++stats.eta_sweeps;
-                } else if (cycle == 0 && sweep == 0) {
+                if (cycle == 0 && sweep == 0) {
                     schurGBPFirstZeroMessageSweep(
                         ws,
                         args.message_damping,
@@ -1953,7 +1987,9 @@ Eigen::VectorXd solveFastHGBPWithFixedGroups(
             }
             remaining_full_sweeps -= full_this_cycle;
         }
-        if (full_this_cycle < args.pre_sweeps) {
+        if (!use_jacobi_smoother &&
+            !gcr_active &&
+            full_this_cycle < args.pre_sweeps) {
             if (!fixed_maps_ready) {
                 const auto map_t0 = Clock::now();
                 buildSchurGBPFixedEtaMaps(
@@ -2012,10 +2048,62 @@ Eigen::VectorXd solveFastHGBPWithFixedGroups(
             cycle_matvec.noalias() += coarse_matvec;
         }
 
-        constexpr double alpha = 1.0;
+        double alpha = 1.0;
+        if (gcr_active) {
+            const auto exact_t0 = Clock::now();
+            packedRootExactSchurMultiplyInto(
+                exact_landmarks,
+                pose_scaling,
+                exact_damping,
+                cycle_delta,
+                gbp_threads,
+                exact_cycle_matvec);
+            const Eigen::VectorXd raw_direction = cycle_delta;
+            const Eigen::VectorXd raw_product = exact_cycle_matvec;
+            for (size_t previous = 0;
+                 previous < gcr_directions.size();
+                 ++previous) {
+                const double beta =
+                    -gcr_products[previous].dot(exact_cycle_matvec) /
+                    gcr_curvature[previous];
+                cycle_delta.noalias() +=
+                    beta * gcr_directions[previous];
+                exact_cycle_matvec.noalias() +=
+                    beta * gcr_products[previous];
+            }
+            double denominator = exact_cycle_matvec.squaredNorm();
+            double numerator = residual.dot(exact_cycle_matvec);
+            if (!(std::isfinite(numerator) &&
+                  std::isfinite(denominator) &&
+                  denominator > 0.0)) {
+                gcr_directions.clear();
+                gcr_products.clear();
+                gcr_curvature.clear();
+                cycle_delta = raw_direction;
+                exact_cycle_matvec = raw_product;
+                denominator = exact_cycle_matvec.squaredNorm();
+                numerator = residual.dot(exact_cycle_matvec);
+            }
+            alpha = std::isfinite(numerator) &&
+                            std::isfinite(denominator) &&
+                            denominator > 0.0
+                ? numerator / denominator
+                : 0.0;
+            if (alpha != 0.0 && std::isfinite(denominator)) {
+                gcr_directions.push_back(cycle_delta);
+                gcr_products.push_back(exact_cycle_matvec);
+                gcr_curvature.push_back(denominator);
+            }
+            residual.noalias() -= alpha * exact_cycle_matvec;
+            stats.exact_residual_sec +=
+                elapsed(exact_t0, Clock::now());
+        } else {
+            residual.noalias() -= alpha * cycle_matvec;
+        }
         x.noalias() += alpha * cycle_delta;
-        residual.noalias() -= alpha * cycle_matvec;
     }
+    stats.relative_linear_residual =
+        residual.norm() / std::max(1.0, rhs.norm());
     return x;
 }
 
@@ -2102,6 +2190,7 @@ RootHGBPResult runRootHGBP(
             input_problem,
             problem,
             lab.min_pair_observations,
+            lab.pair_backbone_min_coverage,
             threads);
     const PackedBlockSchurPattern& pattern = topology.pattern;
     const RootHGBPBuildPlan& build_plan = topology.build_plan;
@@ -2113,6 +2202,15 @@ RootHGBPResult runRootHGBP(
             : pattern.slot_pair_row_ptr.back();
     result.retained_observations =
         build_plan.retained_edge_count;
+    result.strong_camera_pairs = topology.strong_camera_pairs;
+    result.strong_active_cameras = topology.strong_active_cameras;
+    result.pair_graph_active_cameras =
+        topology.selected_active_cameras;
+    result.pair_graph_components = topology.selected_components;
+    result.pair_graph_largest_component =
+        topology.selected_largest_component;
+    result.pair_spanning_backbone_used =
+        topology.spanning_backbone_used;
     PackedRootLandmarks packed_landmarks =
         makePackedRootLandmarks(problem, build_plan);
     refreshPackedRootCameraCache(
@@ -2142,7 +2240,6 @@ RootHGBPResult runRootHGBP(
     double fixed_cut_ratio = 0.0;
 
     for (int outer = 1; outer <= args.outer; ++outer) {
-        const int hgbp_outer = outer;
         const auto outer_t0 = Clock::now();
         double linearize_time = 0.0;
         const bool fuse_linearize_build = need_linearization;
@@ -2159,13 +2256,16 @@ RootHGBPResult runRootHGBP(
             args.build_threads,
             lab.pair_sample_cap,
             lab.pair_sample_rescale,
+            lab.pair_factor_scale,
             lab.unreduced_unary,
-            hgbp_outer <= lab.full_lambda_outers,
+            true,
             fuse_linearize_build,
             !lab.no_pose_scaling,
             pose_scaling_epsilon,
             pose_scaling,
             build_breakdown);
+        refreshPSDPairPreconditioner(
+            fast_system, args.build_threads);
         const auto build_t1 = Clock::now();
 
         int group_count = 0;
@@ -2179,38 +2279,26 @@ RootHGBPResult runRootHGBP(
                 schurCutRatio(fast_system, fixed_groups);
         }
         group_count = static_cast<int>(fixed_groups.size());
+        Args solve_args = args;
+        const bool gcr_active =
+            outer >= lab.krylov_start_outer;
+        if (!gcr_active) {
+            solve_args.mg_cycles = 1;
+        }
         Eigen::VectorXd increment =
             solveFastHGBPWithFixedGroups(
                 fast_system,
-                args,
-            fixed_groups,
-            coarse_workspace,
-            hgbp_outer > lab.full_lambda_outers,
-            stats);
-        double linear_residual =
-            std::numeric_limits<double>::quiet_NaN();
-        int exact_refinement_steps = 0;
-        const auto exact_refinement_t0 = Clock::now();
-        const bool small_problem =
-            fast_system.free_cameras < 64;
-        const bool run_exact_refinement =
-            small_problem ||
-            (outer >= 11 && fixed_cut_ratio >= 0.05);
-        if (run_exact_refinement) {
-            exact_refinement_steps =
-                refinePackedRootSchurPCG(
-                    fast_system,
-                    packed_landmarks,
-                    pose_scaling,
-                    lambda,
-                    3,
-                    small_problem
-                        ? std::min(6, threads)
-                        : threads,
-                    increment,
-                    linear_residual);
-        }
-        const auto exact_refinement_t1 = Clock::now();
+                packed_landmarks,
+                pose_scaling,
+                lambda,
+                solve_args,
+                fixed_groups,
+                coarse_workspace,
+                lab.use_jacobi_smoother,
+                gcr_active,
+                stats);
+        const double linear_residual =
+            stats.relative_linear_residual;
         const auto solve_t1 = Clock::now();
 
         const auto backup_t0 = Clock::now();
@@ -2282,10 +2370,6 @@ RootHGBPResult runRootHGBP(
             build_breakdown.pair_sec);
         result.solve_sec.push_back(
             elapsed(solve_t0, solve_t1));
-        result.exact_refinement_sec.push_back(
-            elapsed(
-                exact_refinement_t0,
-                exact_refinement_t1));
         result.backup_sec.push_back(
             elapsed(backup_t0, backup_t1));
         result.back_substitute_sec.push_back(
@@ -2299,6 +2383,8 @@ RootHGBPResult runRootHGBP(
         result.gbp_mean_sec.push_back(stats.mean_sec);
         result.gbp_coarse_residual_sec.push_back(
             stats.coarse_residual_sec);
+        result.gbp_exact_residual_sec.push_back(
+            stats.exact_residual_sec);
         result.gbp_coarse_solve_sec.push_back(
             stats.coarse_solve_sec);
         result.accepted_alpha.push_back(
@@ -2309,8 +2395,6 @@ RootHGBPResult runRootHGBP(
         result.groups.push_back(group_count);
         result.full_sweeps.push_back(stats.full_sweeps);
         result.eta_sweeps.push_back(stats.eta_sweeps);
-        result.exact_refinement_steps.push_back(
-            exact_refinement_steps);
 
         std::cout << std::setprecision(17)
                   << "[H-GBP] outer=" << outer
@@ -2330,7 +2414,6 @@ RootHGBPResult runRootHGBP(
                   << " cut=" << fixed_cut_ratio
                   << " full=" << stats.full_sweeps
                   << " eta=" << stats.eta_sweeps
-                  << " exact_refine=" << exact_refinement_steps
                   << "\n";
     }
 
@@ -2377,9 +2460,15 @@ void writeRootHGBPJson(
     out << "  \"message_damping\": "
         << args.message_damping << ",\n";
     out << "  \"initial_lambda\": " << lab.initial_lambda << ",\n";
-    out << "  \"exact_refinement_policy\": \"cost-first\",\n";
-    out << "  \"full_lambda_outers\": "
-        << lab.full_lambda_outers << ",\n";
+    out << "  \"pair_factor_scale\": "
+        << lab.pair_factor_scale << ",\n";
+    out << "  \"pair_backbone_min_coverage\": "
+        << lab.pair_backbone_min_coverage << ",\n";
+    out << "  \"krylov_start_outer\": "
+        << lab.krylov_start_outer << ",\n";
+    out << "  \"fine_smoother\": \""
+        << (lab.use_jacobi_smoother ? "jacobi" : "gbp")
+        << "\",\n";
     out << "  \"min_pair_observations\": "
         << lab.min_pair_observations << ",\n";
     out << "  \"pair_sample_cap\": "
@@ -2409,6 +2498,19 @@ void writeRootHGBPJson(
         << result.retained_pair_references << ",\n";
     out << "  \"retained_observations\": "
         << result.retained_observations << ",\n";
+    out << "  \"strong_camera_pairs\": "
+        << result.strong_camera_pairs << ",\n";
+    out << "  \"strong_active_cameras\": "
+        << result.strong_active_cameras << ",\n";
+    out << "  \"pair_graph_active_cameras\": "
+        << result.pair_graph_active_cameras << ",\n";
+    out << "  \"pair_graph_components\": "
+        << result.pair_graph_components << ",\n";
+    out << "  \"pair_graph_largest_component\": "
+        << result.pair_graph_largest_component << ",\n";
+    out << "  \"pair_spanning_backbone_used\": "
+        << (result.pair_spanning_backbone_used ? "true" : "false")
+        << ",\n";
     out << "  \"grouping_cut_ratio\": "
         << result.grouping_cut_ratio << ",\n";
     out << "  \"costs\": ";
@@ -2431,8 +2533,6 @@ void writeRootHGBPJson(
     writeDoubleArray(out, result.build_pair_sec);
     out << ",\n  \"solve_sec\": ";
     writeDoubleArray(out, result.solve_sec);
-    out << ",\n  \"exact_refinement_sec\": ";
-    writeDoubleArray(out, result.exact_refinement_sec);
     out << ",\n  \"backup_sec\": ";
     writeDoubleArray(out, result.backup_sec);
     out << ",\n  \"back_substitute_sec\": ";
@@ -2449,6 +2549,8 @@ void writeRootHGBPJson(
     writeDoubleArray(out, result.gbp_mean_sec);
     out << ",\n  \"gbp_coarse_residual_sec\": ";
     writeDoubleArray(out, result.gbp_coarse_residual_sec);
+    out << ",\n  \"gbp_exact_residual_sec\": ";
+    writeDoubleArray(out, result.gbp_exact_residual_sec);
     out << ",\n  \"gbp_coarse_solve_sec\": ";
     writeDoubleArray(out, result.gbp_coarse_solve_sec);
     out << ",\n  \"accepted_alpha\": ";
@@ -2465,8 +2567,6 @@ void writeRootHGBPJson(
     writeIntArray(out, result.full_sweeps);
     out << ",\n  \"eta_sweeps\": ";
     writeIntArray(out, result.eta_sweeps);
-    out << ",\n  \"exact_refinement_steps\": ";
-    writeIntArray(out, result.exact_refinement_steps);
     out << "\n}\n";
 }
 

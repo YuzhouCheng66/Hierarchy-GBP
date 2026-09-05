@@ -130,10 +130,12 @@ normalization preserves the H-GBP-1/H-GBP-16 ratio exactly. The
 build to improve either thread path.
 
 The BA publication table follows the same rule. Its source is
-`results/ba_comparison_with_hgbp1.tex`, and the exact H-GBP-1 normalization is
-recorded in `results/ba_time_normalization_20260727.json`. Both Ceres columns,
-RootBA-QR, and PowerBA were run with 16 requested and 16 reported worker
-threads; the table headers state this explicitly.
+`results/ba_comparison_with_hgbp1.tex`. For each dataset and thread mode, the
+old table time is multiplied by `new current / previous current`; all ratios
+are recorded in `results/ba_time_normalization_20260727.json`. Baseline times
+are unchanged. Both Ceres columns, RootBA-QR, and PowerBA were run with 16
+requested and 16 reported worker threads; the table headers state this
+explicitly.
 
 ## Formal PGO Results
 
@@ -175,19 +177,26 @@ above.
 
 | Dataset | H-GBP-1 | H-GBP-16 |
 |---|---:|---:|
-| Ladybug49 | 0.207022 / 26942.349049 / 0.919837 | 0.100867 / 26942.349048 / 0.919837 |
-| Venice89 | 2.041507 / 580007.057819 / 1.015013 | 0.535544 / 580007.057816 / 1.015013 |
-| Final93 | 1.329496 / 291102.494527 / 1.006331 | 0.327726 / 291102.494527 / 1.006331 |
-| Ladybug138 | 0.517570 / 122678.814212 / 1.199835 | 0.166671 / 122678.814212 / 1.199835 |
-| Trafalgar257 | 1.082858 / 201643.285957 / 0.944764 | 0.321548 / 201643.285956 / 0.944764 |
-| Dubrovnik356 | 8.417697 / 1040079.485323 / 0.910259 | 1.283900 / 1040079.485325 / 0.910259 |
-| Final394 | 3.849099 / 603152.714526 / 1.062373 | 0.764902 / 603152.704097 / 1.062373 |
-| Ladybug1723 | 3.075111 / 771223.261789 / 1.065971 | 0.752244 / 771223.751280 / 1.065971 |
-| Venice1778 | 37.817810 / 3390248.696771 / 0.823278 | 4.824911 / 3390248.696770 / 0.823278 |
-| Final1936 | 30.913472 / 9306268.679998 / 1.336021 | 6.541774 / 9306268.679996 / 1.336021 |
-| Final3068 | 10.763374 / 3496404.580924 / 1.454011 | 1.555132 / 3496404.583177 / 1.454011 |
-| Final4585 | 51.243364 / 10447354.889746 / 1.070000 | 6.137337 / 10447354.889733 / 1.070000 |
+| Ladybug49 | 0.416665 / 26705.643849 / 0.915787 | 0.149132 / 26705.643849 / 0.915787 |
+| Venice89 | 3.301417 / 577201.596294 / 1.012555 | 0.879164 / 577201.596295 / 1.012555 |
+| Final93 | 2.280848 / 291090.135195 / 1.006310 | 0.577561 / 291090.135195 / 1.006310 |
+| Ladybug138 | 1.241941 / 120648.898804 / 1.189867 | 0.386744 / 120648.898804 / 1.189867 |
+| Trafalgar257 | 2.091560 / 198055.008851 / 0.936320 | 0.613733 / 198055.009708 / 0.936320 |
+| Dubrovnik356 | 7.920982 / 1037911.974726 / 0.909310 | 1.835116 / 1037912.563996 / 0.909310 |
+| Final394 | 6.637038 / 600202.304514 / 1.059772 | 1.478522 / 600202.304254 / 1.059772 |
+| Ladybug1723 | 5.855432 / 759701.849077 / 1.057979 | 1.631938 / 759283.201486 / 1.057687 |
+| Venice1778 | 31.670896 / 3372462.738345 / 0.821115 | 7.384497 / 3372462.738345 / 0.821115 |
+| Final1936 | 23.024170 / 9303980.698093 / 1.335857 | 6.170800 / 9303980.698093 / 1.335857 |
+| Final3068 | 8.081253 / 3400612.594139 / 1.433955 | 2.205327 / 3400612.591616 / 1.433955 |
+| Final4585 | 31.504007 / 10404752.181469 / 1.067816 | 7.858938 / 10404752.181469 / 1.067816 |
 
-All BA runs use 20 outer iterations. Grouping, retained pair sampling,
-initial damping, pose scaling, and unary reduction are explicitly listed in
-`configs/ba.json`.
+All BA runs use 20 outer iterations. The formal solver uses PSD pair-factor
+GBP, fixed-precision eta sweeps, aggregate coarse correction, and GCR over
+H-GBP V-cycle directions. It does not use PCG, sparse Cholesky, or a direct
+polish step. Grouping, retained pair sampling, initial damping, pose scaling,
+and the two delayed-GCR cases are explicitly listed in `configs/ba.json`.
+
+On Final3068, the same 20-outer configuration gives costs 3,400,612.594 for
+full H-GBP, 3,402,985.385 without hierarchy, 3,790,934.988 with Jacobi in
+place of GBP, and 3,718,442.768 with both removed. The common configuration
+and measurements are recorded in `results/ba_hgbp_causal_ablation.json`.

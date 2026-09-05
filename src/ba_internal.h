@@ -12,6 +12,7 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <limits>
 #include <numeric>
 #include <sstream>
 #include <stdexcept>
@@ -88,7 +89,10 @@ struct PackedGBPStats {
     double eta_sec = 0.0;
     double mean_sec = 0.0;
     double coarse_residual_sec = 0.0;
+    double exact_residual_sec = 0.0;
     double coarse_solve_sec = 0.0;
+    double relative_linear_residual =
+        std::numeric_limits<double>::quiet_NaN();
     int full_sweeps = 0;
     int eta_sweeps = 0;
     int edges = 0;
@@ -429,11 +433,15 @@ struct SchurGBPEdge {
     int slot_ji = -1;
     Mat9 aij = Mat9::Zero();
     Mat9 aji = Mat9::Zero();
+    Mat9 factor_lam_i = Mat9::Zero();
+    Mat9 factor_lam_j = Mat9::Zero();
+    double factor_scale = 1.0;
 };
 
 struct SchurGBPWorkspace {
     int n = 0;
     Mat9List unary_lam;
+    Mat9List preconditioner_lam;
     Vec9List unary_eta;
     Mat9List belief_lam;
     Vec9List belief_eta;
@@ -456,6 +464,13 @@ struct SchurGBPWorkspace {
     std::vector<int> fixed_eta_pair_msg_to_j;
     int fixed_eta_pair_edge_count = 0;
 };
+
+GBP_FORCE_INLINE const Mat9& schurGBPPreconditionerLambda(
+    const SchurGBPWorkspace& ws,
+    int variable
+) {
+    return ws.preconditioner_lam[static_cast<size_t>(variable)];
+}
 
 struct FastHGBPBuildThreadAccum {
     Mat9List diag_blocks;
@@ -490,6 +505,15 @@ struct FastHGBPSystem {
     int build_threads_actual = 1;
     std::vector<FastHGBPBuildThreadAccum> build_accum;
 };
+
+GBP_FORCE_INLINE double schurGBPPreconditionerEdgeScale(
+    const FastHGBPSystem& sys,
+    int row_block_position
+) {
+    const int edge = sys.row_block_edge_ids[
+        static_cast<size_t>(row_block_position)];
+    return sys.ws.edges[static_cast<size_t>(edge)].factor_scale;
+}
 
 struct FastHGBPCoarseWorkspace {
     int free_cameras = 0;
@@ -707,6 +731,7 @@ void initializeFastHGBPSystemStructure(FastHGBPSystem& sys, const PackedBlockSch
     ws = SchurGBPWorkspace{};
     ws.n = pattern.free_cameras;
     ws.unary_lam.assign(ws.n, Mat9::Zero());
+    ws.preconditioner_lam.assign(ws.n, Mat9::Zero());
     ws.unary_eta.assign(ws.n, Vec9::Zero());
     ws.belief_lam.assign(ws.n, Mat9::Zero());
     ws.belief_eta.assign(ws.n, Vec9::Zero());
@@ -986,24 +1011,28 @@ void schurGBPSweep(SchurGBPWorkspace& ws, double damping, int threads = 1) {
             for (int eidx = 0; eidx < edge_count; ++eidx) {
                 const SchurGBPEdge& edge = ws.edges[static_cast<size_t>(eidx)];
                 {
-                    const Mat9 cavity_lam = ws.belief_lam[edge.j] - ws.msg_lam[edge.msg_to_j];
+                    Mat9 cavity_lam = ws.belief_lam[edge.j] - ws.msg_lam[edge.msg_to_j];
+                    cavity_lam.noalias() += edge.factor_lam_j;
                     const Vec9 cavity_eta = ws.belief_eta[edge.j] - ws.msg_eta[edge.msg_to_j];
                     Mat9 solved_cross = Mat9::Zero();
                     Vec9 solved_eta = Vec9::Zero();
                     solveRegularizedSpd9(cavity_lam, edge.aji, cavity_eta, solved_cross, solved_eta);
                     Mat9 lam = -(edge.aij * solved_cross);
+                    lam.noalias() += edge.factor_lam_i;
                     lam = 0.5 * (lam + lam.transpose());
                     const Vec9 eta = -(edge.aij * solved_eta);
                     ws.next_msg_lam[edge.msg_to_i] = keep * ws.msg_lam[edge.msg_to_i] + omega * lam;
                     ws.next_msg_eta[edge.msg_to_i] = keep * ws.msg_eta[edge.msg_to_i] + omega * eta;
                 }
                 {
-                    const Mat9 cavity_lam = ws.belief_lam[edge.i] - ws.msg_lam[edge.msg_to_i];
+                    Mat9 cavity_lam = ws.belief_lam[edge.i] - ws.msg_lam[edge.msg_to_i];
+                    cavity_lam.noalias() += edge.factor_lam_i;
                     const Vec9 cavity_eta = ws.belief_eta[edge.i] - ws.msg_eta[edge.msg_to_i];
                     Mat9 solved_cross = Mat9::Zero();
                     Vec9 solved_eta = Vec9::Zero();
                     solveRegularizedSpd9(cavity_lam, edge.aij, cavity_eta, solved_cross, solved_eta);
                     Mat9 lam = -(edge.aji * solved_cross);
+                    lam.noalias() += edge.factor_lam_j;
                     lam = 0.5 * (lam + lam.transpose());
                     const Vec9 eta = -(edge.aji * solved_eta);
                     ws.next_msg_lam[edge.msg_to_j] = keep * ws.msg_lam[edge.msg_to_j] + omega * lam;
@@ -1041,12 +1070,14 @@ void schurGBPSweep(SchurGBPWorkspace& ws, double damping, int threads = 1) {
     }
     for (const SchurGBPEdge& edge : ws.edges) {
         {
-            const Mat9 cavity_lam = ws.belief_lam[edge.j] - ws.msg_lam[edge.msg_to_j];
+            Mat9 cavity_lam = ws.belief_lam[edge.j] - ws.msg_lam[edge.msg_to_j];
+            cavity_lam.noalias() += edge.factor_lam_j;
             const Vec9 cavity_eta = ws.belief_eta[edge.j] - ws.msg_eta[edge.msg_to_j];
             Mat9 solved_cross = Mat9::Zero();
             Vec9 solved_eta = Vec9::Zero();
             solveRegularizedSpd9(cavity_lam, edge.aji, cavity_eta, solved_cross, solved_eta);
             Mat9 lam = -(edge.aij * solved_cross);
+            lam.noalias() += edge.factor_lam_i;
             lam = 0.5 * (lam + lam.transpose());
             const Vec9 eta = -(edge.aij * solved_eta);
             const Mat9 damped_lam = keep * ws.msg_lam[edge.msg_to_i] + omega * lam;
@@ -1057,12 +1088,14 @@ void schurGBPSweep(SchurGBPWorkspace& ws, double damping, int threads = 1) {
             ws.next_belief_eta[edge.i].noalias() += damped_eta;
         }
         {
-            const Mat9 cavity_lam = ws.belief_lam[edge.i] - ws.msg_lam[edge.msg_to_i];
+            Mat9 cavity_lam = ws.belief_lam[edge.i] - ws.msg_lam[edge.msg_to_i];
+            cavity_lam.noalias() += edge.factor_lam_i;
             const Vec9 cavity_eta = ws.belief_eta[edge.i] - ws.msg_eta[edge.msg_to_i];
             Mat9 solved_cross = Mat9::Zero();
             Vec9 solved_eta = Vec9::Zero();
             solveRegularizedSpd9(cavity_lam, edge.aij, cavity_eta, solved_cross, solved_eta);
             Mat9 lam = -(edge.aji * solved_cross);
+            lam.noalias() += edge.factor_lam_j;
             lam = 0.5 * (lam + lam.transpose());
             const Vec9 eta = -(edge.aji * solved_eta);
             const Mat9 damped_lam = keep * ws.msg_lam[edge.msg_to_j] + omega * lam;
@@ -1092,14 +1125,16 @@ void buildSchurGBPFixedEtaMaps(SchurGBPWorkspace& ws, int threads = 1) {
         for (int eidx = 0; eidx < edge_count; ++eidx) {
             const SchurGBPEdge& edge = ws.edges[static_cast<size_t>(eidx)];
             {
-                const Mat9 cavity_lam = ws.belief_lam[edge.j] - ws.msg_lam[edge.msg_to_j];
+                Mat9 cavity_lam = ws.belief_lam[edge.j] - ws.msg_lam[edge.msg_to_j];
+                cavity_lam.noalias() += edge.factor_lam_j;
                 Mat9 inv_cavity = Mat9::Zero();
                 Vec9 unused = Vec9::Zero();
                 solveRegularizedSpd9(cavity_lam, I, zero, inv_cavity, unused);
                 ws.fixed_eta_map[edge.msg_to_i].noalias() = -(edge.aij * inv_cavity);
             }
             {
-                const Mat9 cavity_lam = ws.belief_lam[edge.i] - ws.msg_lam[edge.msg_to_i];
+                Mat9 cavity_lam = ws.belief_lam[edge.i] - ws.msg_lam[edge.msg_to_i];
+                cavity_lam.noalias() += edge.factor_lam_i;
                 Mat9 inv_cavity = Mat9::Zero();
                 Vec9 unused = Vec9::Zero();
                 solveRegularizedSpd9(cavity_lam, I, zero, inv_cavity, unused);
@@ -1112,14 +1147,16 @@ void buildSchurGBPFixedEtaMaps(SchurGBPWorkspace& ws, int threads = 1) {
 
     for (const SchurGBPEdge& edge : ws.edges) {
         {
-            const Mat9 cavity_lam = ws.belief_lam[edge.j] - ws.msg_lam[edge.msg_to_j];
+            Mat9 cavity_lam = ws.belief_lam[edge.j] - ws.msg_lam[edge.msg_to_j];
+            cavity_lam.noalias() += edge.factor_lam_j;
             Mat9 inv_cavity = Mat9::Zero();
             Vec9 unused = Vec9::Zero();
             solveRegularizedSpd9(cavity_lam, I, zero, inv_cavity, unused);
             ws.fixed_eta_map[edge.msg_to_i].noalias() = -(edge.aij * inv_cavity);
         }
         {
-            const Mat9 cavity_lam = ws.belief_lam[edge.i] - ws.msg_lam[edge.msg_to_i];
+            Mat9 cavity_lam = ws.belief_lam[edge.i] - ws.msg_lam[edge.msg_to_i];
+            cavity_lam.noalias() += edge.factor_lam_i;
             Mat9 inv_cavity = Mat9::Zero();
             Vec9 unused = Vec9::Zero();
             solveRegularizedSpd9(cavity_lam, I, zero, inv_cavity, unused);
@@ -1383,7 +1420,8 @@ void buildFastHGBPCoarseWorkspace(
 
         touch_group(gi);
         row_group_accum[static_cast<size_t>(gi)].noalias() +=
-            coarse.scale[static_cast<size_t>(gi)] * sys.ws.unary_lam[static_cast<size_t>(i)];
+            coarse.scale[static_cast<size_t>(gi)] *
+            schurGBPPreconditionerLambda(sys.ws, i);
 
         const int begin = sys.row_block_offsets[static_cast<size_t>(i)];
         const int end = sys.row_block_offsets[static_cast<size_t>(i + 1)];
@@ -1391,7 +1429,9 @@ void buildFastHGBPCoarseWorkspace(
             const int gj = coarse.gid[static_cast<size_t>(sys.row_block_cols[static_cast<size_t>(pos)])];
             touch_group(gj);
             row_group_accum[static_cast<size_t>(gj)].noalias() +=
-                coarse.scale[static_cast<size_t>(gj)] * sys.row_blocks[static_cast<size_t>(pos)];
+                coarse.scale[static_cast<size_t>(gj)] *
+                schurGBPPreconditionerEdgeScale(sys, pos) *
+                sys.row_blocks[static_cast<size_t>(pos)];
         }
 
         std::sort(touched_groups.begin(), touched_groups.end());

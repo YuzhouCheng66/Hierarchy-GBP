@@ -130,8 +130,10 @@ def validate_config(suite: str, config: dict[str, Any]) -> None:
         "message_damping",
         "coarse_scale",
         "normalize_bal",
-        "full_lambda_outers",
-        "exact_refinement_policy",
+        "pair_factor_scale",
+        "pair_backbone_min_coverage",
+        "krylov_start_outer",
+        "fine_smoother",
         "cost_relative_tolerance",
         "mre_relative_tolerance",
         "rmse_relative_tolerance",
@@ -159,11 +161,10 @@ def validate_config(suite: str, config: dict[str, Any]) -> None:
         "reference",
     }
     for dataset, record in datasets.items():
-        valid_keys = (
-            dataset_keys,
-            dataset_keys | {"full_lambda_outers"},
-        )
-        if set(record) not in valid_keys:
+        optional_keys = {"mg_cycles", "krylov_start_outer"}
+        if not dataset_keys.issubset(record) or not set(record).issubset(
+            dataset_keys | optional_keys
+        ):
             raise ValueError(
                 f"{dataset}: invalid BA configuration keys"
             )
@@ -298,7 +299,7 @@ def ba_command(
         "--outer",
         str(shared["outer"]),
         "--mg-cycles",
-        str(shared["mg_cycles"]),
+        str(config.get("mg_cycles", shared["mg_cycles"])),
         "--pre-sweeps",
         str(shared["pre_sweeps"]),
         "--gbp-full-sweeps",
@@ -315,10 +316,14 @@ def ba_command(
         str(shared["message_damping"]),
         "--initial-lambda",
         str(config["initial_lambda"]),
-        "--exact-refinement-policy",
-        str(shared["exact_refinement_policy"]),
-        "--full-lambda-outers",
-        str(config.get("full_lambda_outers", shared["full_lambda_outers"])),
+        "--pair-factor-scale",
+        str(shared["pair_factor_scale"]),
+        "--pair-backbone-min-coverage",
+        str(shared["pair_backbone_min_coverage"]),
+        "--krylov-start-outer",
+        str(config.get("krylov_start_outer", shared["krylov_start_outer"])),
+        "--fine-smoother",
+        str(shared["fine_smoother"]),
         "--min-pair-observations",
         str(config["min_pair_observations"]),
         "--pair-sample-cap",
