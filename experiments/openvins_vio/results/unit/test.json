@@ -1,0 +1,10 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "0",
+    "<WORK_DIR>/build-integrated/test_gaussian_backend"
+  ],
+  "returncode": 0,
+  "binary_sha256": "89532253d8eb31fe0f59adf6400e56dd14cecff32b1bb64bb666342f0758bc92"
+}

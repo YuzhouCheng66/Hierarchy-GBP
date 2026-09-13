@@ -1,0 +1,3 @@
+Setting printing level to: SILENT
+EuRoC replay: backend=root_messages, GT initialization=DISABLED, stereo=2149, unmatched image records=0
+EuRoC replay failed: Gaussian backend: live independent innovation statistic mismatch

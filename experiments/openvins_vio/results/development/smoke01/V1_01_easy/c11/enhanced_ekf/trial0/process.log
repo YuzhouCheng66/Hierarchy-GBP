@@ -1,0 +1,3 @@
+Setting printing level to: SILENT
+EuRoC replay: backend=enhanced_ekf, GT initialization=DISABLED, stereo=2912, unmatched image records=0
+processed=601, initialized=489, remaining camera queue=0

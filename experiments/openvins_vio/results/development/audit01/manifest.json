@@ -1,0 +1,246 @@
+{
+  "schema": "openvins_live_suite_v1",
+  "phase": "audit",
+  "started_utc": "2026-09-13T13:25:54.249213+00:00",
+  "cpu": 0,
+  "seed": 20260913,
+  "duration_s": -1,
+  "system": {
+    "system": "Linux",
+    "node": "<HOST>",
+    "release": "6.11.0-29-generic",
+    "version": "#29~24.04.1-Ubuntu SMP PREEMPT_DYNAMIC Thu Jun 26 14:16:59 UTC 2",
+    "machine": "x86_64",
+    "processor": "x86_64"
+  },
+  "lscpu": "Architecture:                         x86_64\nCPU op-mode(s):                       32-bit, 64-bit\nAddress sizes:                        42 bits physical, 48 bits virtual\nByte Order:                           Little Endian\nCPU(s):                               14\nOn-line CPU(s) list:                  0-13\nVendor ID:                            GenuineIntel\nModel name:                           Intel(R) Core(TM) Ultra 5 245KF\nCPU family:                           6\nModel:                                198\nThread(s) per core:                   1\nCore(s) per socket:                   14\nSocket(s):                            1\nStepping:                             2\nCPU(s) scaling MHz:                   40%\nCPU max MHz:                          4800.0000\nCPU min MHz:                          800.0000\nBogoMIPS:                             8371.20\nFlags:                                fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush dts acpi mmx fxsr sse sse2 ss ht tm pbe syscall nx pdpe1gb rdtscp lm constant_tsc art arch_perfmon pebs bts rep_good nopl xtopology nonstop_tsc cpuid aperfmperf tsc_known_freq pni pclmulqdq dtes64 monitor ds_cpl vmx smx est tm2 ssse3 sdbg fma cx16 xtpr pdcm pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand lahf_lm abm 3dnowprefetch cpuid_fault ssbd ibrs ibpb stibp ibrs_enhanced tpr_shadow flexpriority ept vpid ept_ad fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid rdt_a rdseed adx smap clflushopt clwb intel_pt sha_ni xsaveopt xsavec xgetbv1 xsaves split_lock_detect user_shstk avx_vnni lam wbnoinvd dtherm ida arat pln pts hwp hwp_notify hwp_act_window hwp_epp hwp_pkg_req hfi vnmi umip pku ospke waitpkg gfni vaes vpclmulqdq rdpid bus_lock_detect movdiri movdir64b fsrm md_clear serialize arch_lbr ibt flush_l1d arch_capabilities\nVirtualization:                       VT-x\nL1d cache:                            416 KiB (10 instances)\nL1i cache:                            640 KiB (10 instances)\nL2 cache:                             26 MiB (8 instances)\nL3 cache:                             24 MiB (1 instance)\nNUMA node(s):                         1\nNUMA node0 CPU(s):                    0-13\nVulnerability Gather data sampling:   Not affected\nVulnerability Itlb multihit:          Not affected\nVulnerability L1tf:                   Not affected\nVulnerability Mds:                    Not affected\nVulnerability Meltdown:               Not affected\nVulnerability Mmio stale data:        Not affected\nVulnerability Reg file data sampling: Not affected\nVulnerability Retbleed:               Not affected\nVulnerability Spec rstack overflow:   Not affected\nVulnerability Spec store bypass:      Mitigation; Speculative Store Bypass disabled via prctl\nVulnerability Spectre v1:             Mitigation; usercopy/swapgs barriers and __user pointer sanitization\nVulnerability Spectre v2:             Mitigation; Enhanced / Automatic IBRS; IBPB conditional; RSB filling; PBRSB-eIBRS Not affected; BHI Not affected\nVulnerability Srbds:                  Not affected\nVulnerability Tsx async abort:        Not affected\n",
+  "builds": {
+    "integrated": {
+      "schema": "live_openvins_build_v1",
+      "mode": "integrated",
+      "started_utc": "2026-09-13T13:23:55.287702+00:00",
+      "upstream_commit": "69488123ed9362dd44b6f28e7f4680abbff1442b",
+      "patch": {
+        "upstream_commit": "69488123ed9362dd44b6f28e7f4680abbff1442b",
+        "files": {
+          "state/State.h": {
+            "before": "25ea7fb25ddf726ce0d41200d7f824b7d3668dcf60dd568f09073fca93142b8f",
+            "after": "7cfeec138112926372427bf75f4cb20fdd71434883d52f9b39c9c1abc1103498"
+          },
+          "state/State.cpp": {
+            "before": "f9e523eeb63a83bc96e7be7dbb7ad1ecf0300e8195b939fcd233f8c5f9763050",
+            "after": "ffba37daa608c363da3385d84e7bcbe207236df2ae88eda95b8f21f50850a33b"
+          },
+          "state/StateHelper.h": {
+            "before": "76ecd50030f82ef8601392460e09a2c7b3886078a62502ba5cf0c738056ad6ed",
+            "after": "95adb4ae51eae5660062e9c385d9bead85e2b5e082c9bc82ee07a35580cd3c90"
+          },
+          "state/StateHelper.cpp": {
+            "before": "efbc95a15fbd931178af75a5b65b60cbf563c6f0f311624d7b6c1e010be37945",
+            "after": "2d3ee7c93856d4adb5b9893c60386a2e6fbd44a0d7bd3be9f965021a76c6c3fa"
+          },
+          "core/VioManager.cpp": {
+            "before": "13d0c40710f2d267e8b5967c9a91d026c12a79fec174b63154942ae97b896182",
+            "after": "107c739267ee593bb6346fd0bffc5352eb37a11edd72e79fc8d609edba205dbe"
+          },
+          "update/UpdaterMSCKF.cpp": {
+            "before": "b0c2c51bb7e5a0593702cba93c006304fd9408be0c5b1bbfd79499248a6327b5",
+            "after": "b76385ed62b88b4ff504eaf2a3b2be07f46f85b4d6beb0f0dee1ada78e939c6b"
+          },
+          "update/UpdaterMSCKF.h": {
+            "before": "c1a505fc73320ca8ace4912c707c1d8a3ec0c763bfcbfc23bcc631224a5d78b6",
+            "after": "b7dd574dbcd605b5ad0f0ea2a7e343b7d3a3040eda2376ad6f9e7339e08eb35b"
+          }
+        },
+        "algorithm": "live root messages and shared EKF; no hierarchy claim",
+        "recorded_state_inputs": false
+      },
+      "configure": [
+        "cmake",
+        "-S",
+        "<WORK_DIR>/source-integrated/ov_msckf",
+        "-B",
+        "<WORK_DIR>/build-integrated",
+        "-G",
+        "Ninja",
+        "-DENABLE_ROS=OFF",
+        "-DENABLE_ARUCO_TAGS=OFF",
+        "-DCMAKE_BUILD_TYPE=Release",
+        "-DCMAKE_CXX_FLAGS_RELEASE=-O3 -DNDEBUG -g0 -march=native -DEIGEN_DONT_PARALLELIZE",
+        "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+        "-DEIGEN3_INCLUDE_DIR=/usr/include/eigen3",
+        "-DOV_GAUSSIAN_PACKAGE=<PACKAGE>",
+        "-DOV_GAUSSIAN_INTEGRATION=ON",
+        "-DOV_MKL_LIB_DIR=<MKL_PREFIX>/lib",
+        "-DCMAKE_PROJECT_INCLUDE=<PACKAGE>/cmake/hook.cmake",
+        "-DCMAKE_BUILD_RPATH=/usr/lib/x86_64-linux-gnu;<DEPENDENCY_PREFIX>/lib;<DEPENDENCY_PREFIX>/lib/x86_64-linux-gnu;<MKL_PREFIX>/lib",
+        "-DCMAKE_PREFIX_PATH=<DEPENDENCY_PREFIX>",
+        "-DCMAKE_MODULE_PATH=<DEPENDENCY_PREFIX>/share/glog/cmake",
+        "-DCMAKE_CXX_FLAGS=-I<DEPENDENCY_PREFIX>/include",
+        "-DCMAKE_EXE_LINKER_FLAGS=-Wl,-rpath-link,<DEPENDENCY_PREFIX>/lib"
+      ],
+      "package_source_sha256": {
+        "PROTOCOL.md": "4198e594e5ba2ca96a54acc004d293f1c1f18bd16040b7f9a2605afd7a6b4553",
+        "LICENSE": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+        "configs/kalibr_imucam_chain.yaml": "b9e11b7bcda102f7c8c384c97318d67f3916b58942f9073722f83c22bd7073f7",
+        "configs/euroc-c21.yaml": "f15002051e9f71fb68868246dda051006ba1a5f8770c004f5f6a04b976cf8506",
+        "configs/kalibr_imu_chain.yaml": "408ea8b60b5f9e7c8251e6d302f04c0675bfefdd31229bb1afd139bc8f4a0287",
+        "configs/euroc-c11.yaml": "7bd5c54f7715fefb4cdbc602187c7a65ba9307914b052f084c4cc1ae1122fe2d",
+        "src/run_euroc_folder.cpp": "95645c9241900e5e9434c2636e702bc7364ca3aad6470954242a7c05c0ea1a34",
+        "src/Backend.cpp": "48f5da49ef27baf317bf867e7fb45672b1f973f9dd86e60c37e6f9f1fb4e6c84",
+        "tests/test_backend.cpp": "a8fb6213bda9f5c711f7a40177a1742730c06258f0fe1f63293e4075ceea20c3",
+        "scripts/run_suite.py": "3774579a2b2406926554700aecb6f4ed76cdc2d63bd7fcce2caec81f1f1fe9a6",
+        "scripts/score_euroc.py": "bdabc2ee1060688c6f1f88e1af5f2e42f1f9cae70ec44675c3f93461ce1d270b",
+        "scripts/patch_openvins.py": "456e43fde00ff876a7670eab402d630f51783666d451d906735d6dc41990f16a",
+        "scripts/build.py": "773414752022a930bac5e1ac30b2e840ab67ae1f686a3686fbcc902ec57622cf",
+        "cmake/driver.cmake": "eae9f254343d784d8f0065121d8a5e555afba34378ceec6a324ba4bdacb3342f",
+        "cmake/hook.cmake": "3034c05e2d507666e0ceb5057db80c09188798f9eed54c909708926a6d3f9179",
+        "include/ov_gaussian/Backend.h": "a721a9cdd7aa4ae40ceee607beaadb76aaf479fbee3b3e2885be445f3433708c"
+      },
+      "environment": {
+        "LD_LIBRARY_PATH": "/usr/lib/x86_64-linux-gnu:<DEPENDENCY_PREFIX>/lib:<DEPENDENCY_PREFIX>/lib/x86_64-linux-gnu:<MKL_PREFIX>/lib",
+        "OMP_NUM_THREADS": "1",
+        "OPENBLAS_NUM_THREADS": "1",
+        "MKL_NUM_THREADS": "1",
+        "MKL_DYNAMIC": "FALSE",
+        "MKL_THREADING_LAYER": "SEQUENTIAL",
+        "MKL_INTERFACE_LAYER": "LP64"
+      },
+      "configure_returncode": 0,
+      "compile": [
+        "cmake",
+        "--build",
+        "<WORK_DIR>/build-integrated",
+        "--target",
+        "run_euroc_folder",
+        "test_gaussian_backend",
+        "-j",
+        "3"
+      ],
+      "build_returncode": 0,
+      "finished_utc": "2026-09-13T13:24:34.629955+00:00",
+      "log": "build-20260913T142355.log",
+      "source_diff": " ov_msckf/src/core/VioManager.cpp     |  3 ++\n ov_msckf/src/state/State.cpp         | 13 +++++++\n ov_msckf/src/state/State.h           |  6 +++-\n ov_msckf/src/state/StateHelper.cpp   | 70 +++++++++++++++++++++++++++++++++++-\n ov_msckf/src/state/StateHelper.h     |  2 ++\n ov_msckf/src/update/UpdaterMSCKF.cpp | 58 ++++++++++++++++++++++++++++++\n ov_msckf/src/update/UpdaterMSCKF.h   |  2 ++\n 7 files changed, 152 insertions(+), 2 deletions(-)\n",
+      "binary_sha256": {
+        "run_euroc_folder": "aed5dbd49be9ce04c37743ee35af1691cafc217762f321729f404c528ee82242",
+        "libov_msckf_lib.so": "394b0431d3f58a68cf82d0011188ffe6385678b1ef1c814c177e36e56513301f",
+        "test_gaussian_backend": "c8051bdb65392b02d36e1e9b6f7355ba6508b08e107ec11154cdf6cce83c0ba5",
+        "libov_gaussian_backend.a": "3ae028012d9824866dfb2fd8960907d4657471b76bffc0aeaa2f5eb77ccfade8"
+      },
+      "compile_commands_sha256": "bc444f851feb49ce46c73e489b05307943eb4ec774fb76eb23ebd672e9182e6a"
+    }
+  },
+  "environment": {
+    "LD_LIBRARY_PATH": "/usr/lib/x86_64-linux-gnu:<DEPENDENCY_PREFIX>/lib:<DEPENDENCY_PREFIX>/lib/x86_64-linux-gnu:<MKL_PREFIX>/lib",
+    "OMP_NUM_THREADS": "1",
+    "OPENBLAS_NUM_THREADS": "1",
+    "MKL_NUM_THREADS": "1",
+    "MKL_DYNAMIC": "FALSE",
+    "MKL_THREADING_LAYER": "SEQUENTIAL",
+    "MKL_INTERFACE_LAYER": "LP64"
+  },
+  "protocol_sha256": "4198e594e5ba2ca96a54acc004d293f1c1f18bd16040b7f9a2605afd7a6b4553",
+  "runner_sha256": "3774579a2b2406926554700aecb6f4ed76cdc2d63bd7fcce2caec81f1f1fe9a6",
+  "configs_sha256": {
+    "kalibr_imucam_chain.yaml": "b9e11b7bcda102f7c8c384c97318d67f3916b58942f9073722f83c22bd7073f7",
+    "euroc-c21.yaml": "f15002051e9f71fb68868246dda051006ba1a5f8770c004f5f6a04b976cf8506",
+    "kalibr_imu_chain.yaml": "408ea8b60b5f9e7c8251e6d302f04c0675bfefdd31229bb1afd139bc8f4a0287",
+    "euroc-c11.yaml": "7bd5c54f7715fefb4cdbc602187c7a65ba9307914b052f084c4cc1ae1122fe2d"
+  },
+  "job_order": [
+    [
+      "V1_01_easy",
+      11,
+      "root_messages",
+      0
+    ],
+    [
+      "V1_01_easy",
+      11,
+      "enhanced_ekf",
+      0
+    ],
+    [
+      "V1_01_easy",
+      21,
+      "root_messages",
+      0
+    ],
+    [
+      "V1_01_easy",
+      21,
+      "enhanced_ekf",
+      0
+    ],
+    [
+      "V1_02_medium",
+      11,
+      "root_messages",
+      0
+    ],
+    [
+      "V1_02_medium",
+      11,
+      "enhanced_ekf",
+      0
+    ],
+    [
+      "V1_02_medium",
+      21,
+      "root_messages",
+      0
+    ],
+    [
+      "V1_02_medium",
+      21,
+      "enhanced_ekf",
+      0
+    ],
+    [
+      "V1_03_difficult",
+      11,
+      "root_messages",
+      0
+    ],
+    [
+      "V1_03_difficult",
+      11,
+      "enhanced_ekf",
+      0
+    ],
+    [
+      "V1_03_difficult",
+      21,
+      "root_messages",
+      0
+    ],
+    [
+      "V1_03_difficult",
+      21,
+      "enhanced_ekf",
+      0
+    ]
+  ],
+  "data_manifests": {
+    "V1_01_easy": {
+      "cam0/data.csv": "fde68e2c385fba8b927023b912bf37ff48e33128035efe852e396e6dbb499877",
+      "cam1/data.csv": "fde68e2c385fba8b927023b912bf37ff48e33128035efe852e396e6dbb499877",
+      "imu0/data.csv": "4cef78a5cf7c8ee52016a160de4b50184da2a216d615feb7ebbbb3bc99efa89e",
+      "state_groundtruth_estimate0/data.csv": "701200e6924ba845ccdeea884bd717c82d1ed91f480913ea6e2e6ccb9c0fbf6d"
+    },
+    "V1_02_medium": {
+      "cam0/data.csv": "8f99cf27fb91dabdfb198999cb925d660cf6a830be4c5cf0df1d2bfa98929e16",
+      "cam1/data.csv": "a9d55e39d60825d580b4d27f36120201c9eee7239f946d98b319588032cc3e6c",
+      "imu0/data.csv": "51804ce6362dc200fff3ed6a3aba1df769528badf1a877d19d5cac976a544c09",
+      "state_groundtruth_estimate0/data.csv": "fed415eee44313584b9c4f61010dac146d5e4a4a35301db25b1ecd7d4d91b5f0"
+    },
+    "V1_03_difficult": {
+      "cam0/data.csv": "b26ca5392713e941197cd287e713e36484255ee9289362ab2ab83a35d8f9e327",
+      "cam1/data.csv": "b26ca5392713e941197cd287e713e36484255ee9289362ab2ab83a35d8f9e327",
+      "imu0/data.csv": "543835f7b7dd9d1287c9052955e030ade113c51dc97ec2c15d13a318521ad0d7",
+      "state_groundtruth_estimate0/data.csv": "703ba51a854daba80f20df93e76605c2278b3f227afe2bcbe9eb4255186fc3d9"
+    }
+  },
+  "finished_utc": "2026-09-13T13:28:00.656156+00:00",
+  "complete": true
+}

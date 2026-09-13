@@ -1,5 +1,10 @@
 # Hierarchy-GBP
 
+This research branch also includes a [live OpenVINS end-to-end experiment](experiments/openvins_vio/README.md)
+with an unmodified official baseline and reproducible trajectory/timing results.
+That experiment evaluates a nonhierarchical covariance-root Gaussian backend;
+it does not attribute its performance to H-GBP hierarchy.
+
 This repository contains the cleaned, verified H-GBP implementations used for
 the SE2 pose-graph, SE3 pose-graph, and bundle-adjustment experiments.
 Experimental Aitken/Anderson solvers and superseded execution paths are not

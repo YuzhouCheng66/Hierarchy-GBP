@@ -1,0 +1,7 @@
+# Preserve the exact source/evidence bytes referenced by the published SHA-256s.
+# In particular, do not let a collaborator's core.autocrlf rewrite audit files.
+* -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+# Unified patch context contains intentional space-only lines.
+patches/*.patch -whitespace
+# Preserve the frozen configuration files, including their final blank lines.
+configs/*.yaml whitespace=blank-at-eol,space-before-tab,cr-at-eol,-blank-at-eof

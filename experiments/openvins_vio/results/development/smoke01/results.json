@@ -1,0 +1,468 @@
+[
+  {
+    "sequence": "V1_01_easy",
+    "clones": 11,
+    "method": "root_messages",
+    "trial": 0,
+    "phase": "smoke",
+    "returncode": 0,
+    "process_wall_ms": 3734.3904869630933,
+    "started_utc": "2026-09-13T13:22:19.133683+00:00",
+    "finished_utc": "2026-09-13T13:22:22.868087+00:00",
+    "command": [
+      "taskset",
+      "-c",
+      "0",
+      "<WORK_DIR>/build-integrated/run_euroc_folder",
+      "<PACKAGE>/configs/euroc-c11.yaml",
+      "<EUROC_ROOT>/V1_01_easy",
+      "<WORK_DIR>/smoke01/V1_01_easy/c11/root_messages/trial0/vio",
+      "30"
+    ],
+    "directory": "V1_01_easy/c11/root_messages/trial0",
+    "run": {
+      "backend": "root_messages",
+      "config": "<PACKAGE>/configs/euroc-c11.yaml",
+      "mav0": "<EUROC_ROOT>/V1_01_easy/mav0",
+      "data_kind": "real EuRoC grayscale images and IMU",
+      "gt_initialized": false,
+      "gt_loaded": false,
+      "frames": 601,
+      "initialized_frames": 489,
+      "unmatched_camera_records": 0,
+      "throttled_pairs": 0,
+      "tail_pairs_without_future_imu": 0,
+      "imu_samples_fed": 6002,
+      "elapsed_camera_s": 30,
+      "first_initialized_elapsed_s": 5.599999904632568,
+      "total_camera_ms": 2266.7398139999987,
+      "total_decode_ms": 1385.5075379999996,
+      "total_imu_feed_ms": 1.85830299999999,
+      "replay_wall_ms": 3664.854536
+    },
+    "backend": {
+      "mode": "root_messages",
+      "audit": true,
+      "initializations": 2,
+      "propagations": 493,
+      "clones": 493,
+      "removals": 482,
+      "visual_attempts": 429,
+      "features": 3899,
+      "accepted": 3578,
+      "updates": 423,
+      "certified_accepts": 3572,
+      "innovation_solves": 327,
+      "marginal_queries": 489,
+      "full_queries": 1,
+      "suffix_removals": 483,
+      "general_removals": 0,
+      "audit_events": 1893,
+      "audit_gates": 3899,
+      "audit_covariance_max_abs": 1.0249767318556006e-14,
+      "audit_covariance_max_rel": 1.7746846993045254e-13,
+      "audit_delta_max_abs": 5.086961067473324e-13,
+      "audit_chi_max_rel": 1.4439096513729598e-11,
+      "physical_dimension": 81,
+      "unique_dimension": 75
+    },
+    "score": {
+      "estimate": "<WORK_DIR>/smoke01/V1_01_easy/c11/root_messages/trial0/vio_trajectory.txt",
+      "groundtruth": "<EUROC_ROOT>/V1_01_easy/mav0/state_groundtruth_estimate0/data.csv",
+      "sha256": {
+        "estimate": "b547370a0696079bcfc4758559ccccb41ae6df17a081544c19472402346b4bb0",
+        "groundtruth": "701200e6924ba845ccdeea884bd717c82d1ed91f480913ea6e2e6ccb9c0fbf6d"
+      },
+      "primary_alignment": "yaw4dof",
+      "scale": 1.0,
+      "groundtruth_role": "offline scoring only; estimator initialization must be verified from its runner/provenance",
+      "input_estimates": 489,
+      "matched_estimates": 489,
+      "excluded_estimates": 0,
+      "first_matched_ns": 1403715278862143000,
+      "last_matched_ns": 1403715303262143100,
+      "matched_duration_s": 24.4000001,
+      "matching": {
+        "method": "position linear / shortest-arc quaternion SLERP",
+        "extrapolation": false,
+        "max_gt_bracket_gap_s": 0.02,
+        "maximum_actual_gap_s": 0.0050001920000000005,
+        "optimized_clock_shift_s": 0.0,
+        "warmup_after_first_initialized_estimate_s": 0.0
+      },
+      "alignments": {
+        "yaw4dof": {
+          "transform": {
+            "rotation": [
+              [
+                0.9644799868748921,
+                -0.2641559291740544,
+                0.0
+              ],
+              [
+                0.2641559291740544,
+                0.9644799868748921,
+                0.0
+              ],
+              [
+                0.0,
+                0.0,
+                1.0
+              ]
+            ],
+            "translation": [
+              0.8661322085912658,
+              2.1748405588871504,
+              0.9534218710571778
+            ],
+            "scale": 1.0,
+            "yaw_rad": 0.2673286609065433,
+            "horizontal_correlation": 1.664894144781919
+          },
+          "position_m": {
+            "count": 489,
+            "rmse": 0.02913310609537679,
+            "mean": 0.027257374730557622,
+            "median": 0.026117453148343028,
+            "p95": 0.0441653661017675,
+            "maximum": 0.0769502492863774
+          },
+          "rotation_rad": {
+            "count": 489,
+            "rmse": 0.11120809468584361,
+            "mean": 0.11112803530816144,
+            "median": 0.11118962894242072,
+            "p95": 0.11821106449493746,
+            "maximum": 0.12096525464203042
+          },
+          "fit_scope": "all matched scored positions, no orientation fit"
+        },
+        "se3": {
+          "transform": {
+            "rotation": [
+              [
+                0.9643214953603153,
+                -0.2639478965782968,
+                -0.020385325063341623
+              ],
+              [
+                0.26399936680904496,
+                0.9645228378200194,
+                -0.00017218606219106215
+              ],
+              [
+                0.01970755972891326,
+                -0.005215670187946454,
+                0.9997921828430256
+              ]
+            ],
+            "translation": [
+              0.872146925578972,
+              2.1749373324233465,
+              0.9476462740274854
+            ],
+            "scale": 1.0,
+            "horn_eigenvalue_gap": 0.23234291654711114
+          },
+          "position_m": {
+            "count": 489,
+            "rmse": 0.026253554154488802,
+            "mean": 0.02388782450615603,
+            "median": 0.023938193712197717,
+            "p95": 0.043273222344743484,
+            "maximum": 0.0717086466859919
+          },
+          "rotation_rad": {
+            "count": 489,
+            "rmse": 0.11038661409563552,
+            "mean": 0.11005793719867595,
+            "median": 0.10946483505634182,
+            "p95": 0.1256517690759286,
+            "maximum": 0.12895485005103588
+          },
+          "fit_scope": "all matched scored positions, no orientation fit"
+        }
+      },
+      "clock_and_output_audit": {
+        "initialized_rows": 489,
+        "trajectory_time_vs_imu_time_max_s": 0.0,
+        "imu_time_vs_state_time_plus_estimated_dt_max_s": 0.0,
+        "position_difference_max_m": 0.0,
+        "quaternion_difference_max_rad": 1.2412670766236366e-16,
+        "estimated_cam_to_imu_dt_min_s": 0.0,
+        "estimated_cam_to_imu_dt_max_s": 0.0,
+        "fitted_clock_offset_s": 0.0,
+        "note": "Checks runner output consistency; does not establish calibration accuracy against hardware truth"
+      },
+      "rpe": {
+        "interval_s": 1.0,
+        "position_m": {
+          "count": 469,
+          "rmse": 0.03506267187648086,
+          "mean": 0.0323443833534886,
+          "median": 0.03223465635707376,
+          "p95": 0.05322865953957191,
+          "maximum": 0.07518502823630527
+        },
+        "rotation_rad": {
+          "count": 469,
+          "rmse": 0.010693041178293838,
+          "mean": 0.009592282378404917,
+          "median": 0.009442580332739358,
+          "p95": 0.01746204861330964,
+          "maximum": 0.02454138314877055
+        },
+        "skipped_endpoints": 20,
+        "note": "overlapping intervals are diagnostic samples, not independent trials"
+      },
+      "quaternion_direction_diagnostic": {
+        "intended_hamilton_imu_to_world_rotation_rpe_rmse_rad": 0.010693041178293838,
+        "deliberately_inverted_estimate_rotation_rpe_rmse_rad": 0.35587538876084435,
+        "note": "diagnostic comparison; no convention selection or time-offset fitting"
+      }
+    },
+    "artifacts_sha256": {
+      "evaluation_errors.csv": "11a2679a4e3094fe27b0c4db89a2ff718064b57f0b5e3f624bd67985a96b70e6",
+      "evaluation_excluded.csv": "1230061ba0d430992ef443f725070b06bdf8f60540c1eddf9a08933d518d7d07",
+      "vio_states.csv": "cd90640425e6d7b7da98dea1b694868106e9288ba532487d3e58b4509e189400",
+      "vio_trajectory.txt": "b547370a0696079bcfc4758559ccccb41ae6df17a081544c19472402346b4bb0",
+      "process.log": "3f6f9890fd74ec8c078b6ac68cb0342a14f64fcfdc6dc01c602db972371a7a80",
+      "evaluation_score.json": "1458b179c8186df4ceb53693a35139215dd018f1574b8659a1964445de15d549",
+      "vio_backend.json": "fd4b6a715116470d3d0527aa16f2239b454b346def246063da90d5f6961266d9",
+      "vio_run.json": "610645b537101c5cffb28391dbeeda71e1db8571e9a8cc14172dbe2baf7ed6f4"
+    }
+  },
+  {
+    "sequence": "V1_01_easy",
+    "clones": 11,
+    "method": "enhanced_ekf",
+    "trial": 0,
+    "phase": "smoke",
+    "returncode": 0,
+    "process_wall_ms": 3663.908839924261,
+    "started_utc": "2026-09-13T13:22:22.974645+00:00",
+    "finished_utc": "2026-09-13T13:22:26.638567+00:00",
+    "command": [
+      "taskset",
+      "-c",
+      "0",
+      "<WORK_DIR>/build-integrated/run_euroc_folder",
+      "<PACKAGE>/configs/euroc-c11.yaml",
+      "<EUROC_ROOT>/V1_01_easy",
+      "<WORK_DIR>/smoke01/V1_01_easy/c11/enhanced_ekf/trial0/vio",
+      "30"
+    ],
+    "directory": "V1_01_easy/c11/enhanced_ekf/trial0",
+    "run": {
+      "backend": "enhanced_ekf",
+      "config": "<PACKAGE>/configs/euroc-c11.yaml",
+      "mav0": "<EUROC_ROOT>/V1_01_easy/mav0",
+      "data_kind": "real EuRoC grayscale images and IMU",
+      "gt_initialized": false,
+      "gt_loaded": false,
+      "frames": 601,
+      "initialized_frames": 489,
+      "unmatched_camera_records": 0,
+      "throttled_pairs": 0,
+      "tail_pairs_without_future_imu": 0,
+      "imu_samples_fed": 6002,
+      "elapsed_camera_s": 30,
+      "first_initialized_elapsed_s": 5.599999904632568,
+      "total_camera_ms": 2203.766377,
+      "total_decode_ms": 1383.3591059999999,
+      "total_imu_feed_ms": 1.849842000000002,
+      "replay_wall_ms": 3598.730689
+    },
+    "backend": {
+      "mode": "enhanced_ekf",
+      "audit": true,
+      "initializations": 2,
+      "propagations": 493,
+      "clones": 493,
+      "removals": 482,
+      "visual_attempts": 429,
+      "features": 3899,
+      "accepted": 3578,
+      "updates": 423,
+      "certified_accepts": 3572,
+      "innovation_solves": 327,
+      "marginal_queries": 489,
+      "full_queries": 1,
+      "suffix_removals": 0,
+      "general_removals": 0,
+      "audit_events": 1893,
+      "audit_gates": 3899,
+      "audit_covariance_max_abs": 1.140265982043982e-14,
+      "audit_covariance_max_rel": 1.9743010046748842e-13,
+      "audit_delta_max_abs": 8.914739143076777e-13,
+      "audit_chi_max_rel": 3.616788785269371e-11,
+      "physical_dimension": 81,
+      "unique_dimension": 75
+    },
+    "score": {
+      "estimate": "<WORK_DIR>/smoke01/V1_01_easy/c11/enhanced_ekf/trial0/vio_trajectory.txt",
+      "groundtruth": "<EUROC_ROOT>/V1_01_easy/mav0/state_groundtruth_estimate0/data.csv",
+      "sha256": {
+        "estimate": "7653db9ee3f94a3f2f47eb1e61c6507337ca9f7582c919d59bb9cd54e47c8a59",
+        "groundtruth": "701200e6924ba845ccdeea884bd717c82d1ed91f480913ea6e2e6ccb9c0fbf6d"
+      },
+      "primary_alignment": "yaw4dof",
+      "scale": 1.0,
+      "groundtruth_role": "offline scoring only; estimator initialization must be verified from its runner/provenance",
+      "input_estimates": 489,
+      "matched_estimates": 489,
+      "excluded_estimates": 0,
+      "first_matched_ns": 1403715278862143000,
+      "last_matched_ns": 1403715303262143100,
+      "matched_duration_s": 24.4000001,
+      "matching": {
+        "method": "position linear / shortest-arc quaternion SLERP",
+        "extrapolation": false,
+        "max_gt_bracket_gap_s": 0.02,
+        "maximum_actual_gap_s": 0.0050001920000000005,
+        "optimized_clock_shift_s": 0.0,
+        "warmup_after_first_initialized_estimate_s": 0.0
+      },
+      "alignments": {
+        "yaw4dof": {
+          "transform": {
+            "rotation": [
+              [
+                0.9644799819019696,
+                -0.2641559473310727,
+                0.0
+              ],
+              [
+                0.2641559473310727,
+                0.9644799819019696,
+                0.0
+              ],
+              [
+                0.0,
+                0.0,
+                1.0
+              ]
+            ],
+            "translation": [
+              0.8661322001297835,
+              2.1748405409312763,
+              0.9534218381133932
+            ],
+            "scale": 1.0,
+            "yaw_rad": 0.267328679732251,
+            "horizontal_correlation": 1.6648941330926912
+          },
+          "position_m": {
+            "count": 489,
+            "rmse": 0.029133135683218764,
+            "mean": 0.027257407006434045,
+            "median": 0.026117489135690942,
+            "p95": 0.04416539541013152,
+            "maximum": 0.07695024029523627
+          },
+          "rotation_rad": {
+            "count": 489,
+            "rmse": 0.11120810833748741,
+            "mean": 0.11112804890208176,
+            "median": 0.11118960765533337,
+            "p95": 0.11821108066102602,
+            "maximum": 0.12096527864800109
+          },
+          "fit_scope": "all matched scored positions, no orientation fit"
+        },
+        "se3": {
+          "transform": {
+            "rotation": [
+              [
+                0.9643214898290957,
+                -0.2639479150794399,
+                -0.020385347164322724
+              ],
+              [
+                0.26399938506079784,
+                0.9645228328209972,
+                -0.00017220476037820053
+              ],
+              [
+                0.019707585882440617,
+                -0.0052156583645485075,
+                0.9997921823891756
+              ]
+            ],
+            "translation": [
+              0.8721469236629236,
+              2.17493731974425,
+              0.9476462548370255
+            ],
+            "scale": 1.0,
+            "horn_eigenvalue_gap": 0.23234291349252767
+          },
+          "position_m": {
+            "count": 489,
+            "rmse": 0.026253572187438134,
+            "mean": 0.023887841028204595,
+            "median": 0.023938259271707715,
+            "p95": 0.04327325261333341,
+            "maximum": 0.07170864015777433
+          },
+          "rotation_rad": {
+            "count": 489,
+            "rmse": 0.11038662674992064,
+            "mean": 0.11005794955677113,
+            "median": 0.10946484360710193,
+            "p95": 0.12565179136621588,
+            "maximum": 0.12895488109109668
+          },
+          "fit_scope": "all matched scored positions, no orientation fit"
+        }
+      },
+      "clock_and_output_audit": {
+        "initialized_rows": 489,
+        "trajectory_time_vs_imu_time_max_s": 0.0,
+        "imu_time_vs_state_time_plus_estimated_dt_max_s": 0.0,
+        "position_difference_max_m": 0.0,
+        "quaternion_difference_max_rad": 1.2412670766236366e-16,
+        "estimated_cam_to_imu_dt_min_s": 0.0,
+        "estimated_cam_to_imu_dt_max_s": 0.0,
+        "fitted_clock_offset_s": 0.0,
+        "note": "Checks runner output consistency; does not establish calibration accuracy against hardware truth"
+      },
+      "rpe": {
+        "interval_s": 1.0,
+        "position_m": {
+          "count": 469,
+          "rmse": 0.03506267432700599,
+          "mean": 0.03234438386347326,
+          "median": 0.032234656356853686,
+          "p95": 0.053228692770740306,
+          "maximum": 0.07518502166819996
+        },
+        "rotation_rad": {
+          "count": 469,
+          "rmse": 0.010693041594368168,
+          "mean": 0.009592283379321784,
+          "median": 0.00944258289419288,
+          "p95": 0.017462048613291713,
+          "maximum": 0.02454138314874354
+        },
+        "skipped_endpoints": 20,
+        "note": "overlapping intervals are diagnostic samples, not independent trials"
+      },
+      "quaternion_direction_diagnostic": {
+        "intended_hamilton_imu_to_world_rotation_rpe_rmse_rad": 0.010693041594368168,
+        "deliberately_inverted_estimate_rotation_rpe_rmse_rad": 0.3558753880703455,
+        "note": "diagnostic comparison; no convention selection or time-offset fitting"
+      }
+    },
+    "artifacts_sha256": {
+      "evaluation_errors.csv": "515fff7a24527862910f7dad2d342a6087ee758cc583e3d7bcdcdf875deded0b",
+      "evaluation_excluded.csv": "1230061ba0d430992ef443f725070b06bdf8f60540c1eddf9a08933d518d7d07",
+      "vio_states.csv": "18cf4e3b46d024461cf30d20b32b27865b6cda0d3b799edecc4be67bdbccf5e6",
+      "vio_trajectory.txt": "7653db9ee3f94a3f2f47eb1e61c6507337ca9f7582c919d59bb9cd54e47c8a59",
+      "process.log": "ea1b8f01758c7a11a3473203f666b836c712866c02060ed26cb03e13661ef99b",
+      "evaluation_score.json": "66d754723357f66ef9f057dcf25401b44516ee8ddedeb749b593dd0a32f620f9",
+      "vio_backend.json": "a7d72045b42333776901b1e2a77e39dd0a2d986430b19d56e4982e8292fc4725",
+      "vio_run.json": "27c05d4924e439d1daa3f2399c20bd6a0e6c7b2daff31979107115b211b44e1c"
+    }
+  }
+]

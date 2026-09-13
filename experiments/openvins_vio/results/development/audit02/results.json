@@ -1,0 +1,58 @@
+[
+  {
+    "sequence": "V1_01_easy",
+    "clones": 21,
+    "method": "root_messages",
+    "trial": 0,
+    "phase": "audit",
+    "returncode": 1,
+    "process_wall_ms": 9631.839090026915,
+    "started_utc": "2026-09-13T13:29:23.006285+00:00",
+    "finished_utc": "2026-09-13T13:29:32.638136+00:00",
+    "command": [
+      "taskset",
+      "-c",
+      "0",
+      "<WORK_DIR>/build-integrated/run_euroc_folder",
+      "<PACKAGE>/configs/euroc-c21.yaml",
+      "<EUROC_ROOT>/V1_01_easy",
+      "<WORK_DIR>/audit02/V1_01_easy/c21/root_messages/trial0/vio",
+      "-1"
+    ],
+    "directory": "V1_01_easy/c21/root_messages/trial0",
+    "artifacts_sha256": {
+      "vio_states.csv": "abc8331597fda83e93821933cf1d8b8272b7ed6a94eb4967de32bb13200a425b",
+      "vio_trajectory.txt": "68b9d499c6d1a49a37dc47d9bcaaafc9c20248f709bf7739d00f008c1db7ed65",
+      "process.log": "2e0cabc48b23b6fb318048d9983288f7a0bd9a1b6f503d135f443203d59990eb",
+      "innovation-failure.txt": "33570242c5bc8be89d0d286e18d0c26ffcafd33a6add0a1a431e3e659e913903"
+    }
+  },
+  {
+    "sequence": "V1_01_easy",
+    "clones": 21,
+    "method": "enhanced_ekf",
+    "trial": 0,
+    "phase": "audit",
+    "returncode": 1,
+    "process_wall_ms": 9325.671687023714,
+    "started_utc": "2026-09-13T13:29:32.639325+00:00",
+    "finished_utc": "2026-09-13T13:29:41.965008+00:00",
+    "command": [
+      "taskset",
+      "-c",
+      "0",
+      "<WORK_DIR>/build-integrated/run_euroc_folder",
+      "<PACKAGE>/configs/euroc-c21.yaml",
+      "<EUROC_ROOT>/V1_01_easy",
+      "<WORK_DIR>/audit02/V1_01_easy/c21/enhanced_ekf/trial0/vio",
+      "-1"
+    ],
+    "directory": "V1_01_easy/c21/enhanced_ekf/trial0",
+    "artifacts_sha256": {
+      "vio_states.csv": "05d54f673c046d0cea6d888a8205ae8020e4aa4961d92bba223dec8910b7d5e3",
+      "vio_trajectory.txt": "a030812c3c3063bce18031869c5c80a08ea8cec38f3d6fd86580cf8439b045ad",
+      "process.log": "d33cc06fd5b00ccbf59e079dd2f20ff9fdd2128e4a27eddff6df56bca81fb17a",
+      "innovation-failure.txt": "ee8b7a7f4b55bac2e2531fa636cb5291313185b5677a43b7467099b2e48c76d1"
+    }
+  }
+]

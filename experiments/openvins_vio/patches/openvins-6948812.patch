@@ -1,0 +1,315 @@
+diff --git a/ov_msckf/src/core/VioManager.cpp b/ov_msckf/src/core/VioManager.cpp
+index 6a0d7b9..179268b 100644
+--- a/ov_msckf/src/core/VioManager.cpp
++++ b/ov_msckf/src/core/VioManager.cpp
+@@ -68,6 +68,9 @@ VioManager::VioManager(VioManagerOptions &params_) : thread_init_running(false),
+ 
+   // Create the state!!
+   state = std::make_shared<State>(params.state_options);
++  if (state->_gaussian && (params.try_zupt || params.use_aruco || params.init_options.init_dyn_use))
++    throw std::runtime_error("Gaussian integration requires static initialization, no ZUPT, and no ArUco");
++
+ 
+   // Set the IMU intrinsics
+   state->_calib_imu_dw->set_value(params.vec_dw);
+diff --git a/ov_msckf/src/state/State.cpp b/ov_msckf/src/state/State.cpp
+index f8c4612..23cfe04 100644
+--- a/ov_msckf/src/state/State.cpp
++++ b/ov_msckf/src/state/State.cpp
+@@ -163,4 +163,17 @@ State::State(StateOptions &options) {
+           std::pow(0.005, 2) * Eigen::MatrixXd::Identity(4, 4);
+     }
+   }
++  if (ov_gaussian::Backend::enabled()) {
++    if (current_id != 15 || _options.max_slam_features != 0 ||
++        _options.do_calib_camera_pose || _options.do_calib_camera_intrinsics ||
++        _options.do_calib_camera_timeoffset || _options.do_calib_imu_intrinsics ||
++        _options.do_calib_imu_g_sensitivity ||
++        _options.feat_rep_msckf != LandmarkRepresentation::Representation::GLOBAL_3D)
++      throw std::runtime_error("Gaussian backend requires fixed-calibration GLOBAL_3D MSCKF-only state");
++    _gaussian = std::make_shared<ov_gaussian::Backend>(ov_gaussian::Backend::selected_mode(), ov_gaussian::Backend::audit_requested());
++    _gaussian->initialize(_Cov);
++    // Make stale legacy covariance use fail visibly instead of returning a plausible old prior.
++    _Cov.resize(0, 0);
++  }
++
+ }
+diff --git a/ov_msckf/src/state/State.h b/ov_msckf/src/state/State.h
+index f83dee5..36be6d7 100644
+--- a/ov_msckf/src/state/State.h
++++ b/ov_msckf/src/state/State.h
+@@ -29,6 +29,7 @@
+ #include <vector>
+ 
+ #include "StateOptions.h"
++#include "ov_gaussian/Backend.h"
+ #include "cam/CamBase.h"
+ #include "types/IMU.h"
+ #include "types/Landmark.h"
+@@ -78,7 +79,7 @@ public:
+    * @brief Calculates the current max size of the covariance
+    * @return Size of the current covariance matrix
+    */
+-  int max_covariance_size() { return (int)_Cov.rows(); }
++  int max_covariance_size() { return _gaussian ? _gaussian->dimension() : (int)_Cov.rows(); }
+ 
+   /**
+    * @brief Gyroscope and accelerometer intrinsic matrix (scale imperfection and axis misalignment)
+@@ -179,6 +180,9 @@ public:
+   /// Rotation from accelerometer to the "IMU" gyroscope frame frame (rpng model)
+   std::shared_ptr<ov_type::JPLQuat> _calib_imu_ACCtoIMU;
+ 
++  // Experimental live Gaussian backend; absent for the original algorithm.
++  std::shared_ptr<ov_gaussian::Backend> _gaussian;
++
+ private:
+   // Define that the state helper is a friend class of this class
+   // This will allow it to access the below functions which should normally not be called
+diff --git a/ov_msckf/src/state/StateHelper.cpp b/ov_msckf/src/state/StateHelper.cpp
+index 0c89c56..211f049 100644
+--- a/ov_msckf/src/state/StateHelper.cpp
++++ b/ov_msckf/src/state/StateHelper.cpp
+@@ -36,6 +36,12 @@ using namespace ov_msckf;
+ void StateHelper::EKFPropagation(std::shared_ptr<State> state, const std::vector<std::shared_ptr<Type>> &order_NEW,
+                                  const std::vector<std::shared_ptr<Type>> &order_OLD, const Eigen::MatrixXd &Phi,
+                                  const Eigen::MatrixXd &Q) {
++  if (state->_gaussian) {
++    if (order_NEW.size()!=1 || order_OLD.size()!=1 || order_NEW[0]!=state->_imu || order_OLD[0]!=state->_imu)
++      throw std::runtime_error("Gaussian backend only supports live 15D IMU propagation");
++    state->_gaussian->propagate(Phi, Q); return;
++  }
++
+ 
+   // We need at least one old and new variable
+   if (order_NEW.empty() || order_OLD.empty()) {
+@@ -115,6 +121,9 @@ void StateHelper::EKFPropagation(std::shared_ptr<State> state, const std::vector
+ 
+ void StateHelper::EKFUpdate(std::shared_ptr<State> state, const std::vector<std::shared_ptr<Type>> &H_order, const Eigen::MatrixXd &H,
+                             const Eigen::VectorXd &res, const Eigen::MatrixXd &R) {
++  if (state->_gaussian)
++    throw std::runtime_error("Gaussian backend must consume the raw MSCKF batch, not a legacy EKFUpdate");
++
+ 
+   //==========================================================
+   //==========================================================
+@@ -198,6 +207,22 @@ void StateHelper::EKFUpdate(std::shared_ptr<State> state, const std::vector<std:
+ 
+ void StateHelper::set_initial_covariance(std::shared_ptr<State> state, const Eigen::MatrixXd &covariance,
+                                          const std::vector<std::shared_ptr<ov_type::Type>> &order) {
++  if (state->_gaussian) {
++    if (state->_variables.size()!=1 || state->_variables[0]!=state->_imu || state->max_covariance_size()!=15)
++      throw std::runtime_error("Gaussian initialization requires a single live IMU");
++    Eigen::MatrixXd initial = state->_gaussian->full_covariance();
++    int i_index=0;
++    for (const auto &a : order) {
++      int j_index=0;
++      for (const auto &b : order) {
++        initial.block(a->id(),b->id(),a->size(),b->size())=covariance.block(i_index,j_index,a->size(),b->size());
++        j_index+=b->size();
++      }
++      i_index+=a->size();
++    }
++    state->_gaussian->initialize(initial); return;
++  }
++
+ 
+   // We need to loop through each element and overwrite the current covariance values
+   // For example consider the following:
+@@ -225,6 +250,12 @@ void StateHelper::set_initial_covariance(std::shared_ptr<State> state, const Eig
+ 
+ Eigen::MatrixXd StateHelper::get_marginal_covariance(std::shared_ptr<State> state,
+                                                      const std::vector<std::shared_ptr<Type>> &small_variables) {
++  if (state->_gaussian) {
++    ov_gaussian::Indices ids;
++    for (const auto &var : small_variables) for (int j=0;j<var->size();++j) ids.push_back(var->id()+j);
++    return state->_gaussian->marginal(ids);
++  }
++
+ 
+   // Calculate the marginal covariance size we need to make our matrix
+   int cov_size = 0;
+@@ -254,6 +285,8 @@ Eigen::MatrixXd StateHelper::get_marginal_covariance(std::shared_ptr<State> stat
+ }
+ 
+ Eigen::MatrixXd StateHelper::get_full_covariance(std::shared_ptr<State> state) {
++  if (state->_gaussian) return state->_gaussian->full_covariance();
++
+ 
+   // Size of the covariance is the active
+   int cov_size = (int)state->_Cov.rows();
+@@ -269,6 +302,19 @@ Eigen::MatrixXd StateHelper::get_full_covariance(std::shared_ptr<State> state) {
+ }
+ 
+ void StateHelper::marginalize(std::shared_ptr<State> state, std::shared_ptr<Type> marg) {
++  if (state->_gaussian) {
++    if (std::find(state->_variables.begin(),state->_variables.end(),marg)==state->_variables.end())
++      throw std::runtime_error("Gaussian marginalization requires an active complete variable");
++    int id=marg->id(),size=marg->size();
++    state->_gaussian->marginalize(id,size);
++    std::vector<std::shared_ptr<Type>> remaining;
++    for (const auto &v : state->_variables) if (v!=marg) {
++      if (v->id()>id) v->set_local_id(v->id()-size);
++      remaining.push_back(v);
++    }
++    marg->set_local_id(-1);state->_variables=std::move(remaining);return;
++  }
++
+ 
+   // Check if the current state has the element we want to marginalize
+   if (std::find(state->_variables.begin(), state->_variables.end(), marg) == state->_variables.end()) {
+@@ -339,6 +385,14 @@ void StateHelper::marginalize(std::shared_ptr<State> state, std::shared_ptr<Type
+ }
+ 
+ std::shared_ptr<Type> StateHelper::clone(std::shared_ptr<State> state, std::shared_ptr<Type> variable_to_clone) {
++  if (state->_gaussian) {
++    if (variable_to_clone!=state->_imu->pose()) throw std::runtime_error("Gaussian clone must be the live IMU pose");
++    int new_id=state->max_covariance_size();
++    auto new_clone=variable_to_clone->clone();new_clone->set_local_id(new_id);
++    state->_gaussian->clone_pose(variable_to_clone->id(),variable_to_clone->size());
++    state->_variables.push_back(new_clone);return new_clone;
++  }
++
+ 
+   // Get total size of new cloned variables, and the old covariance size
+   int total_size = variable_to_clone->size();
+@@ -393,6 +447,8 @@ std::shared_ptr<Type> StateHelper::clone(std::shared_ptr<State> state, std::shar
+ bool StateHelper::initialize(std::shared_ptr<State> state, std::shared_ptr<Type> new_variable,
+                              const std::vector<std::shared_ptr<Type>> &H_order, Eigen::MatrixXd &H_R, Eigen::MatrixXd &H_L,
+                              Eigen::MatrixXd &R, Eigen::VectorXd &res, double chi_2_mult) {
++  if (state->_gaussian) throw std::runtime_error("Landmark initialization is outside the Gaussian MSCKF-only integration");
++
+ 
+   // Check that this new variable is not already initialized
+   if (std::find(state->_variables.begin(), state->_variables.end(), new_variable) != state->_variables.end()) {
+@@ -484,6 +540,8 @@ bool StateHelper::initialize(std::shared_ptr<State> state, std::shared_ptr<Type>
+ void StateHelper::initialize_invertible(std::shared_ptr<State> state, std::shared_ptr<Type> new_variable,
+                                         const std::vector<std::shared_ptr<Type>> &H_order, const Eigen::MatrixXd &H_R,
+                                         const Eigen::MatrixXd &H_L, const Eigen::MatrixXd &R, const Eigen::VectorXd &res) {
++  if (state->_gaussian) throw std::runtime_error("Landmark initialization is outside the Gaussian MSCKF-only integration");
++
+ 
+   // Check that this new variable is not already initialized
+   if (std::find(state->_variables.begin(), state->_variables.end(), new_variable) != state->_variables.end()) {
+@@ -577,6 +635,9 @@ void StateHelper::initialize_invertible(std::shared_ptr<State> state, std::share
+ }
+ 
+ void StateHelper::augment_clone(std::shared_ptr<State> state, Eigen::Matrix<double, 3, 1> last_w) {
++  if (state->_gaussian && state->_options.do_calib_camera_timeoffset)
++    throw std::runtime_error("Gaussian clone time-offset calibration is unsupported");
++
+ 
+   // We can't insert a clone that occured at the same timestamp!
+   if (state->_clones_IMU.find(state->_timestamp) != state->_clones_IMU.end()) {
+@@ -642,4 +703,11 @@ void StateHelper::marginalize_slam(std::shared_ptr<State> state) {
+       it0++;
+     }
+   }
+-}
+\ No newline at end of file
++}
++void StateHelper::apply_gaussian_increment(std::shared_ptr<State> state, const Eigen::VectorXd &dx) {
++  if (!state->_gaussian || dx.size()!=state->max_covariance_size() || !dx.allFinite())
++    throw std::runtime_error("Invalid live Gaussian tangent increment");
++  for (const auto &v : state->_variables) v->update(dx.segment(v->id(),v->size()));
++  // OpenVINS uses the identity first-order covariance reset here. The next frame
++  // derives fresh Jacobians from these actual updated nominal values and FEJ state.
++}
+diff --git a/ov_msckf/src/state/StateHelper.h b/ov_msckf/src/state/StateHelper.h
+index 6c74013..8875f07 100644
+--- a/ov_msckf/src/state/StateHelper.h
++++ b/ov_msckf/src/state/StateHelper.h
+@@ -45,6 +45,8 @@ class State;
+ class StateHelper {
+ 
+ public:
++  static void apply_gaussian_increment(std::shared_ptr<State> state, const Eigen::VectorXd &dx);
++
+   /**
+    * @brief Performs EKF propagation of the state covariance.
+    *
+diff --git a/ov_msckf/src/update/UpdaterMSCKF.cpp b/ov_msckf/src/update/UpdaterMSCKF.cpp
+index 9a00ade..6118fcc 100644
+--- a/ov_msckf/src/update/UpdaterMSCKF.cpp
++++ b/ov_msckf/src/update/UpdaterMSCKF.cpp
+@@ -142,6 +142,11 @@ void UpdaterMSCKF::update(std::shared_ptr<State> state, std::vector<std::shared_
+   }
+   rT2 = boost::posix_time::microsec_clock::local_time();
+ 
++  if (state->_gaussian) {
++    update_gaussian(state, feature_vec);
++    return;
++  }
++
+   // Calculate the max possible measurement size
+   size_t max_meas_size = 0;
+   for (size_t i = 0; i < feature_vec.size(); i++) {
+@@ -293,3 +298,56 @@ void UpdaterMSCKF::update(std::shared_ptr<State> state, std::vector<std::shared_
+   PRINT_ALL("[MSCKF-UP]: %.4f seconds update state (%d size)\n", (rT5 - rT4).total_microseconds() * 1e-6, (int)res_big.rows());
+   PRINT_ALL("[MSCKF-UP]: %.4f seconds total\n", (rT5 - rT1).total_microseconds() * 1e-6);
+ }
++
++void UpdaterMSCKF::update_gaussian(std::shared_ptr<State> state, std::vector<std::shared_ptr<Feature>> &feature_vec) {
++  if (feature_vec.empty()) return;
++  state->_gaussian->begin_visual();
++  auto it2=feature_vec.begin();
++  while (it2!=feature_vec.end()) {
++    // Convert our feature into our current format
++    UpdaterHelper::UpdaterHelperFeature feat;
++    feat.featid = (*it2)->featid;
++    feat.uvs = (*it2)->uvs;
++    feat.uvs_norm = (*it2)->uvs_norm;
++    feat.timestamps = (*it2)->timestamps;
++
++    // If we are using single inverse depth, then it is equivalent to using the msckf inverse depth
++    feat.feat_representation = state->_options.feat_rep_msckf;
++    if (state->_options.feat_rep_msckf == LandmarkRepresentation::Representation::ANCHORED_INVERSE_DEPTH_SINGLE) {
++      feat.feat_representation = LandmarkRepresentation::Representation::ANCHORED_MSCKF_INVERSE_DEPTH;
++    }
++
++    // Save the position and its fej value
++    if (LandmarkRepresentation::is_relative_representation(feat.feat_representation)) {
++      feat.anchor_cam_id = (*it2)->anchor_cam_id;
++      feat.anchor_clone_timestamp = (*it2)->anchor_clone_timestamp;
++      feat.p_FinA = (*it2)->p_FinA;
++      feat.p_FinA_fej = (*it2)->p_FinA;
++    } else {
++      feat.p_FinG = (*it2)->p_FinG;
++      feat.p_FinG_fej = (*it2)->p_FinG;
++    }
++
++    // Our return values (feature jacobian, state jacobian, residual, and order of state jacobian)
++    Eigen::MatrixXd H_f;
++    Eigen::MatrixXd H_x;
++    Eigen::VectorXd res;
++    std::vector<std::shared_ptr<Type>> Hx_order;
++
++    // Get the Jacobian for this feature
++    UpdaterHelper::get_feature_jacobian_full(state, feat, H_f, H_x, res, Hx_order);
++
++
++    ov_gaussian::Indices columns;
++    for (const auto &v : Hx_order) for (int j=0;j<v->size();++j) columns.push_back(v->id()+j);
++    int dof=res.rows()-H_f.cols();
++    double threshold;
++    if (dof<500) threshold=chi_squared_table.at(dof);
++    else { boost::math::chi_squared dist(dof); threshold=boost::math::quantile(dist,0.95); }
++    auto decision=state->_gaussian->add_feature(H_f,H_x,res,columns,_options.sigma_pix_sq,_options.chi2_multipler*threshold);
++    (*it2)->to_delete=true;
++    if (!decision.accepted) it2=feature_vec.erase(it2); else ++it2;
++  }
++  Eigen::VectorXd dx=state->_gaussian->finish_visual();
++  if (dx.size()) StateHelper::apply_gaussian_increment(state,dx);
++}
+diff --git a/ov_msckf/src/update/UpdaterMSCKF.h b/ov_msckf/src/update/UpdaterMSCKF.h
+index 149ea45..17acf54 100644
+--- a/ov_msckf/src/update/UpdaterMSCKF.h
++++ b/ov_msckf/src/update/UpdaterMSCKF.h
+@@ -67,6 +67,8 @@ public:
+    */
+   void update(std::shared_ptr<State> state, std::vector<std::shared_ptr<ov_core::Feature>> &feature_vec);
+ 
++  void update_gaussian(std::shared_ptr<State> state, std::vector<std::shared_ptr<ov_core::Feature>> &feature_vec);
++
+ protected:
+   /// Options used during update
+   UpdaterOptions _options;
