@@ -1,950 +1,487 @@
+"""Replay fixed H-GBP policies. Dataset identity never selects solver parameters."""
 from __future__ import annotations
 
 import argparse
-import copy
-import csv
+from contextlib import contextmanager
+import ctypes
+from datetime import datetime, timezone
 import hashlib
 import json
+import math
 import os
+from pathlib import Path
+import platform
+import re
 import statistics
 import subprocess
 import sys
 import time
-from datetime import datetime
-from pathlib import Path
-from typing import Any
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 CONFIG_ROOT = PROJECT_ROOT / "configs"
+DRIVER_VERSION = "3"
+NUMERICAL_PREFIXES = (
+    "GBP_", "HGBP_", "OMP_", "KMP_", "GOMP_", "MKL_", "OPENBLAS_",
+    "BLIS_", "VECLIB_", "NUMEXPR_", "TBB_", "EIGEN_", "GOTO_", "BLAS_",
+)
 
 
-def load_json(path: Path) -> dict[str, Any]:
-    return json.loads(path.read_text(encoding="utf-8"))
+def load_json(path):
+    return json.loads(Path(path).read_text(encoding="utf-8-sig"))
 
 
-def sha256(path: Path) -> str:
+def write_json(path, value):
+    Path(path).write_text(json.dumps(value, indent=2, allow_nan=False) + "\n", encoding="utf-8")
+
+
+def sha256(path):
     digest = hashlib.sha256()
-    with path.open("rb") as stream:
+    with Path(path).open("rb") as stream:
         for block in iter(lambda: stream.read(4 * 1024 * 1024), b""):
             digest.update(block)
     return digest.hexdigest()
 
 
-def resolve_root(
-    roots: dict[str, Any],
-    name: str,
-    command_line: Path | None,
-) -> Path:
-    if command_line is not None:
-        return command_line.resolve()
-    record = roots[name]
-    environment_value = os.environ.get(record["environment"])
-    candidate = Path(environment_value or record["default"])
-    if candidate.is_absolute():
-        return candidate.resolve()
-    return (PROJECT_ROOT / candidate).resolve()
+def positive_int(value):
+    number = int(value)
+    if number <= 0:
+        raise argparse.ArgumentTypeError("must be positive")
+    return number
 
 
-def validate_config(suite: str, config: dict[str, Any]) -> None:
-    expected_schema = 2
-    if config.get("schema_version") != expected_schema:
-        raise ValueError(
-            f"{suite}.json must use schema_version {expected_schema}"
-        )
-    if not isinstance(config.get("shared"), dict):
-        raise ValueError(f"{suite}.json is missing the shared object")
-    datasets = config.get("datasets")
-    if not isinstance(datasets, dict) or not datasets:
-        raise ValueError(f"{suite}.json is missing dataset configurations")
-    if suite == "pgo":
-        expected_shared = {
-            "num_outer",
-            "huber_delta",
-            "threads",
-            "process_affinity_mask",
-            "cost_relative_tolerance",
-            "thread_ratio_relative_tolerance",
-            "thread_time_regression_relative_tolerance",
-            "thread_compare_cooldown_sec",
-            "thread_cost_relative_tolerance",
-        }
-        common_keys = {
-            "space",
-            "inner_cycles",
-            "pre_sweeps",
-            "group_size",
-            "r_reduced",
-            "reference",
-        }
-        se2_keys = common_keys | {
-            "coarse_scale",
-            "partial_residual_tol",
-            "basis_rebuild_period",
-            "basis_rebuild_warmup_outers",
-            "jitter",
-            "fixed_eta_after_sweeps",
-        }
-        se3_keys = common_keys | {
-            "basis_rebuild_period",
-            "coarse_numeric_rebuild_period",
-            "coarse_reuse_pcg_iters",
-            "fixed_lambda_after_sweeps",
-            "partial_basis_max_iters",
-            "partial_basis_accept_unconverged",
-            "implicit_fine_operator_threads",
-            "final_direct_polish_steps",
-        }
-        if set(config["shared"]) != expected_shared:
-            raise ValueError(
-                "pgo.json shared keys must be exactly: "
-                + ", ".join(sorted(expected_shared))
-            )
-        for dataset, record in datasets.items():
-            if record.get("space") not in {"SE2", "SE3"}:
-                raise ValueError(f"{dataset}: space must be SE2 or SE3")
-            expected_keys = (
-                se2_keys if record["space"] == "SE2" else se3_keys
-            )
-            if set(record) != expected_keys:
-                missing = sorted(expected_keys - set(record))
-                extra = sorted(set(record) - expected_keys)
-                raise ValueError(
-                    f"{dataset}: invalid configuration keys; "
-                    f"missing={missing}, extra={extra}"
-                )
-            validate_hgbp_reference(
-                dataset,
-                record.get("reference"),
-                {"time_sec", "cost"},
-                {"direct_time_sec", "direct_cost", "hgbp"},
-            )
-        return
-
-    expected_shared = {
-        "outer",
-        "threads",
-        "mg_cycles",
-        "pre_sweeps",
-        "gbp_full_sweeps",
-        "message_damping",
-        "coarse_scale",
-        "normalize_bal",
-        "pair_factor_scale",
-        "pair_backbone_min_coverage",
-        "krylov_start_outer",
-        "fine_smoother",
-        "cost_relative_tolerance",
-        "mre_relative_tolerance",
-        "rmse_relative_tolerance",
-        "thread_ratio_relative_tolerance",
-        "thread_time_regression_relative_tolerance",
-        "thread_compare_cooldown_sec",
-        "thread_cost_relative_tolerance",
-        "thread_mre_relative_tolerance",
-        "thread_rmse_relative_tolerance",
-    }
-    if set(config["shared"]) != expected_shared:
-        raise ValueError(
-            "ba.json shared keys must be exactly: "
-            + ", ".join(sorted(expected_shared))
-        )
-    dataset_keys = {
-        "build_threads",
-        "group_size",
-        "initial_lambda",
-        "min_pair_observations",
-        "pair_sample_cap",
-        "pair_sample_rescale",
-        "unreduced_unary",
-        "no_pose_scaling",
-        "reference",
-    }
-    for dataset, record in datasets.items():
-        optional_keys = {"mg_cycles", "krylov_start_outer"}
-        if not dataset_keys.issubset(record) or not set(record).issubset(
-            dataset_keys | optional_keys
-        ):
-            raise ValueError(
-                f"{dataset}: invalid BA configuration keys"
-            )
-        validate_hgbp_reference(
-            dataset,
-            record.get("reference"),
-            {"time_sec", "cost", "mre", "rmse"},
-            {"hgbp"},
-        )
+def affinity_mask(value):
+    try:
+        mask = int(value, 0)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("expected an integer CPU mask, e.g. 0xffff") from exc
+    if not 0 < mask < 2**64:
+        raise argparse.ArgumentTypeError("affinity mask must be a nonzero 64-bit mask")
+    return hex(mask)
 
 
-def validate_hgbp_reference(
-    dataset: str,
-    reference: Any,
-    entry_keys: set[str],
-    reference_keys: set[str],
-) -> None:
-    if not isinstance(reference, dict) or set(reference) != reference_keys:
-        raise ValueError(
-            f"{dataset}: reference keys must be "
-            + ", ".join(sorted(reference_keys))
-        )
-    hgbp = reference.get("hgbp")
-    if not isinstance(hgbp, dict) or set(hgbp) != {"1", "16"}:
-        raise ValueError(
-            f"{dataset}: reference.hgbp must contain exactly 1 and 16"
-        )
-    for threads in ("1", "16"):
-        entry = hgbp[threads]
-        if not isinstance(entry, dict) or set(entry) != entry_keys:
-            raise ValueError(
-                f"{dataset}: invalid reference.hgbp.{threads} keys"
-            )
+def positive_seconds(value):
+    seconds = float(value)
+    if not math.isfinite(seconds) or seconds <= 0:
+        raise argparse.ArgumentTypeError("must be finite positive seconds")
+    return seconds
 
 
-def pgo_command(
-    executable: Path,
-    input_path: Path,
-    output_path: Path,
-    shared: dict[str, Any],
-    config: dict[str, Any],
-    include_direct: bool,
-    write_poses: bool,
-) -> list[str]:
-    command = [
-        str(executable),
-        "--problem-file",
-        str(input_path),
-        "--out-json",
-        str(output_path),
-        "--num-outer",
-        str(shared["num_outer"]),
-        "--inner-cycles",
-        str(config["inner_cycles"]),
-        "--pre-sweeps",
-        str(config["pre_sweeps"]),
-        "--group-size",
-        str(config["group_size"]),
-        "--r-reduced",
-        str(config["r_reduced"]),
-    ]
-    if config["space"] == "SE2":
-        command.extend(
-            (
-                "--threads",
-                str(shared["threads"]),
-                "--partial-residual-tol",
-                str(config["partial_residual_tol"]),
-                "--basis-rebuild-period",
-                str(config["basis_rebuild_period"]),
-                "--basis-rebuild-warmup-outers",
-                str(config["basis_rebuild_warmup_outers"]),
-                "--huber-delta",
-                str(shared["huber_delta"]),
-                "--coarse-scale",
-                str(config["coarse_scale"]),
-                "--jitter",
-                str(config["jitter"]),
-                "--fixed-eta-after-sweeps",
-                str(config["fixed_eta_after_sweeps"]),
-                "--process-affinity-mask",
-                str(shared["process_affinity_mask"]),
-            )
-        )
-    else:
-        command.extend(
-            (
-                "--threads",
-                str(shared["threads"]),
-                "--huber-delta",
-                str(shared["huber_delta"]),
-                "--process-affinity-mask",
-                str(shared["process_affinity_mask"]),
-                "--basis-rebuild-period",
-                str(config["basis_rebuild_period"]),
-                "--coarse-numeric-rebuild-period",
-                str(config["coarse_numeric_rebuild_period"]),
-                "--coarse-reuse-pcg-iters",
-                str(config["coarse_reuse_pcg_iters"]),
-                "--implicit-fine-operator-threads",
-                str(min(config["implicit_fine_operator_threads"], shared["threads"])),
-                "--fixed-lambda-after-sweeps",
-                str(config["fixed_lambda_after_sweeps"]),
-                "--partial-basis-max-iters",
-                str(config["partial_basis_max_iters"]),
-                "--partial-basis-accept-unconverged",
-                "1" if config["partial_basis_accept_unconverged"] else "0",
-                "--final-direct-polish-steps",
-                str(config["final_direct_polish_steps"]),
-            )
-        )
-        if not include_direct:
-            command.append("--skip-direct")
-    if write_poses:
-        command.append("--write-poses")
-    return command
+def parse_args(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__, allow_abbrev=False)
+    parser.add_argument("suite", choices=("pgo", "ba"))
+    parser.add_argument("datasets", nargs="*", help="canonical names; defaults to all PGO / BA main10")
+    parser.add_argument("--subset", help="PGO: all, SE2, SE3; BA: main10, alamo")
+    parser.add_argument("--input", type=Path, help="arbitrary input, hashed but never reference-verified")
+    parser.add_argument("--space", choices=("SE2", "SE3"), help="required for PGO --input only")
+    parser.add_argument("--label", help="custom display label only, not a reference lookup")
+    thread_group = parser.add_mutually_exclusive_group()
+    thread_group.add_argument("--threads", type=int, choices=(1, 16))
+    thread_group.add_argument("--compare-threads", action="store_true", help="all 1-thread runs, then all 16-thread runs, sequentially")
+    parser.add_argument("--repeats", type=positive_int, default=1)
+    parser.add_argument("--timeout", type=positive_seconds, default=2000.0, help="maximum process wall seconds per run (default: 2000)")
+    parser.add_argument("--build-dir", type=Path, default=PROJECT_ROOT / "build", help="build root with separate pgo/ and ba/ executable/runtime directories")
+    parser.add_argument("--data-root", type=Path, help="canonical inputs; fallback HGBP_PGO_DATA_ROOT / HGBP_BA_DATA_ROOT, then data/<suite>")
+    parser.add_argument("--runtime-root", type=Path, help="RootBA conda environment; fallback HGBP_ROOTBA_RUNTIME; used only for BA")
+    parser.add_argument("--output-root", type=Path, required=True, help="must not exist, including for --dry-run")
+    hardware = parser.add_mutually_exclusive_group()
+    hardware.add_argument("--affinity-mask", type=affinity_mask, default="0xffff", help="hardware selection only (default: 0xffff)")
+    hardware.add_argument("--no-affinity", action="store_true", help="do not set process affinity; the solver's worker-placement policy is unchanged")
+    parser.add_argument("--dry-run", action="store_true", help="verify files/hashes and write planned commands; never launch solvers")
+    args = parser.parse_intermixed_args(argv)
+    if args.input:
+        if args.datasets or args.subset or args.data_root:
+            parser.error("--input cannot be combined with dataset names, --subset or --data-root")
+        if args.suite == "pgo" and args.space is None:
+            parser.error("PGO --input requires --space SE2 or SE3")
+    elif args.space or args.label:
+        parser.error("--space and --label require --input")
+    if args.suite == "ba" and args.space:
+        parser.error("--space is only valid for PGO")
+    if args.datasets and args.subset:
+        parser.error("choose dataset names or --subset, not both")
+    if args.label and not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", args.label):
+        parser.error("--label must contain only letters, digits, underscores, dots or hyphens")
+    if len(set(args.datasets)) != len(args.datasets):
+        parser.error("duplicate dataset names")
+    return args
 
 
-def ba_command(
-    executable: Path,
-    input_path: Path,
-    output_path: Path,
-    shared: dict[str, Any],
-    config: dict[str, Any],
-) -> list[str]:
-    command = [
-        str(executable),
-        "--problem-file",
-        str(input_path),
-        "--out-json",
-        str(output_path),
-        "--outer",
-        str(shared["outer"]),
-        "--mg-cycles",
-        str(config.get("mg_cycles", shared["mg_cycles"])),
-        "--pre-sweeps",
-        str(shared["pre_sweeps"]),
-        "--gbp-full-sweeps",
-        str(shared["gbp_full_sweeps"]),
-        "--group-size",
-        str(config["group_size"]),
-        "--coarse-scale",
-        str(shared["coarse_scale"]),
-        "--build-threads",
-        str(min(config["build_threads"], shared["threads"])),
-        "--gbp-threads",
-        str(shared["threads"]),
-        "--message-damping",
-        str(shared["message_damping"]),
-        "--initial-lambda",
-        str(config["initial_lambda"]),
-        "--pair-factor-scale",
-        str(shared["pair_factor_scale"]),
-        "--pair-backbone-min-coverage",
-        str(shared["pair_backbone_min_coverage"]),
-        "--krylov-start-outer",
-        str(config.get("krylov_start_outer", shared["krylov_start_outer"])),
-        "--fine-smoother",
-        str(shared["fine_smoother"]),
-        "--min-pair-observations",
-        str(config["min_pair_observations"]),
-        "--pair-sample-cap",
-        str(config["pair_sample_cap"]),
-    ]
-    command.append("--normalize-bal" if shared["normalize_bal"] else "--no-normalize-bal")
-    if not config["pair_sample_rescale"]:
-        command.append("--pair-sample-no-rescale")
-    if config["unreduced_unary"]:
-        command.append("--unreduced-unary")
-    if config["no_pose_scaling"]:
-        command.append("--no-pose-scaling")
-    return command
+def select_inputs(args, manifest):
+    if args.input:
+        return [{"label": args.label or "custom", "space": args.space,
+                 "path": args.input.resolve(), "canonical": False, "expected_sha256": None}]
+    subsets = manifest["subsets"][args.suite]
+    subset = args.subset or subsets["default"]
+    if subset == "default" or subset not in subsets:
+        raise ValueError(f"unknown {args.suite} subset: {subset}")
+    names = args.datasets or subsets[subset]
+    fallback = os.environ.get(f"HGBP_{args.suite.upper()}_DATA_ROOT")
+    root = (args.data_root or (Path(fallback) if fallback else PROJECT_ROOT / "data" / args.suite)).resolve()
+    selected = []
+    for name in names:
+        record = manifest["datasets"].get(name)
+        if record is None or record["suite"] != args.suite:
+            raise ValueError(f"unknown {args.suite} dataset: {name}")
+        selected.append({"label": name, "space": record.get("space"),
+                         "path": root / record["path"], "canonical": True,
+                         "expected_sha256": record["sha256"]})
+    return selected
 
 
-def environment_for(
-    suite: str,
-    rootba_runtime: Path,
-    threads: int,
-) -> tuple[dict[str, str], dict[str, str]]:
-    environment = os.environ.copy()
-    overrides: dict[str, str] = {}
+def ba_arguments(policy, threads):
+    # Matches the accepted run_ba.py:hgbp_arguments boolean conventions.
+    result = []
+    for name, value in policy.items():
+        if name in ("description", "threads"):
+            continue
+        flag = "--" + name.replace("_", "-")
+        if isinstance(value, bool):
+            if name == "normalize_bal":
+                result.append("--normalize-bal" if value else "--no-normalize-bal")
+            elif name == "pair_sample_rescale":
+                if not value:
+                    result.append("--pair-sample-no-rescale")
+            elif value:
+                result.append(flag)
+        else:
+            result.extend((flag, str(value)))
+    return result + ["--build-threads", str(threads), "--gbp-threads", str(threads)]
+
+
+def solver_command(suite, config, space, executable, input_path, output_path, threads, mask):
+    command = [str(executable), "--problem-file", str(input_path), "--out-json", str(output_path)]
     if suite == "ba":
-        runtime_paths = (
-            rootba_runtime / "Library" / "bin",
-            rootba_runtime / "Scripts",
-        )
-        overrides = {
-            "OMP_NUM_THREADS": str(threads),
-            "OMP_THREAD_LIMIT": str(threads),
-            "OMP_DYNAMIC": "FALSE",
-            "OPENBLAS_NUM_THREADS": str(threads),
-            "MKL_NUM_THREADS": str(threads),
-            "OMP_WAIT_POLICY": "PASSIVE",
-            "KMP_BLOCKTIME": "0",
-            "PATH": os.pathsep.join(
-                [str(path) for path in runtime_paths] + [environment["PATH"]]
-            ),
-        }
+        return command + ba_arguments(config["policy"], threads)
+    arguments = list(config["profiles"][space]["arguments"])
+    if mask is None:
+        index = arguments.index("--process-affinity-mask")
+        del arguments[index:index + 2]
+    return command + [value.format(threads=threads, affinity_mask=mask) for value in arguments]
+
+
+def environment_for(template, threads, runtime_root=None, inherited=None):
+    inherited = os.environ if inherited is None else inherited
+    removed = sorted(key for key in inherited if key.upper().startswith(NUMERICAL_PREFIXES))
+    environment = {key: value for key, value in inherited.items() if key not in removed}
+    overrides = {key: value.format(threads=threads) for key, value in template.items()}
+    path_key = next((key for key in environment if key.upper() == "PATH"), "PATH")
+    path = environment.pop(path_key, "")
+    if runtime_root:
+        paths = (runtime_root / "Library" / "bin", runtime_root / "Scripts")
+        path = os.pathsep.join([str(p) for p in paths] + [path])
+    overrides["PATH"] = path
     environment.update(overrides)
-    return environment, overrides
+    return environment, {"set": overrides, "removed": removed,
+                         "inherited_temp": {k: environment[k] for k in ("TEMP", "TMP", "TMPDIR") if k in environment}}
 
 
-def read_metrics(suite: str, output_path: Path) -> dict[str, float]:
+@contextmanager
+def process_affinity(mask):
+    """Apply and restore the driver's CPU allocation; every child inherits it."""
+    if mask is None:
+        yield
+        return
+    bits = int(mask, 0)
+    if os.name == "nt":
+        kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel.GetCurrentProcess.restype = ctypes.c_void_p
+        kernel.GetProcessAffinityMask.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_size_t), ctypes.POINTER(ctypes.c_size_t)]
+        kernel.SetProcessAffinityMask.argtypes = [ctypes.c_void_p, ctypes.c_size_t]
+        handle = kernel.GetCurrentProcess()
+        previous, available = ctypes.c_size_t(), ctypes.c_size_t()
+        if not kernel.GetProcessAffinityMask(handle, ctypes.byref(previous), ctypes.byref(available)):
+            raise ctypes.WinError(ctypes.get_last_error())
+        if bits & available.value != bits:
+            raise ValueError("requested affinity is unavailable; select --affinity-mask or --no-affinity")
+        def set_mask(value):
+            if not kernel.SetProcessAffinityMask(handle, value):
+                raise ctypes.WinError(ctypes.get_last_error())
+        set_mask(bits)
+        restore = lambda: set_mask(previous.value)
+    elif hasattr(os, "sched_setaffinity"):
+        previous = os.sched_getaffinity(0)
+        selected = {cpu for cpu in range(64) if bits & (1 << cpu)}
+        if not selected <= previous:
+            raise ValueError("requested affinity is unavailable; select --affinity-mask or --no-affinity")
+        os.sched_setaffinity(0, selected)
+        restore = lambda: os.sched_setaffinity(0, previous)
+    else:
+        raise ValueError("affinity is unsupported on this OS; use --no-affinity")
+    try:
+        yield
+    finally:
+        restore()
+
+
+def require_fields(actual, expected):
+    for key, value in expected.items():
+        if key not in actual or actual[key] != value:
+            raise ValueError(f"native policy mismatch: {key} expected {value!r}, got {actual.get(key)!r}")
+
+
+def finite_nonnegative(value, label):
+    if not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0:
+        raise ValueError(f"invalid native metric: {label}")
+
+
+def read_metrics(suite, output_path, threads, space=None, require_work=False):
     result = load_json(output_path)
     if suite == "pgo":
         history = result["mg_history"]
-        return {
-            "time_sec": sum(float(row["outer_total_sec"]) for row in history),
-            "cost": float(history[-1]["nonlinear_objective"]),
-        }
-    return {
-        "time_sec": float(result["total_sec"]),
-        "cost": float(result["final_cost"]),
-        "mre": float(result["final_are_px"]),
-        "rmse": float(result["final_reprojection_rmse_px"]),
-    }
-
-
-def relative_error(actual: float, expected: float) -> float:
-    return abs(actual - expected) / max(abs(expected), 1e-300)
-
-
-def summarize(
-    suite: str,
-    selected: list[str],
-    configs: dict[str, Any],
-    run_records: list[dict[str, Any]],
-) -> list[dict[str, Any]]:
-    shared = configs["shared"]
-    summary: list[dict[str, Any]] = []
-    for dataset in selected:
-        runs = [row for row in run_records if row["dataset"] == dataset]
-        times = [float(row["metrics"]["time_sec"]) for row in runs]
-        costs = [float(row["metrics"]["cost"]) for row in runs]
-        reference = configs["datasets"][dataset]["reference"]
-        thread_key = str(shared["threads"])
-        if thread_key not in reference["hgbp"]:
-            raise KeyError(
-                f"{dataset}: no H-GBP reference for {thread_key} thread(s)"
-            )
-        hgbp_reference = reference["hgbp"][thread_key]
-        reference_time = float(hgbp_reference["time_sec"])
-        reference_cost = float(hgbp_reference["cost"])
-        median_time = statistics.median(times)
-        median_cost = statistics.median(costs)
-        row: dict[str, Any] = {
-            "dataset": dataset,
-            "repeats": len(runs),
-            "time_median_sec": median_time,
-            "time_min_sec": min(times),
-            "time_max_sec": max(times),
-            "reference_time_sec": reference_time,
-            "time_over_reference": median_time / reference_time,
-            "cost": median_cost,
-            "reference_cost": reference_cost,
-            "cost_relative_error": relative_error(median_cost, reference_cost),
-        }
-        row["cost_match"] = (
-            row["cost_relative_error"] <= shared["cost_relative_tolerance"]
-        )
-        if suite == "ba":
-            mres = [float(run["metrics"]["mre"]) for run in runs]
-            rmses = [float(run["metrics"]["rmse"]) for run in runs]
-            median_mre = statistics.median(mres)
-            median_rmse = statistics.median(rmses)
-            row.update(
-                {
-                    "mre": median_mre,
-                    "rmse": median_rmse,
-                    "reference_mre": float(hgbp_reference["mre"]),
-                    "reference_rmse": float(hgbp_reference["rmse"]),
-                    "mre_relative_error": relative_error(
-                        median_mre, float(hgbp_reference["mre"])
-                    ),
-                    "rmse_relative_error": relative_error(
-                        median_rmse, float(hgbp_reference["rmse"])
-                    ),
-                }
-            )
-            row["mre_match"] = (
-                row["mre_relative_error"]
-                <= shared["mre_relative_tolerance"]
-            )
-            row["rmse_match"] = (
-                row["rmse_relative_error"]
-                <= shared["rmse_relative_tolerance"]
-            )
-        summary.append(row)
-    return summary
-
-
-def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
-    if not rows:
-        return
-    fieldnames = list(
-        dict.fromkeys(key for row in rows for key in row)
-    )
-    with path.open("w", newline="", encoding="utf-8") as stream:
-        writer = csv.DictWriter(stream, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(rows)
-
-
-def print_summary(suite: str, rows: list[dict[str, Any]]) -> None:
-    if suite == "pgo":
-        print(
-            "dataset          time[s]   ref[s]   time/ref"
-            "        cost           rel.err   match"
-        )
-        for row in rows:
-            print(
-                f"{row['dataset']:<15} "
-                f"{row['time_median_sec']:>8.4f} "
-                f"{row['reference_time_sec']:>8.4f} "
-                f"{row['time_over_reference']:>10.3f} "
-                f"{row['cost']:>14.7g} "
-                f"{row['cost_relative_error']:>9.2e} "
-                f"{str(row['cost_match']):>7}"
-            )
+        config = result["config"]
+        if config["sync_num_threads"] != threads or config["num_outer"] != 20:
+            raise ValueError("PGO effective thread/outer budget differs from request")
+        require_fields(config, {"adaptive_precision": True, "smoother": "gbp", "group_size": 20,
+                                "basis_rebuild_period": 1, "robust_huber_delta": 5})
+        for key in ("cycle_energy_krylov", "skip_coarse_quality_ablation", "direct_enabled",
+                    "direct_reference_enabled", "final_direct_polish_steps", "final_coarse_polish_passes"):
+            if config.get(key, False):
+                raise ValueError(f"unexpected PGO ablation/Direct policy: {key}")
+        if space:
+            cycles, sweeps, reduced = (3, 100, 4) if space == "SE2" else (5, 50, 12)
+            require_fields(config, {"inner_cycles": cycles, "pre_sweeps": sweeps, "r_reduced": reduced})
+        if space == "SE3":
+            require_fields(config, {"implicit_fine_operator_threads": threads, "persistent_sweeps": True,
+                                    "automatic_coarse": True, "cycle_line_search": True,
+                                    "precision_initialization": "warm-transport-balanced",
+                                    "coarse_linear_backend": "cholmod_auto", "eta_lift": "precision",
+                                    "residual_stop_enabled": True})
+        if [row["outer"] for row in history] != list(range(21)):
+            raise ValueError("PGO must report the initial state and 20 outer iterations")
+        if len(result.get("direct_history", [])) > 1:
+            raise ValueError("unexpected Direct iterations")
+        if result.get("worker_affinity_failures", 0):
+            raise ValueError("native worker_affinity_failures is nonzero")
+        for row in history:
+            finite_nonnegative(row["nonlinear_objective"], "history cost")
+            for key, value in row.items():
+                if isinstance(value, (int, float)) and not math.isfinite(value):
+                    raise ValueError(f"nonfinite PGO history field: {key}")
+            finite_nonnegative(row["outer_total_sec"], "outer_total_sec")
+            for key in ("full_precision_sweeps", "eta_only_sweeps", "coarse_solves"):
+                finite_nonnegative(row[key], key)
+            if row["outer"]:
+                if require_work and (row["full_precision_sweeps"] + row["eta_only_sweeps"] <= 0 or row["coarse_solves"] <= 0):
+                    raise ValueError("PGO outer iteration did not execute GBP/coarse work")
+        native_key = "hgbp_solver_wall_sec" if "hgbp_solver_wall_sec" in result else "solver_wall_sec"
+        metrics = {"native_wall_sec": float(result[native_key]), "native_wall_field": native_key,
+                   "outer_count": len(history) - 1, "cost": float(history[-1]["nonlinear_objective"]),
+                   "counters": {key: sum(row[key] for row in history[1:]) for key in
+                                ("full_precision_sweeps", "eta_only_sweeps", "coarse_solves")}}
     else:
-        print(
-            "dataset          time[s]   ref[s]   time/ref"
-            "        cost        MRE       RMSE   match"
-        )
-        for row in rows:
-            match = (
-                row["cost_match"]
-                and row["mre_match"]
-                and row["rmse_match"]
-            )
-            print(
-                f"{row['dataset']:<15} "
-                f"{row['time_median_sec']:>8.4f} "
-                f"{row['reference_time_sec']:>8.4f} "
-                f"{row['time_over_reference']:>10.3f} "
-                f"{row['cost']:>11.7g} "
-                f"{row['mre']:>10.6f} "
-                f"{row['rmse']:>10.6f} "
-                f"{str(match):>7}"
-            )
+        if result["threads"] != threads or result["build_threads"] != threads:
+            raise ValueError("BA effective threads differ from request")
+        if result["outer"] != 20 or len(result["costs"]) != 21:
+            raise ValueError("BA must report 20 outer attempts and 21 costs")
+        require_fields(result, {"coarse_operator": "additive", "linear_controller": "fcg",
+                                "aggregation": "connected", "gbp_model": "normalized", "fine_smoother": "gbp",
+                                "mg_cycles": 5, "pre_sweeps": 3, "gbp_full_sweeps": 32,
+                                "graph_neighbors": 4, "coarse_groups_budget": 24,
+                                "variance_rel_tol": 1e-6, "linear_rel_tol": 0.1,
+                                "pair_sample_cap": 16, "pair_sample_rescale": True,
+                                "message_damping": 1.0, "initial_lambda": 1e-4,
+                                "pair_factor_scale": 1.0, "krylov_start_outer": 1,
+                                "unreduced_unary": False, "no_pose_scaling": False})
+        for value in result["costs"]:
+            finite_nonnegative(value, "BA cost history")
+        for key, values in result.items():
+            if isinstance(values, list):
+                for value in values:
+                    if not isinstance(value, (int, float)) or not math.isfinite(value):
+                        raise ValueError(f"nonfinite BA history field: {key}")
+        for key in ("outer_sec", "full_sweeps", "eta_sweeps", "linear_cycles"):
+            if len(result[key]) != 20:
+                raise ValueError(f"BA {key} must contain all 20 outer attempts")
+            for value in result[key]:
+                finite_nonnegative(value, key)
+                if require_work and key != "outer_sec" and value <= 0:
+                    raise ValueError(f"BA iteration did not execute {key}")
+        metrics = {"native_wall_sec": float(result["total_sec"]), "native_wall_field": "total_sec",
+                   "outer_count": result["outer"], "cost": float(result["final_cost"]),
+                   "mre": float(result["final_are_px"]), "rmse": float(result["final_reprojection_rmse_px"]),
+                   "observations": result["num_observations"],
+                   "counters": {key: sum(result[key]) for key in ("full_sweeps", "eta_sweeps", "linear_cycles")}}
+        config = {key: value for key, value in result.items() if not isinstance(value, (list, dict))}
+    for key in ("native_wall_sec", "cost", "mre", "rmse"):
+        if key in metrics:
+            finite_nonnegative(metrics[key], key)
+    if metrics["native_wall_sec"] <= 0:
+        raise ValueError("native wall time must be positive")
+    # Banded eigensolver failures are recoverable fallbacks, not failed solves.
+    metrics["diagnostics"] = {key: result[key] for key in ("basis_band_failures", "worker_affinity_failures") if key in result}
+    metrics["warnings"] = ["banded eigensolver used a recoverable fallback"] if result.get("basis_band_failures", 0) else []
+    if suite == "ba":
+        if metrics["observations"] <= 0 or not math.isclose(metrics["rmse"]**2 * metrics["observations"], metrics["cost"], rel_tol=1e-8, abs_tol=1e-10):
+            raise ValueError("inconsistent BA SSR/RMSE/observation count")
+        if metrics["mre"] > metrics["rmse"] + 1e-9:
+            raise ValueError("BA MRE exceeds RMSE")
+    return metrics, config
 
 
-def compare_threads(
-    args: argparse.Namespace,
-    parser: argparse.ArgumentParser,
-) -> int:
-    if args.threads is not None:
-        parser.error("--compare-threads cannot be combined with --threads")
+def check_quality(metrics, reference, tolerance):
+    if reference is None:
+        return {"status": "not_applicable", "reason": "custom input: no canonical hash or quality reference"}
+    errors = {key: abs(metrics[key] - reference[key]) / max(abs(reference[key]), 1e-300)
+              for key in ("cost", "mre", "rmse") if key in reference}
+    return {"status": "pass" if all(error <= tolerance for error in errors.values()) else "fail",
+            "relative_tolerance": tolerance, "relative_error": errors,
+            "time_over_reference": metrics["native_wall_sec"] / reference["time_sec"]}
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_root = (
-        args.output_root.resolve()
-        if args.output_root
-        else PROJECT_ROOT
-        / "results"
-        / "reproduction"
-        / f"{args.suite}_scaling_{timestamp}"
-    )
-    output_root.mkdir(parents=True, exist_ok=True)
 
-    def child_command(threads: int) -> list[str]:
-        command = [
-            sys.executable,
-            str(Path(__file__).resolve()),
-            args.suite,
-            *args.datasets,
-            "--threads",
-            str(threads),
-            "--repeats",
-            str(args.repeats),
-            "--output-root",
-            str(output_root / f"{threads}-thread"),
-        ]
-        optional_paths = (
-            ("--pgo-data-root", args.pgo_data_root),
-            ("--ba-data-root", args.ba_data_root),
-            ("--rootba-runtime", args.rootba_runtime),
-            ("--se2-exe", args.se2_exe),
-            ("--se3-exe", args.se3_exe),
-            ("--ba-exe", args.ba_exe),
-        )
-        for option, value in optional_paths:
-            if value is not None:
-                command.extend((option, str(value)))
-        for enabled, option in (
-            (args.include_direct, "--include-direct"),
-            (args.write_poses, "--write-poses"),
-            (args.skip_input_hash, "--skip-input-hash"),
-            (args.no_verify_results, "--no-verify-results"),
-            (args.dry_run, "--dry-run"),
-        ):
-            if enabled:
-                command.append(option)
-        return command
+def version_info():
+    def git(*arguments):
+        try:
+            return subprocess.check_output(["git", *arguments], cwd=PROJECT_ROOT, stderr=subprocess.DEVNULL, text=True).strip()
+        except (OSError, subprocess.CalledProcessError):
+            return None
+    return {"driver_version": DRIVER_VERSION, "driver_sha256": sha256(Path(__file__)),
+            "git_head": git("rev-parse", "HEAD"), "git_status": git("status", "--porcelain"),
+            "python": sys.version, "platform": platform.platform(), "processor": platform.processor(),
+            "logical_cpus": os.cpu_count()}
 
-    comparison_config = load_json(CONFIG_ROOT / f"{args.suite}.json")
-    cooldown_seconds = float(
-        comparison_config["shared"]["thread_compare_cooldown_sec"]
-    )
-    for threads in (1, 16):
-        command = child_command(threads)
-        print(
-            f"[thread comparison] {subprocess.list2cmdline(command)}",
-            flush=True,
-        )
-        completed = subprocess.run(command, cwd=PROJECT_ROOT, check=False)
-        if completed.returncode != 0:
-            return completed.returncode
-        if threads == 1 and not args.dry_run and cooldown_seconds > 0.0:
-            print(
-                f"[thread comparison] cooling down for "
-                f"{cooldown_seconds:g} s",
-                flush=True,
-            )
-            time.sleep(cooldown_seconds)
 
-    if args.dry_run:
-        print(f"Resolved paired configurations: {output_root}")
-        return 0
+def summarize(records):
+    rows = []
+    groups = dict.fromkeys((r["dataset"], r["threads"]) for r in records)
+    for label, threads in groups:
+        runs = [r for r in records if (r["dataset"], r["threads"]) == (label, threads)]
+        valid = [r for r in runs if "metrics" in r]
+        row = {"dataset": label, "threads": threads, "attempts": len(runs), "completed": len(valid)}
+        if valid:
+            times = [r["metrics"]["native_wall_sec"] for r in valid]
+            row.update(native_wall_median_sec=statistics.median(times), native_wall_min_sec=min(times),
+                       native_wall_max_sec=max(times), process_wall_median_sec=statistics.median(r["process_wall_sec"] for r in valid),
+                       outer_counts=[r["metrics"]["outer_count"] for r in valid],
+                       quality_status="fail" if any(r["status"] != "ok" for r in runs) else valid[0]["quality"]["status"])
+            for key in ("cost", "mre", "rmse"):
+                if key in valid[0]["metrics"]:
+                    row[key + "_median"] = statistics.median(r["metrics"][key] for r in valid)
+            if valid[0]["reference"]:
+                row["time_over_reference"] = statistics.median(times) / valid[0]["reference"]["time_sec"]
+        rows.append(row)
+    comparisons = []
+    for label in dict.fromkeys(r["dataset"] for r in rows):
+        by_thread = {r["threads"]: r for r in rows if r["dataset"] == label and "native_wall_median_sec" in r}
+        if set(by_thread) == {1, 16} and by_thread[16]["native_wall_median_sec"] > 0:
+            comparisons.append({"dataset": label, "native_time_1_over_16": by_thread[1]["native_wall_median_sec"] / by_thread[16]["native_wall_median_sec"]})
+    return {"timing": "Ratios only; no cross-machine speed pass/fail. Quality checked per repeat against its own thread reference.",
+            "results": rows, "thread_comparison": comparisons}
 
+
+def run(args):
+    output_root = args.output_root.resolve()
+    if output_root.exists():
+        raise ValueError(f"--output-root must be a new directory: {output_root}")
     config = load_json(CONFIG_ROOT / f"{args.suite}.json")
-    validate_config(args.suite, config)
-    one_rows = {
-        row["dataset"]: row
-        for row in load_json(output_root / "1-thread" / "summary.json")
-    }
-    sixteen_rows = {
-        row["dataset"]: row
-        for row in load_json(output_root / "16-thread" / "summary.json")
-    }
-    selected = args.datasets or list(config["datasets"])
-    ratio_tolerance = float(
-        config["shared"]["thread_ratio_relative_tolerance"]
-    )
-    time_regression_tolerance = float(
-        config["shared"]["thread_time_regression_relative_tolerance"]
-    )
-    cost_tolerance = float(
-        config["shared"]["thread_cost_relative_tolerance"]
-    )
-    comparison: list[dict[str, Any]] = []
-    for dataset in selected:
-        one = one_rows[dataset]
-        sixteen = sixteen_rows[dataset]
-        measured_ratio = (
-            float(one["time_median_sec"]) /
-            float(sixteen["time_median_sec"])
-        )
-        reference = config["datasets"][dataset]["reference"]["hgbp"]
-        reference_ratio = (
-            float(reference["1"]["time_sec"]) /
-            float(reference["16"]["time_sec"])
-        )
-        one_time_over_reference = (
-            float(one["time_median_sec"]) /
-            float(reference["1"]["time_sec"])
-        )
-        sixteen_time_over_reference = (
-            float(sixteen["time_median_sec"]) /
-            float(reference["16"]["time_sec"])
-        )
-        cost_relative_difference = relative_error(
-            float(one["cost"]),
-            float(sixteen["cost"]),
-        )
-        row = {
-            "dataset": dataset,
-            "hgbp1_time_sec": float(one["time_median_sec"]),
-            "hgbp16_time_sec": float(sixteen["time_median_sec"]),
-            "hgbp1_over_hgbp16": measured_ratio,
-            "reference_hgbp1_over_hgbp16": reference_ratio,
-            "ratio_relative_error": relative_error(
-                measured_ratio,
-                reference_ratio,
-            ),
-            "hgbp1_time_over_reference": one_time_over_reference,
-            "hgbp16_time_over_reference": sixteen_time_over_reference,
-            "hgbp1_cost": float(one["cost"]),
-            "hgbp16_cost": float(sixteen["cost"]),
-            "cost_relative_difference": cost_relative_difference,
-        }
-        row["ratio_match"] = (
-            row["ratio_relative_error"] <= ratio_tolerance
-        )
-        row["time_regression_match"] = (
-            one_time_over_reference <= 1.0 + time_regression_tolerance
-            and sixteen_time_over_reference
-            <= 1.0 + time_regression_tolerance
-        )
-        row["cost_match"] = cost_relative_difference <= cost_tolerance
-        if args.suite == "ba":
-            mre_relative_difference = relative_error(
-                float(one["mre"]),
-                float(sixteen["mre"]),
-            )
-            rmse_relative_difference = relative_error(
-                float(one["rmse"]),
-                float(sixteen["rmse"]),
-            )
-            row.update(
-                {
-                    "hgbp1_mre": float(one["mre"]),
-                    "hgbp16_mre": float(sixteen["mre"]),
-                    "mre_relative_difference": mre_relative_difference,
-                    "hgbp1_rmse": float(one["rmse"]),
-                    "hgbp16_rmse": float(sixteen["rmse"]),
-                    "rmse_relative_difference": rmse_relative_difference,
-                    "mre_match": (
-                        mre_relative_difference
-                        <= float(
-                            config["shared"][
-                                "thread_mre_relative_tolerance"
-                            ]
-                        )
-                    ),
-                    "rmse_match": (
-                        rmse_relative_difference
-                        <= float(
-                            config["shared"][
-                                "thread_rmse_relative_tolerance"
-                            ]
-                        )
-                    ),
-                }
-            )
-        comparison.append(row)
-
-    (output_root / "thread_scaling_summary.json").write_text(
-        json.dumps(comparison, indent=2) + "\n",
-        encoding="utf-8",
-    )
-    write_csv(output_root / "thread_scaling_summary.csv", comparison)
-    print(
-        "dataset          HGBP-1[s] HGBP-16[s]  1/16"
-        "   ref  ratio?  perf?   cost rel.err  match"
-    )
-    for row in comparison:
-        match = row["time_regression_match"] and row["cost_match"]
-        if args.suite == "ba":
-            match = match and row["mre_match"] and row["rmse_match"]
-        print(
-            f"{row['dataset']:<15} "
-            f"{row['hgbp1_time_sec']:>9.4f} "
-            f"{row['hgbp16_time_sec']:>10.4f} "
-            f"{row['hgbp1_over_hgbp16']:>6.2f} "
-            f"{row['reference_hgbp1_over_hgbp16']:>6.2f} "
-            f"{str(row['ratio_match']):>7} "
-            f"{str(row['time_regression_match']):>6} "
-            f"{row['cost_relative_difference']:>12.2e} "
-            f"{str(match):>6}"
-        )
-    print(f"Thread-scaling results: {output_root}")
-    if not args.no_verify_results and any(
-        not row["time_regression_match"]
-        or not row["cost_match"]
-        or (
-            args.suite == "ba"
-            and (not row["mre_match"] or not row["rmse_match"])
-        )
-        for row in comparison
-    ):
-        return 3
-    return 0
-
-
-def main() -> int:
-    parser = argparse.ArgumentParser(
-        description="Reproduce the formal H-GBP PGO or BA results."
-    )
-    parser.add_argument("suite", choices=("pgo", "ba"))
-    parser.add_argument("datasets", nargs="*")
-    parser.add_argument("--repeats", type=int, default=1)
-    parser.add_argument(
-        "--threads",
-        type=int,
-        help="override the configured worker count (formal runs use 1 or 16)",
-    )
-    parser.add_argument(
-        "--compare-threads",
-        action="store_true",
-        help="run H-GBP at both 1 and 16 threads and verify scaling/quality",
-    )
-    parser.add_argument("--output-root", type=Path)
-    parser.add_argument("--pgo-data-root", type=Path)
-    parser.add_argument("--ba-data-root", type=Path)
-    parser.add_argument("--rootba-runtime", type=Path)
-    parser.add_argument("--se2-exe", type=Path)
-    parser.add_argument("--se3-exe", type=Path)
-    parser.add_argument("--ba-exe", type=Path)
-    parser.add_argument("--include-direct", action="store_true")
-    parser.add_argument("--write-poses", action="store_true")
-    parser.add_argument("--skip-input-hash", action="store_true")
-    parser.add_argument("--no-verify-results", action="store_true")
-    parser.add_argument("--dry-run", action="store_true")
-    args = parser.parse_args()
-
-    if args.compare_threads:
-        return compare_threads(args, parser)
-
-    configs = copy.deepcopy(load_json(CONFIG_ROOT / f"{args.suite}.json"))
-    validate_config(args.suite, configs)
-    if args.threads is not None:
-        if args.threads < 1:
-            parser.error("--threads must be positive")
-        if args.threads not in (1, 16):
-            parser.error("formal runs support --threads 1 or --threads 16")
-        configs["shared"]["threads"] = args.threads
+    if config.get("schema_version") != 3 or "datasets" in config or "shared" in config:
+        raise ValueError("obsolete solver configuration: expected unified schema 3")
     manifest = load_json(CONFIG_ROOT / "datasets.json")
-    available = list(configs["datasets"])
-    selected = args.datasets or available
-    unknown = sorted(set(selected) - set(available))
-    if unknown:
-        parser.error(f"unknown {args.suite} datasets: {', '.join(unknown)}")
-    if args.repeats < 1:
-        parser.error("--repeats must be positive")
+    references = load_json(CONFIG_ROOT / "reference.json")
+    selected = select_inputs(args, manifest)
+    runtime_value = (args.runtime_root or os.environ.get("HGBP_ROOTBA_RUNTIME")) if args.suite == "ba" else None
+    runtime = Path(runtime_value).resolve() if runtime_value else None
+    if runtime is not None and not runtime.is_dir():
+        raise ValueError(f"runtime root does not exist: {runtime}")
+    mask = None if args.no_affinity else args.affinity_mask
+    thread_counts = [1, 16] if args.compare_threads else [args.threads or 16]
+    executables = {}
+    for item in selected:
+        item["input_sha256"] = sha256(item["path"])
+        if item["canonical"] and item["input_sha256"] != item["expected_sha256"]:
+            raise ValueError(f"{item['label']}: input SHA-256 mismatch")
+        family = item["space"] if args.suite == "pgo" else "ba"
+        if family not in executables:
+            name = f"{family.lower()}_benchmark" if args.suite == "pgo" else "ba_solver"
+            executable = (args.build_dir / args.suite / (name + (".exe" if os.name == "nt" else ""))).resolve()
+            # Strict split layout: PGO and BA require different OpenBLAS binaries.
+            executables[family] = {"path": str(executable), "sha256": sha256(executable),
+                                   "adjacent_dll_sha256": {p.name: sha256(p) for p in sorted(executable.parent.glob("*.dll"))}}
+        item["executable"] = executables[family]
+        item["reference"] = None
+        if item["canonical"]:
+            reference = references["datasets"][item["label"]]
+            if reference["suite"] != args.suite or reference["input_sha256"] != item["input_sha256"]:
+                raise ValueError("reference is not bound to this canonical input")
+            item["reference"] = {str(t): reference["threads"][str(t)] for t in thread_counts}
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_root = (
-        args.output_root.resolve()
-        if args.output_root
-        else PROJECT_ROOT / "results" / "reproduction" / f"{args.suite}_{timestamp}"
-    )
-    output_root.mkdir(parents=True, exist_ok=True)
-
-    roots = manifest["roots"]
-    data_root = resolve_root(
-        roots,
-        args.suite,
-        args.pgo_data_root if args.suite == "pgo" else args.ba_data_root,
-    )
-    rootba_runtime = resolve_root(
-        roots, "rootba_runtime", args.rootba_runtime
-    )
-    executables = {
-        "SE2": (args.se2_exe or PROJECT_ROOT / "build" / "se2_benchmark.exe").resolve(),
-        "SE3": (args.se3_exe or PROJECT_ROOT / "build" / "se3_benchmark.exe").resolve(),
-        "ba": (args.ba_exe or PROJECT_ROOT / "build" / "ba_solver.exe").resolve(),
-    }
-
-    resolved: dict[str, Any] = {
-        "suite": args.suite,
-        "repeats": args.repeats,
-        "shared": configs["shared"],
-        "data_root": str(data_root),
-        "selected": {},
-        "executables": {},
-    }
-    for name, executable in executables.items():
-        if executable.exists():
-            resolved["executables"][name] = {
-                "path": str(executable),
-                "sha256": sha256(executable),
-            }
-
-    verified_paths: set[Path] = set()
-    run_records: list[dict[str, Any]] = []
-    for dataset in selected:
-        config = configs["datasets"][dataset]
-        data_record = manifest["datasets"][dataset]
-        input_path = (data_root / data_record["path"]).resolve()
-        if not input_path.is_file():
-            raise FileNotFoundError(f"{dataset}: input not found: {input_path}")
-        if not args.skip_input_hash and input_path not in verified_paths:
-            actual_hash = sha256(input_path)
-            if actual_hash != data_record["sha256"]:
-                raise RuntimeError(
-                    f"{dataset}: SHA-256 mismatch\n"
-                    f"expected {data_record['sha256']}\nactual   {actual_hash}"
-                )
-            verified_paths.add(input_path)
-            print(f"[input] {dataset}: SHA-256 verified")
-
-        resolved["selected"][dataset] = {
-            "input": str(input_path),
-            "input_sha256": data_record["sha256"],
-            "config": config,
-        }
-        executable_key = config["space"] if args.suite == "pgo" else "ba"
-        executable = executables[executable_key]
-        if not executable.is_file():
-            raise FileNotFoundError(f"executable not found: {executable}")
-
+    plan = []
+    environments = {}
+    for threads in thread_counts:
         for repeat in range(1, args.repeats + 1):
-            output_path = output_root / f"{dataset}_run{repeat}.json"
-            log_path = output_root / f"{dataset}_run{repeat}.log"
-            if args.suite == "pgo":
-                command = pgo_command(
-                    executable,
-                    input_path,
-                    output_path,
-                    configs["shared"],
-                    config,
-                    args.include_direct,
-                    args.write_poses,
-                )
-            else:
-                command = ba_command(
-                    executable,
-                    input_path,
-                    output_path,
-                    configs["shared"],
-                    config,
-                )
-            environment, overrides = environment_for(
-                args.suite,
-                rootba_runtime,
-                int(configs["shared"]["threads"]),
-            )
-            print(
-                f"[run] {dataset} {repeat}/{args.repeats}: "
-                f"{subprocess.list2cmdline(command)}"
-            )
-            if args.dry_run:
-                continue
-            start = time.perf_counter()
-            with log_path.open("w", encoding="utf-8") as log:
-                completed = subprocess.run(
-                    command,
-                    cwd=PROJECT_ROOT,
-                    env=environment,
-                    stdout=log,
-                    stderr=subprocess.STDOUT,
-                    check=False,
-                )
-            external_wall_sec = time.perf_counter() - start
-            record: dict[str, Any] = {
-                "dataset": dataset,
-                "repeat": repeat,
-                "returncode": completed.returncode,
-                "command": command,
-                "environment_overrides": overrides,
-                "input": str(input_path),
-                "output": str(output_path),
-                "log": str(log_path),
-                "external_wall_sec": external_wall_sec,
-            }
-            if completed.returncode != 0:
-                run_records.append(record)
-                raise RuntimeError(
-                    f"{dataset} repeat {repeat} failed; see {log_path}"
-                )
-            record["metrics"] = read_metrics(args.suite, output_path)
-            run_records.append(record)
-
-    (output_root / "resolved_config.json").write_text(
-        json.dumps(resolved, indent=2) + "\n", encoding="utf-8"
-    )
-    (output_root / "runs.json").write_text(
-        json.dumps(run_records, indent=2) + "\n", encoding="utf-8"
-    )
+            for item in selected:
+                family = item["space"] if args.suite == "pgo" else "ba"
+                profile = config["profiles"][family] if args.suite == "pgo" else config
+                env, env_record = environment_for(profile["environment"], threads, runtime if args.suite == "ba" else None)
+                environments[(family, threads)] = env
+                stem = f"{item['label']}_t{threads}_r{repeat}"
+                result = output_root / (stem + ".json")
+                plan.append({"dataset": item["label"], "suite": args.suite, "space": item["space"],
+                             "threads": threads, "repeat": repeat, "canonical": item["canonical"],
+                             "input": str(item["path"]), "input_sha256": item["input_sha256"],
+                             "canonical_hash_verified": item["canonical"], "executable": item["executable"],
+                             "reference": item["reference"][str(threads)] if item["reference"] else None,
+                             "reference_status": "available" if item["canonical"] else "custom input: no canonical hash or quality reference",
+                             "command": solver_command(args.suite, config, item["space"], item["executable"]["path"], item["path"], result, threads, mask),
+                             "environment": env_record, "affinity_mask": mask, "cwd": str(PROJECT_ROOT),
+                             "output": str(result), "log": str(output_root / (stem + ".log")), "status": "planned"})
+    output_root.mkdir(parents=True, exist_ok=False)
+    write_json(output_root / "protocol.json", {"created_utc": datetime.now(timezone.utc).isoformat(),
+               "version": version_info(), "config": config, "config_hashes": {name: sha256(CONFIG_ROOT / name) for name in
+               (f"{args.suite}.json", "datasets.json", "reference.json")}, "dry_run": args.dry_run,
+               "sequential_thread_order": thread_counts, "runtime_root": str(runtime) if runtime else None,
+               "runtime_root_applies_to": "ba only", "affinity_mask": mask, "timeout_sec": args.timeout,
+               "timing": "Native solver wall includes setup, excludes parsing/output. Process wall recorded separately."})
+    write_json(output_root / "runs.json", plan)
     if args.dry_run:
-        print(f"Resolved configuration: {output_root / 'resolved_config.json'}")
+        for record in plan:
+            print(json.dumps(record["command"]))
+        print(f"Dry run only: {output_root}")
         return 0
+    tolerance = references["quality_relative_tolerance"][args.suite]
+    with process_affinity(mask):
+        for record in plan:
+            family = record["space"] if args.suite == "pgo" else "ba"
+            record["status"] = "running"
+            write_json(output_root / "runs.json", plan)
+            start = time.perf_counter()
+            try:
+                with Path(record["log"]).open("w", encoding="utf-8") as log:
+                    process = subprocess.run(record["command"], cwd=PROJECT_ROOT,
+                                             env=environments[(family, record["threads"])], stdout=log,
+                                             stderr=subprocess.STDOUT, check=False,
+                                             timeout=args.timeout,
+                                             creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
+                record["process_wall_sec"] = time.perf_counter() - start
+                record["returncode"] = process.returncode
+                if process.returncode:
+                    raise ValueError(f"solver exited with code {process.returncode}")
+                record["output_sha256"] = sha256(record["output"])
+                metrics, effective = read_metrics(args.suite, record["output"], record["threads"], record["space"],
+                                                  require_work=record["canonical"])
+                record["metrics"], record["effective_config"] = metrics, effective
+                record["quality"] = check_quality(metrics, record["reference"], tolerance)
+                record["status"] = "quality_failed" if record["quality"]["status"] == "fail" else "ok"
+            except subprocess.TimeoutExpired:
+                record.update(status="timeout", process_wall_sec=time.perf_counter() - start,
+                              error=f"process exceeded {args.timeout:g} seconds", returncode=None)
+            except (OSError, ValueError, KeyError, TypeError, OverflowError) as exc:
+                record.setdefault("process_wall_sec", time.perf_counter() - start)
+                record.update(status="failed", error=str(exc))
+            finally:
+                write_json(output_root / "runs.json", plan)
+                write_json(output_root / "summary.json", summarize(plan))
+            print(f"{record['dataset']} t{record['threads']} r{record['repeat']}: {record['status']}", flush=True)
+    return 2 if any(record["status"] != "ok" for record in plan) else 0
 
-    summary = summarize(args.suite, selected, configs, run_records)
-    (output_root / "summary.json").write_text(
-        json.dumps(summary, indent=2) + "\n", encoding="utf-8"
-    )
-    write_csv(output_root / "summary.csv", summary)
-    print_summary(args.suite, summary)
-    print(f"Results: {output_root}")
 
-    if not args.no_verify_results:
-        failed = [
-            row
-            for row in summary
-            if not row["cost_match"]
-            or (
-                args.suite == "ba"
-                and (not row["mre_match"] or not row["rmse_match"])
-            )
-        ]
-        if failed:
-            print(
-                "Numerical verification failed for: "
-                + ", ".join(row["dataset"] for row in failed),
-                file=sys.stderr,
-            )
-            return 2
-    return 0
+def main(argv=None):
+    args = parse_args(argv)
+    try:
+        return run(args)
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
 
 
 if __name__ == "__main__":

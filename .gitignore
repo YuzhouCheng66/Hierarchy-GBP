@@ -16,9 +16,8 @@
 *.profraw
 *.vtune
 
-# Reproduction runs are machine-specific; publication references are tracked.
-/results/reproduction/
-/results/publish_validation/
+# Local runs are not release files; validation references live in configs/.
+/results/
 
 # Python and editor noise.
 **/__pycache__/

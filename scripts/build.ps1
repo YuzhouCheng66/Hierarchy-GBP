@@ -6,7 +6,9 @@ param(
     [string]$DependencyRoot = $env:HGBP_DEPENDENCY_ROOT,
     [string]$EigenDir = $env:HGBP_EIGEN_DIR,
     [string]$VcpkgInstalledDir = $env:HGBP_VCPKG_INSTALLED_DIR,
-    [string]$RootBADir = $env:HGBP_ROOTBA_DIR
+    [string]$RootBADir = $env:HGBP_ROOTBA_DIR,
+    [string]$PGORuntimeDir = $env:HGBP_PGO_RUNTIME,
+    [switch]$PGOOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -38,7 +40,8 @@ function Resolve-DependencyDirectory {
 
 $EigenDir = Resolve-DependencyDirectory $EigenDir "Eigen"
 $VcpkgInstalledDir = Resolve-DependencyDirectory $VcpkgInstalledDir "vcpkg installed tree"
-$RootBADir = Resolve-DependencyDirectory $RootBADir "RootBA checkout"
+if (!$PGOOnly) { $RootBADir = Resolve-DependencyDirectory $RootBADir "RootBA checkout" }
+$PGORuntimeDir = Resolve-DependencyDirectory $PGORuntimeDir "PGO runtime (OpenBLAS with LAPACKE)"
 
 if ([System.IO.Path]::IsPathRooted($BuildDirectory)) {
     $BuildDir = [System.IO.Path]::GetFullPath($BuildDirectory)
@@ -56,7 +59,8 @@ function Invoke-CMakeBuild {
         "-DCMAKE_CXX_COMPILER=$MsvcCompilerCMake",
         "-DHGBP_EIGEN_DIR=$EigenDir",
         "-DHGBP_VCPKG_INSTALLED_DIR=$VcpkgInstalledDir",
-        "-DHGBP_ROOTBA_DIR=$RootBADir"
+        "-DHGBP_ROOTBA_DIR=$RootBADir",
+        "-DHGBP_BUILD_BA=$(!$PGOOnly)"
     )
 
     & cmake @configureArgs
@@ -69,9 +73,17 @@ function Invoke-CMakeBuild {
         throw "CMake build failed with exit code $LASTEXITCODE."
     }
 
-    $vcpkgBin = Join-Path $VcpkgInstalledDir "bin"
-    if (Test-Path -LiteralPath $vcpkgBin -PathType Container) {
-        Copy-Item -Force -Path (Join-Path $vcpkgBin "*.dll") -Destination $BuildDir
+    # Keep the validated PGO LAPACKE runtime separate from BA's dependency DLLs.
+    Copy-Item -Force -Path (Join-Path $VcpkgInstalledDir "bin/*.dll") -Destination (Join-Path $BuildDir "pgo")
+    Copy-Item -Force -Path (Join-Path $PGORuntimeDir "*.dll") -Destination (Join-Path $BuildDir "pgo")
+    if (!$PGOOnly) {
+        $baBin = Join-Path $BuildDir "ba"
+        $runtimeBin = Join-Path $RootBADir "conda_env/Library/bin"
+        # Do not shadow the system MSVC/OpenMP runtime with conda's older DLLs.
+        foreach ($name in @('tbb12.dll', 'fmt.dll', 'glog.dll', 'gflags.dll')) {
+            Copy-Item -Force -LiteralPath (Join-Path $runtimeBin $name) -Destination $baBin
+        }
+        Copy-Item -Force -Path (Join-Path $VcpkgInstalledDir "bin/*.dll") -Destination $baBin
     }
 }
 

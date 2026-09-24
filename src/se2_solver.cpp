@@ -1,4 +1,5 @@
 #include "internal/se2_solver_impl.h"
+#include "internal/scoped_worker_affinity.h"
 #include "internal/se2_sync.h"
 #include "internal/se2_group_sync.h"
 #include "internal/se2_residual.h"
@@ -7,6 +8,7 @@
 #include "internal/se2_dense_sync.h"
 #include "internal/se2_basis_data.h"
 #include "internal/partial_symmetric_eigen.h"
+#include "internal/cycle_energy.h"
 
 #include <algorithm>
 #include <array>
@@ -2034,6 +2036,50 @@ gbp::FactorGraph buildLinearizedResidualGraph(
     return std::move(workspace.graph);
 }
 
+ExperimentResults runSyntheticSE2DirectReference(
+    const SyntheticSE2Problem& problem, int num_outer,
+    const RobustLossConfig& robust_loss_config
+) {
+    if(num_outer<1) throw std::runtime_error("Direct reference requires positive outer count");
+    ExperimentResults results;
+    const auto solver_begin=SteadyClock::now();
+    auto workspace=buildSyntheticResidualGraphWorkspace(problem,1e-12,nullptr);
+    PoseVec poses=problem.init_poses;
+    results.direct_history.push_back(OuterDirectRow{0,nonlinearObjective(problem,poses,1),0.,0.});
+    results.direct_pose_history.push_back(poses);
+    results.num_poses=static_cast<int>(problem.init_poses.size());
+    results.num_edges=static_cast<int>(problem.edges.size());
+    results.initial_objective=results.direct_history.front().nonlinear_objective;
+    results.initial_poses=problem.init_poses;
+    // Same serial reference loop as the original strict-compare implementation.
+    // Its state, matrix and poses are completely separate from H-GBP.
+    for(int outer=1;outer<=num_outer;++outer) {
+        const auto begin=SteadyClock::now();
+        SyntheticResidualRelinearizeStats relin;
+        relinearizeSyntheticResidualGraph(workspace,problem,poses,1,&relin,robust_loss_config);
+        const auto built=SteadyClock::now();
+        const auto joint=workspace.graph.jointDistributionInfSparse();
+        const auto lam=symmetrizeSparse(joint.lam);
+        const auto assembled=SteadyClock::now();
+        const Eigen::VectorXd step=solveSparseCholesky(lam,joint.eta,0.);
+        const auto solved=SteadyClock::now();
+        poses=applyPoseDeltas(poses,step);
+        const auto applied=SteadyClock::now();
+        const double cost=nonlinearObjective(problem,poses,1);
+        const auto scored=SteadyClock::now();
+        results.direct_history.push_back(OuterDirectRow{
+            outer,cost,step.norm(),(joint.eta-lam*step).norm(),
+            elapsedSeconds(begin,scored),elapsedSeconds(begin,built),
+            relin.factor_relinearize_sec,relin.reset_state_sec,
+            elapsedSeconds(built,assembled),elapsedSeconds(assembled,solved),
+            elapsedSeconds(solved,applied),elapsedSeconds(applied,scored)});
+        results.direct_pose_history.push_back(poses);
+    }
+    results.solver_wall_sec=elapsedSeconds(solver_begin,SteadyClock::now());
+    results.direct_solver_wall_sec=results.solver_wall_sec;
+    return results;
+}
+
 ExperimentResults runSyntheticSE2Experiment(
     const SyntheticSE2Problem& problem,
     int num_outer,
@@ -2052,6 +2098,13 @@ ExperimentResults runSyntheticSE2Experiment(
     int final_coarse_polish_passes
 ) {
     ExperimentResults results;
+    const auto solver_wall_start = SteadyClock::now();
+    std::ofstream linear_audit;
+    if (const char* path = std::getenv("HGBP_LINEAR_AUDIT"); path && *path) {
+        linear_audit.open(path);
+        if (!linear_audit) throw std::runtime_error("Cannot open SE2 linear audit");
+        linear_audit << std::setprecision(17);
+    }
     const int upper_polish_passes = std::max(0, final_coarse_polish_passes);
     results.num_poses = static_cast<int>(problem.gt_poses.size());
     results.num_edges = static_cast<int>(problem.edges.size());
@@ -2387,7 +2440,63 @@ ExperimentResults runSyntheticSE2Experiment(
         Eigen::VectorXd delta_e;
         Eigen::VectorXd e_now;
         Eigen::VectorXd e_hat;
+        const bool cycle_energy_enabled = getenvEnabled("HGBP_CYCLE_ENERGY");
+        const bool residual_cycles = getenvEnabled("HGBP_RESIDUAL_CYCLES");
+        if (residual_cycles && !cycle_energy_enabled)
+            throw std::runtime_error("residual cycle control requires cycle energy");
+        if (cycle_energy_enabled && !use_packed_residual_solver)
+            throw std::runtime_error("SE2 cycle energy requires the validated packed path");
+        CycleEnergyHistory cycle_energy(inner_cycles);
+        Eigen::VectorXd cycle_start, cycle_residual, trial_residual;
+        Eigen::VectorXd accumulated, accumulated_residual;
+        Eigen::VectorXd correction_reference;
+        Eigen::SparseMatrix<double> audit_H;
+        Eigen::VectorXd audit_b, audit_exact;
+        Eigen::MatrixXd audit_P;
+        int gbp_sweeps_executed=0,jacobi_sweeps_executed=0,coarse_solves=0;
+        if (linear_audit.is_open()) {
+            // Shadow reference only. It is never used to update the MG iterate.
+            auto audit_graph = buildLinearizedResidualGraph(problem, mg_poses, 1e-12, robust_loss_config);
+            auto joint = audit_graph.jointDistributionInfSparse();
+            audit_H = joint.lam;
+            audit_b = joint.eta;
+            Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> exact;
+            exact.compute(audit_H);
+            if (exact.info() != Eigen::Success) throw std::runtime_error("SE2 diagnostic factorization failed");
+            audit_exact = exact.solve(audit_b);
+            audit_P.setZero(audit_b.size(), basis.coarse_dim);
+            for (int v = 0; v < packed_residual_workspace.num_vars; ++v) {
+                audit_P.block(3*v, basis.var_coarse_offset[v], 3, basis.var_r_local[v]) =
+                    Eigen::Map<const Eigen::Matrix<double,3,Eigen::Dynamic>>(
+                        varBasis3xRPtr(basis,v), 3, basis.var_r_local[v]);
+            }
+            const double direct_trial = nonlinearObjective(problem, applyPoseDeltas(mg_poses, audit_exact), 1);
+            linear_audit << "{\"outer\":" << outer << ",\"stage\":\"reference\",\"exact_trial_raw_cost\":" << direct_trial
+                << ",\"optimal_linear_decrease\":" << 0.5*audit_b.dot(audit_exact)
+                << ",\"exact_step_norm\":" << audit_exact.norm()
+                << ",\"coarse_operator_error\":" << (Eigen::MatrixXd(coarse_lam)-audit_P.transpose()*audit_H*audit_P).norm()
+                << "}\n";
+        }
+        auto audit_state = [&](const char* stage, int cycle) {
+            if (!linear_audit.is_open()) return;
+            Eigen::VectorXd value;
+            stackedMeanVectorSyntheticSE2PackedResidualWorkspaceInto(packed_residual_workspace, value, 1);
+            if (residual_cycles) value += correction_reference;
+            const Eigen::VectorXd residual = audit_b-audit_H*value;
+            linear_audit << "{\"outer\":" << outer << ",\"cycle\":" << cycle << ",\"stage\":\"" << stage
+                << "\",\"relative_residual\":" << residual.norm()/std::max(1e-300,audit_b.norm())
+                << ",\"projected_residual\":" << (audit_P.transpose()*residual).norm()
+                << ",\"linear_decrease\":" << 0.5*value.dot(audit_b+residual)
+                << ",\"step_error\":" << (value-audit_exact).norm()/std::max(1e-300,audit_exact.norm()) << "}\n";
+        };
+        if (residual_cycles) {
+            accumulated=Eigen::VectorXd::Zero(3*packed_residual_workspace.num_vars);
+            correction_reference=accumulated;
+            fineResidualSyntheticSE2PackedInto(packed_residual_workspace,
+                accumulated,accumulated_residual,packed_sweep_threads);
+        }
         auto apply_upper_correction = [&]() {
+            if(getenvEnabled("HGBP_SE2_SKIP_COARSE")) return;
             if (use_packed_residual_solver) {
                 stackedMeanVectorSyntheticSE2PackedResidualWorkspaceInto(
                     packed_residual_workspace,
@@ -2426,6 +2535,7 @@ ExperimentResults runSyntheticSE2Experiment(
 
             const auto coarse_solve_t0 = SteadyClock::now();
             solveWithSparseCholeskyInto(*coarse_factor, coarse_eta, delta_z);
+            ++coarse_solves;
             const auto coarse_solve_t1 = SteadyClock::now();
             coarse_solve_sec += elapsedSeconds(coarse_solve_t0, coarse_solve_t1);
 
@@ -2451,9 +2561,31 @@ ExperimentResults runSyntheticSE2Experiment(
             prolong_inject_sec += elapsedSeconds(inject_t0, inject_t1);
         };
 
+        if (use_packed_residual_solver)
+            initializeSE2PackedMessagesFromFactors(packed_residual_workspace,
+                packed_residual_workspace.message_initialization,packed_sweep_threads);
         for (int cyc = 0; cyc < inner_cycles; ++cyc) {
+            audit_state("before_sweeps",cyc);
             const auto sweeps_t0 = SteadyClock::now();
+            if (cycle_energy_enabled) {
+                if (residual_cycles) {
+                    cycle_start=accumulated;
+                    cycle_residual=accumulated_residual;
+                    shiftSE2PackedCorrectionReference(packed_residual_workspace,accumulated-correction_reference);
+                    correction_reference=accumulated;
+                } else {
+                    stackedMeanVectorSyntheticSE2PackedResidualWorkspaceInto(
+                        packed_residual_workspace, cycle_start, packed_sweep_threads);
+                    fineResidualSyntheticSE2PackedInto(
+                        packed_residual_workspace, cycle_start, cycle_residual, packed_sweep_threads);
+                }
+            }
             if (use_packed_residual_solver) {
+                const std::string smoother=std::getenv("HGBP_SE2_SMOOTHER")?std::getenv("HGBP_SE2_SMOOTHER"):"gbp";
+                if(smoother=="jacobi") {
+                    blockJacobiSE2PackedIterations(packed_residual_workspace,pre_sweeps,packed_sweep_threads);
+                    jacobi_sweeps_executed+=pre_sweeps;
+                } else if(smoother=="gbp") {
                 synchronousIterationsSyntheticSE2PackedResidualWorkspace(
                     packed_residual_workspace,
                     pre_sweeps,
@@ -2461,6 +2593,8 @@ ExperimentResults runSyntheticSE2Experiment(
                     fastsync_variable_pass_sec,
                     packed_sweep_threads
                 );
+                gbp_sweeps_executed+=pre_sweeps;
+                }
             } else {
                 for (int sweep = 0; sweep < pre_sweeps; ++sweep) {
                     if (use_fastsync_local_packed) {
@@ -2495,7 +2629,29 @@ ExperimentResults runSyntheticSE2Experiment(
             const auto sweeps_t1 = SteadyClock::now();
             sweeps_sec += elapsedSeconds(sweeps_t0, sweeps_t1);
 
+            audit_state("after_sweeps",cyc);
             apply_upper_correction();
+            audit_state("after_coarse",cyc);
+            if (cycle_energy_enabled) {
+                const auto energy_t0 = SteadyClock::now();
+                stackedMeanVectorSyntheticSE2PackedResidualWorkspaceInto(
+                    packed_residual_workspace, e_now, packed_sweep_threads);
+                fineResidualSyntheticSE2PackedInto(
+                    packed_residual_workspace, e_now, trial_residual, packed_sweep_threads);
+                if (residual_cycles) e_now+=cycle_start;
+                const Eigen::VectorXd unaccelerated = e_now;
+                cycle_energy.accept(cycle_start, cycle_residual, e_now, trial_residual);
+                if (residual_cycles) {
+                    accumulated=e_now;
+                    accumulated_residual=trial_residual;
+                } else {
+                    delta_e = e_now-unaccelerated;
+                    injectCorrectionKeepMessagesSyntheticSE2PackedResidualWorkspace(
+                        packed_residual_workspace, delta_e, packed_sweep_threads);
+                }
+                prolong_inject_sec += elapsedSeconds(energy_t0,SteadyClock::now());
+                audit_state("after_energy",cyc);
+            }
         }
         if (outer == num_outer) {
             for (int polish = 0; polish < upper_polish_passes; ++polish) {
@@ -2516,6 +2672,7 @@ ExperimentResults runSyntheticSE2Experiment(
         } else {
             e_hat = stackedMeanVector(residual_graph);
         }
+        if (residual_cycles) e_hat=accumulated;
         const double recorded_factor_pass_sec =
             (use_packed_residual_solver || use_fastsync_local_packed || use_fastsync_local ||
              (enable_singlecore_fastsync &&
@@ -2578,6 +2735,14 @@ ExperimentResults runSyntheticSE2Experiment(
                 basis_partial_converged,
                 basis_partial_fallback,
                 basis_partial_total_iters,
+                gbp_sweeps_executed,jacobi_sweeps_executed,coarse_solves,
+                packed_residual_workspace.full_precision_sweeps,
+                packed_residual_workspace.eta_only_sweeps,
+                packed_residual_workspace.precision_checks,
+                packed_residual_workspace.precision_freezes,
+                packed_residual_workspace.precision_thaws,
+                packed_residual_workspace.first_precision_freeze_sweep,
+                packed_residual_workspace.last_precision_residual,
             }
         );
         results.mg_pose_history.push_back(mg_poses);
@@ -2597,6 +2762,7 @@ ExperimentResults runSyntheticSE2Experiment(
         results.packed_fixedeta_serial_delta_sweeps = packed_residual_workspace.fixedeta_serial_delta_sweeps;
     }
 
+    results.solver_wall_sec = elapsedSeconds(solver_wall_start,SteadyClock::now());
     return results;
 }
 
@@ -2625,8 +2791,31 @@ void writeExperimentResultsJson(
     }
 
     out << "{\n";
+    out << "  \"worker_affinity\": \"scoped_ascending_allowed_cpus\",\n";
+    out << "  \"worker_affinity_failures\": " << ScopedWorkerAffinity::failures.load() << ",\n";
+    out << "  \"solver_wall_sec\": " << jsonNumber(results.solver_wall_sec) << ",\n";
+    out << "  \"hgbp_solver_wall_sec\": " << jsonNumber(results.hgbp_solver_wall_sec) << ",\n";
+    out << "  \"direct_solver_wall_sec\": " << jsonNumber(results.direct_solver_wall_sec) << ",\n";
     out << "  \"config\": {\n";
     out << "    \"num_outer\": " << num_outer << ",\n";
+    out << "    \"adaptive_precision\": " << (getenvEnabled("HGBP_SE2_ADAPTIVE_PRECISION")?"true":"false") << ",\n";
+    out << "    \"precision_tolerance\": " << SE2PrecisionPolicy::tolerance << ",\n";
+    out << "    \"precision_check_period\": " << SE2PrecisionPolicy::check_period << ",\n";
+    out << "    \"precision_check_backoff\": true,\n";
+    out << "    \"precision_max_check_period\": " << SE2PrecisionPolicy::max_check_period << ",\n";
+    out << "    \"precision_stable_checks\": " << SE2PrecisionPolicy::stable_checks << ",\n";
+    out << "    \"frozen_precision_check_period\": " << SE2PrecisionPolicy::frozen_check_period << ",\n";
+    out << "    \"direct_reference_enabled\": " << (results.direct_history.size()>1?"true":"false") << ",\n";
+    out << "    \"direct_reference_only\": " << (results.mg_history.empty() && results.direct_history.size()>1?"true":"false") << ",\n";
+    out << "    \"cycle_energy_krylov\": " << (getenvEnabled("HGBP_CYCLE_ENERGY")?"true":"false") << ",\n";
+    out << "    \"residual_cycles\": " << (getenvEnabled("HGBP_RESIDUAL_CYCLES")?"true":"false") << ",\n";
+    out << "    \"diagnostic_only\": " << (getenvEnabled("HGBP_LINEAR_AUDIT")?"true":"false") << ",\n";
+    out << "    \"eta_relaxation\": " << (std::getenv("HGBP_SE2_ETA_RELAXATION") ? std::getenv("HGBP_SE2_ETA_RELAXATION") : "1") << ",\n";
+    out << "    \"cholesky_schur\": " << (getenvEnabled("HGBP_SE2_CHOLESKY_SCHUR")?"true":"false") << ",\n";
+    out << "    \"message_lift\": " << (getenvEnabled("HGBP_SE2_MESSAGE_LIFT")?"true":"false") << ",\n";
+    out << "    \"message_initialization\": " << (std::getenv("HGBP_SE2_MESSAGE_INITIALIZATION")?std::getenv("HGBP_SE2_MESSAGE_INITIALIZATION"):"0") << ",\n";
+    out << "    \"smoother\": \"" << (std::getenv("HGBP_SE2_SMOOTHER")?std::getenv("HGBP_SE2_SMOOTHER"):"gbp") << "\",\n";
+    out << "    \"skip_coarse_quality_ablation\": " << (getenvEnabled("HGBP_SE2_SKIP_COARSE")?"true":"false") << ",\n";
     out << "    \"inner_cycles\": " << inner_cycles << ",\n";
     out << "    \"pre_sweeps\": " << pre_sweeps << ",\n";
     out << "    \"group_size\": " << group_size << ",\n";
@@ -2737,6 +2926,16 @@ void writeExperimentResultsJson(
             << ", \"basis_partial_converged\": " << row.basis_partial_converged
             << ", \"basis_partial_fallback\": " << row.basis_partial_fallback
             << ", \"basis_partial_total_iters\": " << row.basis_partial_total_iters
+            << ", \"gbp_sweeps_executed\": " << row.gbp_sweeps_executed
+            << ", \"jacobi_sweeps_executed\": " << row.jacobi_sweeps_executed
+            << ", \"coarse_solves\": " << row.coarse_solves
+            << ", \"full_precision_sweeps\": " << row.full_precision_sweeps
+            << ", \"eta_only_sweeps\": " << row.eta_only_sweeps
+            << ", \"precision_checks\": " << row.precision_checks
+            << ", \"precision_freezes\": " << row.precision_freezes
+            << ", \"precision_thaws\": " << row.precision_thaws
+            << ", \"first_precision_freeze_sweep\": " << row.first_precision_freeze_sweep
+            << ", \"precision_residual\": " << jsonNumber(row.precision_residual)
             << "}";
         out << (i + 1 == results.mg_history.size() ? "\n" : ",\n");
     }

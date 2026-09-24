@@ -10,6 +10,13 @@
 
 namespace slam {
 
+struct SE3PrecisionPolicy {
+    static constexpr double tolerance = 1e-8;
+    static constexpr int check_period = 5;
+    static constexpr int stable_checks = 3;
+    static constexpr int frozen_check_period = 25;
+};
+
 struct SyntheticSE3PackedSoAStats {
     int sweeps = 0;
     int full_lambda_sweeps = 0;
@@ -28,6 +35,30 @@ struct SyntheticSE3PackedSoAWorkspace {
     int num_unary_factors = 0;
     double tiny_prior = 1e-12;
     int sweeps_since_relinearize = 0;
+    bool adaptive_precision = false;
+    bool persistent_sweeps = false;
+    bool precision_frozen = false;
+    int precision_stable_checks = 0;
+    int precision_checks = 0;
+    int precision_freezes = 0;
+    int precision_thaws = 0;
+    int first_precision_freeze_sweep = -1;
+    int last_precision_check_sweep = -1;
+    double last_precision_residual = 0.0;
+    int full_precision_sweeps = 0;
+    int eta_only_sweeps = 0;
+    AlignedDoubles precision_residuals;
+    bool jacobi_ready = false;
+    int jacobi_sweeps = 0;
+    int cycle_message_rebuilds = 0;
+    AlignedDoubles jacobi_diagonal, jacobi_inverse, jacobi_rhs, jacobi_x, jacobi_alt;
+    bool defect_ready = false;
+    int defect_mean_sweeps = 0;
+    int defect_map_builds = 0;
+    int defect_clamps = 0;
+    double defect_build_sec = 0;
+    double defect_inverse_residual = 0;
+    AlignedDoubles defect_belief_inverse, defect_map0, defect_map1;
 
     AlignedDoubles prior_eta;       // num_vars * 6
     AlignedDoubles prior_lam21;     // num_vars * 21, symmetric upper packed
@@ -48,6 +79,9 @@ struct SyntheticSE3PackedSoAWorkspace {
     AlignedDoubles binary_eta1;      // num_binary_factors * 6
     AlignedDoubles binary_diag0_lam21;
     AlignedDoubles binary_diag1_lam21;
+    // Serial-only, immutable factor reference norms for one linearization.
+    AlignedDoubles binary_reference_norms;
+    bool binary_reference_norms_valid = false;
     AlignedDoubles binary_cross01_lam36; // full 6x6 col-major
     AlignedDoubles binary_cross10_lam36; // full 6x6 col-major
 
@@ -74,6 +108,24 @@ void relinearizeSyntheticSE3PackedSoAWorkspaceFromGraph(
     SyntheticSE3PackedSoAWorkspace& workspace,
     const gbp::FactorGraph& graph
 );
+
+// Call after basis construction, once per fresh linearization.
+void initializeBalancedSE3PackedMessages(SyntheticSE3PackedSoAWorkspace& workspace, int num_threads = 1);
+void recomputeSE3PackedBeliefs(SyntheticSE3PackedSoAWorkspace& workspace,int num_threads);
+// Lift an already accepted mean correction into existing FV eta. Canonical
+// factors and all precisions are unchanged; no new GBP iteration is performed.
+void liftSE3PackedMeanCorrection(SyntheticSE3PackedSoAWorkspace& workspace,
+    const Eigen::VectorXd& delta, bool precision_weighted, int num_threads);
+double measureSE3PackedEtaMismatch(const SyntheticSE3PackedSoAWorkspace& workspace);
+void blockJacobiSE3PackedIterations(SyntheticSE3PackedSoAWorkspace& workspace, int sweeps, int num_threads);
+// Experimental mean solver. Fixed diagonal FV precisions are NOT exact marginals.
+void prepareSE3PrecisionDefect(SyntheticSE3PackedSoAWorkspace& workspace, int num_threads);
+void precisionDefectSE3Iterations(SyntheticSE3PackedSoAWorkspace& workspace,
+    int sweeps, int num_threads, double damping, double update_limit);
+// Reconstruct FV eta consistently with a coarse-corrected mean and true b-Hx.
+// Leaves canonical factors and every precision unchanged.
+void rebuildSE3PackedMessagesAtMean(SyntheticSE3PackedSoAWorkspace& workspace,
+    const Eigen::VectorXd& mean, const Eigen::VectorXd& residual, int num_threads);
 
 void assembleJointEtaSyntheticSE3PackedSoAWorkspaceInto(
     const SyntheticSE3PackedSoAWorkspace& workspace,

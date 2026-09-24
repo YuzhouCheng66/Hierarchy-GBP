@@ -1,19 +1,5 @@
 {
-  "schema_version": 1,
-  "roots": {
-    "pgo": {
-      "environment": "HGBP_PGO_DATA_ROOT",
-      "default": "data\\pgo"
-    },
-    "ba": {
-      "environment": "HGBP_BA_DATA_ROOT",
-      "default": "data\\ba"
-    },
-    "rootba_runtime": {
-      "environment": "HGBP_ROOTBA_RUNTIME",
-      "default": "third_party\\rootba\\conda_env"
-    }
-  },
+  "schema_version": 2,
   "datasets": {
     "FR079": {
       "suite": "pgo",
@@ -98,7 +84,7 @@
     },
     "Ladybug49": {
       "suite": "ba",
-      "path": "ladybug\\problem-49-7776-pre.txt",
+      "path": "ladybug/problem-49-7776-pre.txt",
       "cameras": 49,
       "points": 7776,
       "observations": 31843,
@@ -108,7 +94,7 @@
     },
     "Venice89": {
       "suite": "ba",
-      "path": "venice\\problem-89-110973-pre.txt",
+      "path": "venice/problem-89-110973-pre.txt",
       "cameras": 89,
       "points": 110973,
       "observations": 562976,
@@ -118,7 +104,7 @@
     },
     "Final93": {
       "suite": "ba",
-      "path": "final\\problem-93-61203-pre.txt",
+      "path": "final/problem-93-61203-pre.txt",
       "cameras": 93,
       "points": 61203,
       "observations": 287451,
@@ -126,19 +112,9 @@
       "sha256": "90dda36d202d43221e4f8e3c969d1820e421b315cfe29f99159e5bcddf67436a",
       "preprocessing": "BAL pre file"
     },
-    "Ladybug138": {
-      "suite": "ba",
-      "path": "ladybug\\problem-138-19878-pre.txt",
-      "cameras": 138,
-      "points": 19878,
-      "observations": 85217,
-      "bytes": 4787841,
-      "sha256": "0921d835d31752af15cec103866535290cb40a9a7aa50102bda47c57ebd387f2",
-      "preprocessing": "BAL pre file"
-    },
     "Trafalgar257": {
       "suite": "ba",
-      "path": "trafalgar\\problem-257-65132-pre.txt",
+      "path": "trafalgar/problem-257-65132-pre.txt",
       "cameras": 257,
       "points": 65132,
       "observations": 225911,
@@ -148,7 +124,7 @@
     },
     "Dubrovnik356": {
       "suite": "ba",
-      "path": "dubrovnik\\problem-356-226730-pre.txt",
+      "path": "dubrovnik/problem-356-226730-pre.txt",
       "cameras": 356,
       "points": 226730,
       "observations": 1255268,
@@ -158,7 +134,7 @@
     },
     "Final394": {
       "suite": "ba",
-      "path": "final\\problem-394-100368-pre.txt",
+      "path": "final/problem-394-100368-pre.txt",
       "cameras": 394,
       "points": 100368,
       "observations": 534408,
@@ -168,7 +144,7 @@
     },
     "Ladybug1723": {
       "suite": "ba",
-      "path": "ladybug\\problem-1723-156502-pre.txt",
+      "path": "ladybug/problem-1723-156502-pre.txt",
       "cameras": 1723,
       "points": 156502,
       "observations": 678718,
@@ -178,7 +154,7 @@
     },
     "Venice1778": {
       "suite": "ba",
-      "path": "venice\\problem-1778-993923-pre.txt",
+      "path": "venice/problem-1778-993923-pre.txt",
       "cameras": 1778,
       "points": 993923,
       "observations": 5001946,
@@ -186,19 +162,9 @@
       "sha256": "4f3f4d12f5872a8c593d35b60e00f447e1e1e5aee797445dfbb3f3e8e1b9b2a0",
       "preprocessing": "BAL pre file"
     },
-    "Final1936": {
-      "suite": "ba",
-      "path": "final\\problem-1936-649673-pre.txt",
-      "cameras": 1936,
-      "points": 649673,
-      "observations": 5213733,
-      "bytes": 262239363,
-      "sha256": "46e039c2a5f5715f48450ca74bce19bf4d1b26ac6daf2c14bf188508b0e39313",
-      "preprocessing": "BAL pre file"
-    },
     "Final3068": {
       "suite": "ba",
-      "path": "final\\problem-3068-310854-pre.txt",
+      "path": "final/problem-3068-310854-pre.txt",
       "cameras": 3068,
       "points": 310854,
       "observations": 1653812,
@@ -208,13 +174,69 @@
     },
     "Final4585": {
       "suite": "ba",
-      "path": "final\\problem-4585-1324582-pre.txt",
+      "path": "final/problem-4585-1324582-pre.txt",
       "cameras": 4585,
       "points": 1324582,
       "observations": 9125125,
       "bytes": 483747054,
       "sha256": "d5e0ea06a364d7a7b5b087ab3c9d53c97dbbcd6c7d3984b62428185e66b9dd54",
       "preprocessing": "BAL pre file"
+    },
+    "OneDSfMAlamo": {
+      "suite": "ba",
+      "path": "public_ood_20260920/OneDSfMAlamo.txt",
+      "cameras": 577,
+      "points": 140080,
+      "observations": 816891,
+      "sha256": "24ad4f705b7f13a48ce25fc4647e139a1b9781c253573548127b212382a84a5c",
+      "preprocessing": "Existing public_ood_20260920 BAL conversion; no regeneration"
+    }
+  },
+  "subsets": {
+    "pgo": {
+      "default": "all",
+      "all": [
+        "FR079",
+        "FRH",
+        "M3500",
+        "ParkingGarage",
+        "Sphere",
+        "Cubicle",
+        "Grid",
+        "Globe10k",
+        "Globe100k"
+      ],
+      "SE2": [
+        "FR079",
+        "FRH",
+        "M3500"
+      ],
+      "SE3": [
+        "ParkingGarage",
+        "Sphere",
+        "Cubicle",
+        "Grid",
+        "Globe10k",
+        "Globe100k"
+      ]
+    },
+    "ba": {
+      "default": "main10",
+      "main10": [
+        "Ladybug49",
+        "Venice89",
+        "Final93",
+        "Trafalgar257",
+        "Dubrovnik356",
+        "Final394",
+        "Ladybug1723",
+        "Venice1778",
+        "Final3068",
+        "Final4585"
+      ],
+      "alamo": [
+        "OneDSfMAlamo"
+      ]
     }
   }
 }

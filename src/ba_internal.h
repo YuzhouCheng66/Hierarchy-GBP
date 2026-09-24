@@ -50,6 +50,16 @@ using Mat93List = std::vector<Mat93, Eigen::aligned_allocator<Mat93>>;
 using Vec9List = std::vector<Vec9, Eigen::aligned_allocator<Vec9>>;
 using Mat9List = std::vector<Mat9, Eigen::aligned_allocator<Mat9>>;
 
+struct BAStepModel {
+    double full_decrease = 0.0;
+    double linear_decrease = 0.0;
+
+    double decrease(double alpha) const {
+        return alpha * linear_decrease - alpha * alpha *
+            (linear_decrease - full_decrease);
+    }
+};
+
 struct Observation {
     int camera = -1;
     int point = -1;
@@ -70,18 +80,22 @@ struct Args {
     std::string problem_file;
     std::string out_json = "ba_result.json";
     int outer = 20;
-    int mg_cycles = 1;
-    int pre_sweeps = 1;
-    int gbp_full_sweeps = 2;
-    int group_size = 20;
+    int mg_cycles = 5;
+    int pre_sweeps = 3;
+    int gbp_full_sweeps = 32;
     int build_threads = 16;
     int gbp_threads = 16;
-    double message_damping = 0.1;
+    double message_damping = 1.0;
     double coarse_scale = 1.0;
     bool normalize_bal = true;
 };
 
 struct PackedGBPStats {
+    int accepted_search_directions = 0;
+    int true_schur_products = 0;
+    double model_decrease = 0.0;
+    double variance_defect = std::numeric_limits<double>::quiet_NaN();
+    int cycles = 0;
     double group_sec = 0.0;
     double workspace_sec = 0.0;
     double full_sec = 0.0;
@@ -215,24 +229,23 @@ unsigned long long blockKey(int r, int c) {
            static_cast<unsigned int>(c);
 }
 
-bool parseInt(const char* raw, int& out) {
-    try {
-        out = std::stoi(std::string(raw));
-        return true;
-    } catch (...) {
-        return false;
-    }
+void parseInt(const char* raw, int& out) {
+    size_t consumed = 0;
+    const std::string value(raw);
+    const int parsed = std::stoi(value, &consumed);
+    if (consumed != value.size()) throw std::runtime_error("Invalid integer: " + value);
+    out = parsed;
 }
 
-bool parseDouble(const char* raw, double& out) {
-    try {
-        out = std::stod(std::string(raw));
-        return true;
-    } catch (...) {
-        return false;
+void parseDouble(const char* raw, double& out) {
+    size_t consumed = 0;
+    const std::string value(raw);
+    const double parsed = std::stod(value, &consumed);
+    if (consumed != value.size() || !std::isfinite(parsed)) {
+        throw std::runtime_error("Invalid finite number: " + value);
     }
+    out = parsed;
 }
-
 
 Args parseArgs(int argc, char** argv) {
     Args args;
@@ -250,8 +263,6 @@ Args parseArgs(int argc, char** argv) {
             parseInt(argv[++i], args.pre_sweeps);
         } else if (arg == "--gbp-full-sweeps" && i + 1 < argc) {
             parseInt(argv[++i], args.gbp_full_sweeps);
-        } else if (arg == "--group-size" && i + 1 < argc) {
-            parseInt(argv[++i], args.group_size);
         } else if (arg == "--build-threads" && i + 1 < argc) {
             parseInt(argv[++i], args.build_threads);
         } else if (arg == "--gbp-threads" && i + 1 < argc) {
@@ -262,16 +273,14 @@ Args parseArgs(int argc, char** argv) {
             parseDouble(argv[++i], args.coarse_scale);
         } else if (arg == "--normalize-bal") {
             args.normalize_bal = true;
-        } else if (arg == "--no-normalize-bal") {
-            args.normalize_bal = false;
         } else if (arg == "--help" || arg == "-h") {
             std::cout
                 << "Usage: ba_solver --problem-file <BAL.txt> [options]\n"
                 << "  --out-json <result.json>\n"
-                << "  --outer <20> --mg-cycles <1> --pre-sweeps <1>\n"
-                << "  --gbp-full-sweeps <2> --group-size <20>\n"
+                << "  --outer <20> --mg-cycles <5> --pre-sweeps <3>\n"
+                << "  --gbp-full-sweeps <32> --normalize-bal\n"
                 << "  --build-threads <16> --gbp-threads <16>\n"
-                << "  --message-damping <0.1> --coarse-scale <1.0>\n";
+                << "  --message-damping <1.0> --coarse-scale 1\n";
             std::exit(0);
         } else {
             throw std::runtime_error("unknown argument: " + arg);
@@ -280,16 +289,16 @@ Args parseArgs(int argc, char** argv) {
     if (args.problem_file.empty()) {
         throw std::runtime_error("--problem-file is required");
     }
-    args.outer = std::max(1, args.outer);
-    args.mg_cycles = std::max(1, args.mg_cycles);
-    args.pre_sweeps = std::max(1, args.pre_sweeps);
-    args.gbp_full_sweeps = std::max(0, args.gbp_full_sweeps);
-    args.group_size = std::max(1, args.group_size);
-    args.build_threads = std::max(1, args.build_threads);
-    args.gbp_threads = std::max(1, args.gbp_threads);
-    args.message_damping =
-        std::min(1.0, std::max(0.0, args.message_damping));
-    args.coarse_scale = std::max(0.0, args.coarse_scale);
+    if (args.outer < 1 || args.mg_cycles < 1 || args.pre_sweeps < 1 ||
+        args.gbp_full_sweeps < 1 || args.build_threads < 1 || args.gbp_threads < 1) {
+        throw std::runtime_error("Iteration and thread budgets must be positive");
+    }
+    if (args.message_damping <= 0.0 || args.message_damping > 1.0) {
+        throw std::runtime_error("message-damping must be in (0,1]");
+    }
+    if (args.coarse_scale != 1.0) {
+        throw std::runtime_error("--coarse-scale must be 1 for additive H-GBP");
+    }
     return args;
 }
 
@@ -486,7 +495,6 @@ struct FastHGBPSystem {
     bool fix_first_camera = true;
     SchurGBPWorkspace ws;
     Mat93List edge_E;
-    Mat93List edge_EBinv;
     Vec9List rhs_blocks;
     std::vector<int> row_edge_offsets;
     std::vector<int> row_edge_ids;
@@ -715,7 +723,7 @@ void initializeFastHGBPSystemStructure(FastHGBPSystem& sys, const PackedBlockSch
     const bool structure_ok =
         sys.pattern == &pattern &&
         sys.ws.n == pattern.free_cameras &&
-        !sys.ws.edges.empty() &&
+        sys.ws.unary_lam.size() == static_cast<size_t>(pattern.free_cameras) &&
         sys.row_edge_offsets.size() == static_cast<size_t>(pattern.free_cameras + 1) &&
         sys.row_block_offsets.size() == static_cast<size_t>(pattern.free_cameras + 1) &&
         sys.row_blocks.size() == sys.row_block_cols.size();
@@ -895,14 +903,16 @@ void fastHGBPMultiplyInto(
     auto multiply_row = [&](int r) {
         double yr[9] = {};
         mat9VecRawAddInto(
-            sys.ws.unary_lam[static_cast<size_t>(r)],
+            schurGBPPreconditionerLambda(sys.ws, r),
             xd + 9 * static_cast<size_t>(r),
             yr);
         const int begin = sys.row_block_offsets[static_cast<size_t>(r)];
         const int end = sys.row_block_offsets[static_cast<size_t>(r + 1)];
         for (int pos = begin; pos < end; ++pos) {
+            const Mat9 block = schurGBPPreconditionerEdgeScale(sys, pos) *
+                sys.row_blocks[static_cast<size_t>(pos)];
             mat9VecRawAddInto(
-                sys.row_blocks[static_cast<size_t>(pos)],
+                block,
                 xd + 9 * static_cast<size_t>(sys.row_block_cols[static_cast<size_t>(pos)]),
                 yr);
         }
@@ -917,64 +927,6 @@ void fastHGBPMultiplyInto(
     for (int r = 0; r < sys.free_cameras; ++r) {
         multiply_row(r);
     }
-}
-
-std::vector<std::vector<int>> buildCovisGroups(const FastHGBPSystem& sys, int group_size) {
-    std::vector<int> degree(sys.free_cameras, 0);
-    std::vector<std::vector<std::pair<int, double>>> neighbors(sys.free_cameras);
-    for (const SchurGBPEdge& edge : sys.ws.edges) {
-        const double w = edge.aij.norm() + edge.aji.norm();
-        if (w <= 0.0) {
-            continue;
-        }
-        neighbors[static_cast<size_t>(edge.i)].push_back({edge.j, w});
-        neighbors[static_cast<size_t>(edge.j)].push_back({edge.i, w});
-        ++degree[static_cast<size_t>(edge.i)];
-        ++degree[static_cast<size_t>(edge.j)];
-    }
-    for (auto& row : neighbors) {
-        std::sort(row.begin(), row.end(), [](const auto& a, const auto& b) {
-            if (a.second != b.second) return a.second > b.second;
-            return a.first < b.first;
-        });
-    }
-    std::vector<int> order(sys.free_cameras);
-    std::iota(order.begin(), order.end(), 0);
-    std::sort(order.begin(), order.end(), [&](int a, int b) {
-        if (degree[static_cast<size_t>(a)] != degree[static_cast<size_t>(b)]) {
-            return degree[static_cast<size_t>(a)] > degree[static_cast<size_t>(b)];
-        }
-        return a < b;
-    });
-    std::vector<char> used(sys.free_cameras, 0);
-    std::vector<std::vector<int>> groups;
-    for (int seed : order) {
-        if (used[static_cast<size_t>(seed)]) {
-            continue;
-        }
-        std::vector<int> group;
-        group.push_back(seed);
-        used[static_cast<size_t>(seed)] = 1;
-        for (const auto& nb : neighbors[static_cast<size_t>(seed)]) {
-            if (static_cast<int>(group.size()) >= group_size) break;
-            if (!used[static_cast<size_t>(nb.first)]) {
-                used[static_cast<size_t>(nb.first)] = 1;
-                group.push_back(nb.first);
-            }
-        }
-        if (static_cast<int>(group.size()) < group_size) {
-            for (int v : order) {
-                if (static_cast<int>(group.size()) >= group_size) break;
-                if (!used[static_cast<size_t>(v)]) {
-                    used[static_cast<size_t>(v)] = 1;
-                    group.push_back(v);
-                }
-            }
-        }
-        std::sort(group.begin(), group.end());
-        groups.push_back(std::move(group));
-    }
-    return groups;
 }
 
 double schurCutRatio(const FastHGBPSystem& sys, const std::vector<std::vector<int>>& groups) {

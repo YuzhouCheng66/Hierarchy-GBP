@@ -1,6 +1,18 @@
 #include "internal/se3_solver_impl.h"
+#include "internal/scoped_worker_affinity.h"
 #include "internal/partial_symmetric_eigen.h"
+#include "internal/banded_symmetric_eigen.h"
 #include "internal/se3_residual.h"
+#include "internal/cycle_energy.h"
+#include "internal/certified_coarse.h"
+#include "internal/coarse_cholesky.h"
+#include "internal/basis_alignment.h"
+#include "internal/se3_precision_warm.h"
+#include "internal/exact_basis_cache.h"
+#include "internal/se3_boundary_precision.h"
+#include "internal/se3_rigid_basis.h"
+#include "internal/se3_objective.h"
+#include "internal/se3_residual_certificate.h"
 
 #include <algorithm>
 #include <atomic>
@@ -70,11 +82,16 @@ struct SE3BasisData {
     int partial_attempt_count = 0;
     int partial_converged_count = 0;
     int full_eigensolver_count = 0;
+    int exact_reuse_count = 0;
+    int partial_work_aborts = 0;
+    int partial_iterations = 0;
+    double exact_cache_sec = 0.0;
+    std::vector<unsigned char> exact_reused;
 };
 
 struct SparseCholeskyFactor {
     Eigen::SparseMatrix<double> A;
-    Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> ldlt_solver;
+    CoarseCholesky ldlt_solver;
     bool analyzed = false;
     int rows = 0;
     int cols = 0;
@@ -82,7 +99,11 @@ struct SparseCholeskyFactor {
     std::vector<int> outer_index;
     std::vector<int> inner_index;
 
-    SparseCholeskyFactor() = default;
+    SparseCholeskyFactor()
+        : ldlt_solver([] {
+            const char* value = std::getenv("HGBP_SE3_COARSE_CHOLMOD");
+            return value && std::string(value) == "1";
+        }()) {}
     SparseCholeskyFactor(const SparseCholeskyFactor&) = delete;
     SparseCholeskyFactor& operator=(const SparseCholeskyFactor&) = delete;
     SparseCholeskyFactor(SparseCholeskyFactor&&) noexcept = default;
@@ -1119,7 +1140,7 @@ void solveWithSparseCholeskyInto(
     const Eigen::VectorXd& eta,
     Eigen::VectorXd& x
 ) {
-    x = factor.ldlt_solver.solve(eta);
+    factor.ldlt_solver.solveInto(eta, x);
     if (factor.ldlt_solver.info() != Eigen::Success) {
         throw std::runtime_error("Sparse Cholesky solve failed");
     }
@@ -1396,6 +1417,8 @@ bool tryManualSynchronousIterationsPackedSoA(
     }
 
     SyntheticSE3PackedSoAWorkspace& packed = *state.workspace;
+    packed.adaptive_precision = se3EnvFlagEnabled("HGBP_SE3_ADAPTIVE_PRECISION");
+    packed.persistent_sweeps=se3EnvFlagEnabled("HGBP_SE3_PERSISTENT_SWEEPS");
     if (!state.valid) {
         relinearizeSyntheticSE3PackedSoAWorkspaceFromGraph(packed, graph);
         state.valid = true;
@@ -1430,6 +1453,9 @@ bool tryManualSynchronousIterationsPackedSoA(
 
     SyntheticSE3PackedSoAStats stats;
     SyntheticSE3PackedSoAStats* stats_ptr = graph.profile_sync_timing ? &stats : nullptr;
+    if(std::getenv("HGBP_SE3_PRECISION_DEFECT") && std::string(std::getenv("HGBP_SE3_PRECISION_DEFECT"))=="diagonal") {
+        precisionDefectSE3Iterations(packed,num_sweeps,num_threads,graph.eta_damping,se3FactorMessageMaxRelativeUpdate());
+    } else {
     synchronousIterationsSyntheticSE3PackedSoAWorkspace(
         packed,
         num_sweeps,
@@ -1439,6 +1465,7 @@ bool tryManualSynchronousIterationsPackedSoA(
         se3FactorMessageMaxRelativeUpdate(),
         stats_ptr
     );
+    }
     if (!se3PackedSoADeferGraphCopyEnabled()) {
         if (se3PackedSoAFullCopyEachCallEnabled()) {
             copySyntheticSE3PackedSoAToGraph(packed, graph, num_threads);
@@ -1995,7 +2022,8 @@ Eigen::MatrixXd buildGroupMessageConditionedInformation(
     const std::vector<int>& var_to_group,
     const std::vector<int>& var_to_local_offset,
     std::vector<int>& factor_stamp,
-    int stamp_value
+    int stamp_value,
+    const SyntheticSE3PackedSoAWorkspace* boundary_messages
 ) {
     int block_dim = 0;
     for (int var_id : group) {
@@ -2054,8 +2082,13 @@ Eigen::MatrixXd buildGroupMessageConditionedInformation(
                     }
                 }
             } else {
-                info.block(local_offset, local_offset, var->dofs, var->dofs) +=
-                    factor->messages[aref.local_idx].lam();
+                if (boundary_messages) {
+                    info.block<6,6>(local_offset, local_offset) += se3PackedBoundaryPrecision(
+                        *boundary_messages, factor->factorID, aref.local_idx);
+                } else {
+                    info.block(local_offset, local_offset, var->dofs, var->dofs) +=
+                        factor->messages[aref.local_idx].lam();
+                }
             }
         }
     }
@@ -2069,8 +2102,15 @@ SE3BasisData buildMessageConditionedBasis(
     int group_size,
     int r_reduced,
     int num_threads,
-    const std::vector<Eigen::MatrixXd>* warm_start_local_bases = nullptr
+    const std::vector<Eigen::MatrixXd>* warm_start_local_bases = nullptr,
+    std::vector<ExactBasisCacheEntry>* exact_cache = nullptr,
+    const SyntheticSE3PackedSoAWorkspace* boundary_messages = nullptr,
+    bool preserve_rigid = false,
+    bool exclude_anchored_rigid = false
 ) {
+    if (boundary_messages) validateSE3BoundarySlots(graph, *boundary_messages);
+    if (preserve_rigid && (!pose_reference || r_reduced<6 || exact_cache))
+        throw std::runtime_error("Rigid basis experiment requires poses, rank>=6, no exact cache");
     SE3BasisData basis;
     basis.groups = orderedGroups(static_cast<int>(graph.var_nodes.size()), group_size);
     basis.var_to_group.assign(graph.var_nodes.size(), -1);
@@ -2078,6 +2118,11 @@ SE3BasisData buildMessageConditionedBasis(
     basis.var_global_offset.assign(graph.var_nodes.size(), -1);
     basis.full_indices_per_group.resize(basis.groups.size());
     basis.local_bases.resize(basis.groups.size());
+    basis.exact_reused.assign(basis.groups.size(), 0);
+    if (exact_cache && exact_cache->size() != basis.groups.size()) {
+        exact_cache->clear();
+        exact_cache->resize(basis.groups.size());
+    }
     basis.group_global_offsets.assign(basis.groups.size(), -1);
     basis.group_dims.assign(basis.groups.size(), 0);
 
@@ -2145,9 +2190,14 @@ SE3BasisData buildMessageConditionedBasis(
         int partial_attempt_count = 0;
         int partial_converged_count = 0;
         int full_eigensolver_count = 0;
+        int exact_reuse_count = 0;
+        int partial_work_aborts = 0;
+        int partial_iterations = 0;
+        double exact_cache_sec = 0.0;
     };
 
     PartialSymmetricEigenOptions partial_opts{};
+    partial_opts.predict_failed_budget = se3EnvFlagEnabled("HGBP_SE3_PREDICT_PARTIAL_BUDGET");
     partial_opts.max_iters = std::max(
         1,
         se3EnvIntOrDefault("GBP_SE3_PARTIAL_BASIS_MAX_ITERS", partial_opts.max_iters)
@@ -2182,7 +2232,9 @@ SE3BasisData buildMessageConditionedBasis(
         std::vector<int>& factor_stamp,
         int& stamp_value,
         BasisThreadStats& stats,
-        PartialSymmetricEigenWorkspace& partial_ws
+        PartialSymmetricEigenWorkspace& partial_ws,
+        Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd>& full_eig,
+        BandedSymmetricEigenWorkspace& band_eig
     ) {
         const auto block_t0 = SteadyClock::now();
         Eigen::MatrixXd block = buildGroupMessageConditionedInformation(
@@ -2191,18 +2243,46 @@ SE3BasisData buildMessageConditionedBasis(
             basis.var_to_group,
             basis.var_to_local_offset,
             factor_stamp,
-            ++stamp_value
+            ++stamp_value,
+            boundary_messages
         );
         const auto block_t1 = SteadyClock::now();
         stats.block_build_sec += elapsedSeconds(block_t0, block_t1);
 
         const int block_dim = static_cast<int>(block.rows());
         const int r_local = basis.coarse_offsets[g + 1] - basis.coarse_offsets[g];
+        if (exact_cache && r_local < block_dim) {
+            const auto cache_t0 = SteadyClock::now();
+            const auto& entry = (*exact_cache)[g];
+            const bool reuse = entry.matches(block, r_local);
+            if (reuse) {
+                basis.local_bases[g] = entry.basis;
+                basis.exact_reused[g] = 1;
+                ++stats.exact_reuse_count;
+                stats.min_eigenvalue = std::min(stats.min_eigenvalue, entry.min_eigenvalue);
+                stats.max_eigenvalue = std::max(stats.max_eigenvalue, entry.max_eigenvalue);
+                if (entry.min_eigenvalue < -1e-10) ++stats.negative_group_count;
+                if (entry.min_eigenvalue <= 1e-12) ++stats.nonpositive_group_count;
+            }
+            stats.exact_cache_sec += elapsedSeconds(cache_t0, SteadyClock::now());
+            if (reuse) return;
+        }
         Eigen::MatrixXd local_basis = Eigen::MatrixXd::Identity(block_dim, r_local);
-        if (r_local < block_dim) {
-            Eigen::MatrixXd spectral_candidates(block_dim, 0);
-            bool built_candidates = false;
-
+        bool cacheable = false;
+        double cache_min = 0.0, cache_max = 0.0;
+        bool absolute_factor=false;
+        if (preserve_rigid && exclude_anchored_rigid) {
+            for(int id:basis.groups[g]) for(const auto& adjacent:graph.var_nodes[id]->adj_factors)
+                if(adjacent.factor && adjacent.factor->active && adjacent.factor->adj_var_nodes.size()==1)
+                    absolute_factor=true;
+        }
+        if (preserve_rigid && !absolute_factor && r_local < block_dim) {
+            const auto eig_t0=SteadyClock::now();
+            local_basis=se3RigidPreservingBasis(block,
+                se3GroupGaugeGenerators(*pose_reference,basis.groups[g]),r_local);
+            stats.eigensolver_sec+=elapsedSeconds(eig_t0,SteadyClock::now());
+            ++stats.full_eigensolver_count;
+        } else if (r_local < block_dim) {
             const Eigen::MatrixXd* warm_basis =
                     (allow_partial_eigensolver &&
                      warm_start_local_bases != nullptr &&
@@ -2220,14 +2300,27 @@ SE3BasisData buildMessageConditionedBasis(
                 Eigen::MatrixXd evecs;
                 bool eig_ok = false;
 
-                if (try_partial) {
+                // Exact-zero bandwidth selects the backend, never a scene name.
+                // This preserves the matrix and rank; wider blocks keep the old path.
+                const auto band_t0 = SteadyClock::now();
+                if (band_eig.compute(block, r_local,
+                    effectiveThreadCount(num_threads) == 1 ? 2 : 0)) {
+                    ++stats.full_eigensolver_count;
+                    evals = band_eig.values;
+                    evecs = band_eig.vectors;
+                    eig_ok = true;
+                }
+                stats.eigensolver_sec += elapsedSeconds(band_t0, SteadyClock::now());
+                if (try_partial && !eig_ok) {
                     ++stats.partial_attempt_count;
                     const auto eig_t0 = SteadyClock::now();
                     const PartialSymmetricEigenResult partial =
                         computeSmallestEigenpairsPartial(block, r_local, warm_basis, partial_ws, partial_opts);
                     const auto eig_t1 = SteadyClock::now();
                     stats.eigensolver_sec += elapsedSeconds(eig_t0, eig_t1);
-                    if (partial.eigenvectors.rows() == block_dim &&
+                    stats.partial_iterations += partial.iterations;
+                    stats.partial_work_aborts += partial.aborted_for_work ? 1 : 0;
+                    if (!partial.aborted_for_work && partial.eigenvectors.rows() == block_dim &&
                         partial.eigenvectors.cols() == r_local &&
                         partial.eigenvalues.size() == r_local &&
                         (partial.converged ||
@@ -2246,12 +2339,12 @@ SE3BasisData buildMessageConditionedBasis(
                 if (!eig_ok) {
                     ++stats.full_eigensolver_count;
                     const auto eig_t0 = SteadyClock::now();
-                    Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eig(block);
+                    full_eig.compute(block);
                     const auto eig_t1 = SteadyClock::now();
                     stats.eigensolver_sec += elapsedSeconds(eig_t0, eig_t1);
-                    if (eig.info() == Eigen::Success) {
-                        evals = eig.eigenvalues();
-                        evecs = eig.eigenvectors();
+                    if (full_eig.info() == Eigen::Success) {
+                        evals = full_eig.eigenvalues();
+                        evecs = full_eig.eigenvectors().leftCols(r_local);
                         eig_ok = true;
                     }
                 }
@@ -2259,6 +2352,9 @@ SE3BasisData buildMessageConditionedBasis(
                 if (eig_ok) {
                     const double min_eval = evals(0);
                     const double max_eval = evals(evals.size() - 1);
+                    cacheable = true;
+                    cache_min = min_eval;
+                    cache_max = max_eval;
                     stats.min_eigenvalue = std::min(stats.min_eigenvalue, min_eval);
                     stats.max_eigenvalue = std::max(stats.max_eigenvalue, max_eval);
                     if (min_eval < -1e-10) {
@@ -2268,23 +2364,14 @@ SE3BasisData buildMessageConditionedBasis(
                         ++stats.nonpositive_group_count;
                     }
 
-                    spectral_candidates.resize(block_dim, evals.size());
-                    int spec_cols = 0;
-                    for (int i = 0; i < evals.size(); ++i) {
-                        spectral_candidates.col(spec_cols++) = evecs.col(i);
-                    }
-                    spectral_candidates.conservativeResize(block_dim, spec_cols);
-                    built_candidates = true;
+                    local_basis = std::move(evecs);
                 }
-
-            if (built_candidates) {
-                if (spectral_candidates.cols() >= r_local) {
-                    local_basis = spectral_candidates.leftCols(r_local);
-                } else if (spectral_candidates.cols() > 0) {
-                    local_basis.setZero(block_dim, r_local);
-                    local_basis.leftCols(spectral_candidates.cols()) = spectral_candidates;
-                }
-            }
+        }
+        if (exact_cache && r_local < block_dim) {
+            const auto cache_t0 = SteadyClock::now();
+            if (cacheable) (*exact_cache)[g].store(block, local_basis, cache_min, cache_max);
+            else (*exact_cache)[g].valid = false;
+            stats.exact_cache_sec += elapsedSeconds(cache_t0, SteadyClock::now());
         }
         const auto copy_t0 = SteadyClock::now();
         basis.local_bases[g] = std::move(local_basis);
@@ -2301,8 +2388,10 @@ SE3BasisData buildMessageConditionedBasis(
         int stamp_value = 0;
         BasisThreadStats stats;
         PartialSymmetricEigenWorkspace partial_ws;
+        Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> full_eig;
+        BandedSymmetricEigenWorkspace band_eig;
         for (int g = 0; g < static_cast<int>(basis.groups.size()); ++g) {
-            process_group(g, factor_stamp, stamp_value, stats, partial_ws);
+            process_group(g, factor_stamp, stamp_value, stats, partial_ws, full_eig, band_eig);
         }
         basis.block_build_sec = stats.block_build_sec;
         basis.eigensolver_sec = stats.eigensolver_sec;
@@ -2314,6 +2403,10 @@ SE3BasisData buildMessageConditionedBasis(
         basis.partial_attempt_count = stats.partial_attempt_count;
         basis.partial_converged_count = stats.partial_converged_count;
         basis.full_eigensolver_count = stats.full_eigensolver_count;
+        basis.exact_reuse_count = stats.exact_reuse_count;
+        basis.partial_work_aborts = stats.partial_work_aborts;
+        basis.partial_iterations = stats.partial_iterations;
+        basis.exact_cache_sec = stats.exact_cache_sec;
         return basis;
     }
 
@@ -2324,6 +2417,9 @@ SE3BasisData buildMessageConditionedBasis(
     std::vector<int> thread_stamp_values(static_cast<size_t>(thread_count), 0);
     std::vector<BasisThreadStats> thread_stats(static_cast<size_t>(thread_count));
     std::vector<PartialSymmetricEigenWorkspace> thread_partial_ws(static_cast<size_t>(thread_count));
+    std::vector<Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd>> thread_full_eig(
+        static_cast<size_t>(thread_count));
+    std::vector<BandedSymmetricEigenWorkspace> thread_band_eig(static_cast<size_t>(thread_count));
 
     #pragma omp parallel for schedule(static) num_threads(thread_count)
     for (int g = 0; g < static_cast<int>(basis.groups.size()); ++g) {
@@ -2333,7 +2429,9 @@ SE3BasisData buildMessageConditionedBasis(
             thread_factor_stamps[tid],
             thread_stamp_values[tid],
             thread_stats[tid],
-            thread_partial_ws[tid]
+            thread_partial_ws[tid],
+            thread_full_eig[tid],
+            thread_band_eig[tid]
         );
     }
 
@@ -2348,6 +2446,10 @@ SE3BasisData buildMessageConditionedBasis(
         basis.partial_attempt_count += stats.partial_attempt_count;
         basis.partial_converged_count += stats.partial_converged_count;
         basis.full_eigensolver_count += stats.full_eigensolver_count;
+        basis.exact_reuse_count += stats.exact_reuse_count;
+        basis.partial_work_aborts += stats.partial_work_aborts;
+        basis.partial_iterations += stats.partial_iterations;
+        basis.exact_cache_sec += stats.exact_cache_sec;
     }
 
     return basis;
@@ -3354,6 +3456,7 @@ void relinearizeSyntheticSE3ResidualGraph(
     workspace.graph.se3_fixed_lam_eta_hot_entries.clear();
     const bool use_parallel = (num_threads != 1) && (problem.edges.size() > 64);
     const bool transport_messages =
+        !se3EnvFlagEnabled("HGBP_SE3_RESET_TRANSPORT") &&
         outer_index >= 12 &&
         workspace.has_linearization_poses &&
         workspace.linearization_poses.size() == base_poses.size();
@@ -3488,6 +3591,20 @@ void writePoseHistoryJsonArray(std::ostream& out, const SE3PoseHistory& history,
 
 }  // namespace
 
+SE3ChartTransition se3ChartTransition(const SE3Pose& previous,const SE3Pose& current) {
+    const SE3Pose relative=se3Between(previous,current);
+    const Vec6 d=se3Log(relative);
+    if(d.tail<3>().norm()<1e-3) {
+        Mat6 ad=Mat6::Zero();
+        ad.topLeftCorner<3,3>()=skew(d.tail<3>());
+        ad.bottomRightCorner<3,3>()=ad.topLeftCorner<3,3>();
+        ad.topRightCorner<3,3>()=skew(d.head<3>());
+        const Mat6 a2=ad*ad,a4=a2*a2,a6=a4*a2;
+        return {d,Mat6::Identity()+.5*ad+a2/12.-a4/720.+a6/30240.};
+    }
+    return {d,se3LogmapDerivative(relative)};
+}
+
 SyntheticSE3Problem loadSyntheticSE3Problem(const std::string& path) {
     std::ifstream in(path);
     if (!in) {
@@ -3593,6 +3710,66 @@ SyntheticSE3Problem loadSyntheticSE3Problem(const std::string& path) {
     }
 
     return problem;
+}
+
+SE3ObjectiveValues evaluateSE3ObjectivesBuffered(const SyntheticSE3Problem& problem,
+    const SE3PoseVector& poses,const RobustLossConfig& config,SE3ObjectiveWorkspace& workspace,int threads) {
+    workspace.edge_values.resize(problem.edges.size());
+    const int thread_count=effectiveThreadCount(threads);
+    const double delta=config.huber_delta;
+    #pragma omp parallel for schedule(static) num_threads(thread_count) if(thread_count>1)
+    for(int i=0;i<static_cast<int>(problem.edges.size());++i) {
+        const auto& edge=problem.edges[i];
+        const SE3Pose pred=se3Between(poses[edge.i],poses[edge.j]);
+        const Vec6 err=se3Log(se3Compose(se3Inverse(edge.measurement),pred));
+        const double quadratic=(err.transpose()*edge.information*err)(0,0);
+        workspace.edge_values[i].raw=.5*quadratic;
+        workspace.edge_values[i].huber=(delta>0 && quadratic>delta*delta)
+            ? delta*(std::sqrt(quadratic)-.5*delta) : .5*quadratic;
+    }
+    SE3ObjectiveValues values;
+    // Preserve serial edge summation order; no thread-dependent reduction tree.
+    for(const auto& edge:workspace.edge_values) {
+        values.raw+=edge.raw;
+        values.huber+=edge.huber;
+    }
+    const Vec6 anchor=se3Log(se3Compose(se3Inverse(problem.anchor_pose),poses.at(0)));
+    const double prior=.5*(anchor.transpose()*problem.anchor_information*anchor)(0,0);
+    values.raw+=prior; values.huber+=prior;
+    return values;
+}
+
+void applySE3PoseDeltasInto(const SE3PoseVector& base,const Eigen::VectorXd& delta,
+                          double scale,SE3PoseVector& output,int threads) {
+    if(delta.size()!=6*static_cast<int>(base.size()) || &base==&output)
+        throw std::runtime_error("Invalid buffered SE3 pose update");
+    output.resize(base.size());
+    const int thread_count=effectiveThreadCount(threads);
+    #pragma omp parallel for schedule(static) num_threads(thread_count) if(thread_count>1)
+    for(int i=0;i<static_cast<int>(base.size());++i) {
+        const Vec6 step=scale*delta.segment<6>(6*i);
+        output[i]=se3Plus(base[i],step);
+    }
+}
+
+SE3ObjectiveValues evaluateSE3Objectives(const SyntheticSE3Problem& problem,
+                                       const SE3PoseVector& poses,
+                                       const RobustLossConfig& config) {
+    SE3ObjectiveValues values;
+    const double delta=config.huber_delta;
+    for(const auto& edge:problem.edges) {
+        const SE3Pose pred=se3Between(poses.at(edge.i),poses.at(edge.j));
+        const Vec6 err=se3Log(se3Compose(se3Inverse(edge.measurement),pred));
+        const double quadratic=(err.transpose()*edge.information*err)(0,0);
+        values.raw+=0.5*quadratic;
+        values.huber+=(delta>0 && quadratic>delta*delta)
+            ? delta*(std::sqrt(quadratic)-0.5*delta) : 0.5*quadratic;
+    }
+    const Vec6 anchor=se3Log(se3Compose(se3Inverse(problem.anchor_pose),poses.at(0)));
+    const double prior=0.5*(anchor.transpose()*problem.anchor_information*anchor)(0,0);
+    values.raw+=prior;
+    values.huber+=prior;
+    return values;
 }
 
 double nonlinearObjective(
@@ -3729,6 +3906,7 @@ SyntheticSE3ExperimentResults runSyntheticSE3Experiment(
     bool direct_enabled
 ) {
     SyntheticSE3ExperimentResults results;
+    const auto solver_wall_start = SteadyClock::now();
     const int thread_count = effectiveThreadCount(sync_num_threads);
     const ScopedSE3SingleThreadRuntime single_thread_runtime_guard(
         thread_count == 1 && se3SingleThreadRuntimeGuardEnabled()
@@ -3742,6 +3920,14 @@ SyntheticSE3ExperimentResults runSyntheticSE3Experiment(
     SE3PoseVector mg_poses = problem.init_poses;
     results.direct_history.push_back(SyntheticSE3OuterDirectRow{0, results.initial_objective});
     results.mg_history.push_back(SyntheticSE3OuterMGRow{0, results.initial_objective});
+    const bool robust_line_search=se3EnvFlagEnabled("HGBP_SE3_ROBUST_LINE_SEARCH");
+    const bool buffered_objective=se3EnvFlagEnabled("HGBP_SE3_BUFFERED_OBJECTIVE");
+    if(buffered_objective && !robust_line_search)
+        throw std::runtime_error("Buffered objective experiment requires consistent Huber acceptance");
+    SE3ObjectiveWorkspace objective_workspace;
+    SE3PoseVector buffered_trial_poses;
+    if(robust_line_search) results.mg_history.back().nonlinear_huber_objective=
+        evaluateSE3Objectives(problem,mg_poses,robust_loss_config).huber;
     results.direct_pose_history.push_back(direct_poses);
     results.mg_pose_history.push_back(mg_poses);
 
@@ -3754,6 +3940,21 @@ SyntheticSE3ExperimentResults runSyntheticSE3Experiment(
     SE3BasisData cached_basis;
     bool cached_basis_valid = false;
     std::vector<Eigen::MatrixXd> warm_start_basis_local_bases;
+    std::vector<ExactBasisCacheEntry> exact_basis_cache;
+    const bool use_exact_basis_cache = se3EnvFlagEnabled("HGBP_SE3_EXACT_BASIS_CACHE");
+    const std::string eta_lift=std::getenv("HGBP_SE3_ETA_LIFT")?std::getenv("HGBP_SE3_ETA_LIFT"):"none";
+    if(eta_lift!="none" && eta_lift!="degree" && eta_lift!="precision")
+        throw std::runtime_error("Unknown SE3 eta lift policy");
+    const bool cycle_audit_enabled=se3EnvFlagEnabled("HGBP_SE3_CYCLE_AUDIT");
+    const bool residual_stop_enabled=se3EnvFlagEnabled("HGBP_SE3_RESIDUAL_STOP");
+    const std::string precision_defect=std::getenv("HGBP_SE3_PRECISION_DEFECT")?std::getenv("HGBP_SE3_PRECISION_DEFECT"):"none";
+    if(precision_defect!="none" && precision_defect!="diagonal")
+        throw std::runtime_error("Unknown precision-defect experiment");
+    if(precision_defect!="none" && (eta_lift!="precision" ||
+       !std::getenv("HGBP_SE3_PRECISION_INITIALIZATION") ||
+       std::string(std::getenv("HGBP_SE3_PRECISION_INITIALIZATION"))!="cold" ||
+       (std::getenv("HGBP_SE3_SMOOTHER") && std::string(std::getenv("HGBP_SE3_SMOOTHER"))!="gbp")))
+        throw std::runtime_error("Precision-defect requires cold diagonal messages, GBP path and precision eta lift");
     SparseCholeskyFactor coarse_factor_cache;
     bool coarse_factor_cache_valid = false;
     Eigen::SparseMatrix<double> coarse_lam_direct_cache;
@@ -3762,6 +3963,31 @@ SyntheticSE3ExperimentResults runSyntheticSE3Experiment(
     const bool reuse_coarse_pattern = se3ReuseCoarsePatternEnabled();
     const int coarse_numeric_rebuild_period = se3CoarseNumericRebuildPeriod();
     const int coarse_reuse_pcg_iterations = se3CoarseReusePcgIterations();
+    const bool automatic_coarse=se3EnvFlagEnabled("HGBP_SE3_AUTOMATIC_COARSE");
+    const bool amortized_coarse=se3EnvFlagEnabled("HGBP_SE3_AMORTIZED_COARSE");
+    double coarse_extra_work = 0.0;
+    const std::string precision_initialization=std::getenv("HGBP_SE3_PRECISION_INITIALIZATION")?
+        std::getenv("HGBP_SE3_PRECISION_INITIALIZATION"):"cold";
+    const std::string boundary_basis=std::getenv("HGBP_SE3_BOUNDARY_BASIS")?
+        std::getenv("HGBP_SE3_BOUNDARY_BASIS"):"none";
+    const std::string basis_prepass=std::getenv("HGBP_SE3_BASIS_PREPASS")?
+        std::getenv("HGBP_SE3_BASIS_PREPASS"):"none";
+    if(basis_prepass!="none" && basis_prepass!="control" && basis_prepass!="boundary" && basis_prepass!="rigid")
+        throw std::runtime_error("Unknown SE3 presweep basis policy");
+    if(basis_prepass!="none" && (boundary_basis!="none" ||
+        !se3EnvFlagEnabled("HGBP_SE3_BALANCED_INITIALIZATION") ||
+        !se3PackedSoADeferGraphCopyEnabled() || !se3PackedSoASweepsEnabled()))
+        throw std::runtime_error("Presweep basis requires isolated balanced/deferred packed path");
+    if (boundary_basis!="none" && boundary_basis!="early_control" && boundary_basis!="warm_boundary" &&
+        boundary_basis!="rigid_control" && boundary_basis!="warm_rigid" &&
+        boundary_basis!="rigid_unanchored_control" && boundary_basis!="warm_rigid_unanchored" &&
+        boundary_basis!="transport_boundary" && boundary_basis!="transport_rigid_control" &&
+        boundary_basis!="transport_rigid")
+        throw std::runtime_error("Unknown SE3 boundary basis experiment");
+    if (boundary_basis!="none" && !se3EnvFlagEnabled("HGBP_SE3_BALANCED_INITIALIZATION"))
+        throw std::runtime_error("SE3 boundary experiment requires balanced packed initialization");
+    SE3PrecisionWarmState precision_warm;
+    const char* precision_audit_path=std::getenv("HGBP_SE3_PRECISION_AUDIT");
 
     for (int outer = 1; outer <= num_outer; ++outer) {
         if (direct_enabled) {
@@ -3910,6 +4136,41 @@ SyntheticSE3ExperimentResults runSyntheticSE3Experiment(
             };
             const auto joint_t1 = SteadyClock::now();
 
+            Eigen::VectorXd e_now = stackedMeanVector(graph);
+            SE3PrecisionWarmStats precision_warm_stats;
+            double precision_warm_sec=0;
+            auto initialize_packed_messages = [&]() {
+                if (!se3EnvFlagEnabled("HGBP_SE3_BALANCED_INITIALIZATION")) return;
+                if(!implicit_fine_workspace) throw std::runtime_error("Balanced SE3 requires packed workspace");
+                initializeBalancedSE3PackedMessages(*implicit_fine_workspace,thread_count);
+                if(precision_audit_path && precision_audit_path[0] && outer==2)
+                    auditSE3PrecisionWarm(precision_audit_path,graph,*implicit_fine_workspace,precision_warm,mg_poses,thread_count);
+                if(precision_initialization!="cold" && !precision_warm.poses.empty()) {
+                    const auto warm_t0=SteadyClock::now();
+                    precision_warm_stats=initializeWarmSE3Precision(*implicit_fine_workspace,precision_warm,
+                        mg_poses,precision_initialization=="warm-bounded",thread_count,
+                        precision_initialization=="warm-transport" || precision_initialization=="warm-transport-balanced");
+                    precision_warm_sec=elapsedSeconds(warm_t0,SteadyClock::now());
+                }
+                stackedMeanVectorSyntheticSE3PackedSoAWorkspaceInto(*implicit_fine_workspace,e_now,thread_count);
+            };
+            const std::string smoother=std::getenv("HGBP_SE3_SMOOTHER")?std::getenv("HGBP_SE3_SMOOTHER"):"gbp";
+            if (boundary_basis!="none" || basis_prepass!="none") initialize_packed_messages();
+            double basis_prepass_sec=0;
+            if(basis_prepass!="none") {
+                if(!implicit_fine_workspace || smoother=="none")
+                    throw std::runtime_error("Presweep basis needs a packed smoother");
+                if(basis_prepass!="control" && smoother!="gbp")
+                    throw std::runtime_error("Message-conditioned basis requires actual GBP precision");
+                const auto prepass_t0=SteadyClock::now();
+                if(smoother=="jacobi")
+                    blockJacobiSE3PackedIterations(*implicit_fine_workspace,pre_sweeps,thread_count);
+                else manualSynchronousIterations(graph,pre_sweeps,thread_count,0,outer,&problem);
+                basis_prepass_sec=elapsedSeconds(prepass_t0,SteadyClock::now());
+                // e_now deliberately retains the pre-sweep mean: the first cycle's
+                // residual and energy line search must use the unchanged origin.
+            }
+
             const auto basis_t0 = SteadyClock::now();
             const bool basis_within_warmup =
                 basis_rebuild_warmup_outers > 0 && outer <= basis_rebuild_warmup_outers;
@@ -3920,16 +4181,44 @@ SyntheticSE3ExperimentResults runSyntheticSE3Experiment(
                 basis_within_warmup ||
                 (((post_warmup_outer - 1) % basis_rebuild_period) == 0);
             if (rebuild_basis) {
-                cached_basis = buildMessageConditionedBasis(
+                const bool transported=precision_warm_stats.slots>0;
+                const bool use_boundary=boundary_basis=="warm_boundary" || boundary_basis=="warm_rigid" ||
+                    boundary_basis=="warm_rigid_unanchored" ||
+                    (transported && (boundary_basis=="transport_boundary" || boundary_basis=="transport_rigid")) ||
+                    basis_prepass=="boundary" || basis_prepass=="rigid";
+                const bool keep_rigid=boundary_basis=="rigid_control" || boundary_basis=="warm_rigid" ||
+                    boundary_basis=="rigid_unanchored_control" || boundary_basis=="warm_rigid_unanchored" ||
+                    (transported && (boundary_basis=="transport_rigid_control" || boundary_basis=="transport_rigid")) ||
+                    basis_prepass=="rigid";
+                const bool exclude_anchor=boundary_basis=="rigid_unanchored_control" || boundary_basis=="warm_rigid_unanchored" ||
+                    boundary_basis=="transport_rigid_control" || boundary_basis=="transport_rigid" || basis_prepass=="rigid";
+                SE3BasisData fresh_basis = buildMessageConditionedBasis(
                     graph,
                     &mg_poses,
                     group_size,
                     r_reduced,
                     thread_count,
-                    warm_start_basis_local_bases.empty() ? nullptr : &warm_start_basis_local_bases
+                    warm_start_basis_local_bases.empty() ? nullptr : &warm_start_basis_local_bases,
+                    use_exact_basis_cache ? &exact_basis_cache : nullptr,
+                    use_boundary ? implicit_fine_workspace : nullptr,
+                    keep_rigid,
+                    exclude_anchor
                 );
+                // Keep eigensolver warm starts independent of the optional
+                // coarse-coordinate rotation, so alignment cannot change its seeds.
+                warm_start_basis_local_bases = fresh_basis.local_bases;
+                if(automatic_coarse && cached_basis.local_bases.size()==fresh_basis.local_bases.size()) {
+                    #pragma omp parallel for schedule(static) num_threads(thread_count) if(thread_count>1)
+                    for(int g=0;g<static_cast<int>(fresh_basis.local_bases.size());++g) {
+                        if (fresh_basis.exact_reused[g] &&
+                            cached_basis.local_bases[g].rows() == fresh_basis.local_bases[g].rows() &&
+                            cached_basis.local_bases[g].cols() == fresh_basis.local_bases[g].cols())
+                            fresh_basis.local_bases[g] = cached_basis.local_bases[g];
+                        else alignBasisCoordinates(fresh_basis.local_bases[g],cached_basis.local_bases[g]);
+                    }
+                }
+                cached_basis = std::move(fresh_basis);
                 cached_basis_valid = true;
-                warm_start_basis_local_bases = cached_basis.local_bases;
             }
             const auto basis_t1 = SteadyClock::now();
             const SE3BasisData& basis = cached_basis;
@@ -3938,12 +4227,14 @@ SyntheticSE3ExperimentResults runSyntheticSE3Experiment(
             const bool use_cached_coarse_lambda =
                 se3CachedCoarseLambdaEnabled() &&
                 static_cast<int>(basis.local_bases.size()) >= se3CachedCoarseLambdaMinGroups();
-            const bool rebuild_coarse_numeric =
+            bool rebuild_coarse_numeric = automatic_coarse
+                ? (!coarse_factor_cache_valid || coarse_factor_cache.ldlt_solver.rows()!=basis.coarse_dim)
+                : (
                 !coarse_factor_cache_valid ||
                 rebuild_basis ||
                 coarse_numeric_rebuild_period <= 1 ||
                 basis_within_warmup ||
-                (((post_warmup_outer - 1) % coarse_numeric_rebuild_period) == 0);
+                (((post_warmup_outer - 1) % coarse_numeric_rebuild_period) == 0));
             const Eigen::SparseMatrix<double>* coarse_lam_ptr = nullptr;
             if (use_cached_coarse_lambda) {
                 coarse_lam_ptr =
@@ -3975,11 +4266,24 @@ SyntheticSE3ExperimentResults runSyntheticSE3Experiment(
                 coarse_ridge_added_inplace = true;
             }
             const Eigen::SparseMatrix<double>& coarse_lam = *coarse_lam_ptr;
+            double coarse_reuse_work_ratio=0;
+            CoarseWorkEstimate coarse_work;
+            bool coarse_amortized_refresh = false;
+            const double coarse_extra_work_before = coarse_extra_work;
+            if(automatic_coarse && !rebuild_coarse_numeric) {
+                coarse_work=coarse_factor_cache.ldlt_solver.workEstimate(coarse_lam.nonZeros());
+                coarse_reuse_work_ratio=coarse_work.reuseRatio(inner_cycles);
+                if(coarse_reuse_work_ratio>=1.) rebuild_coarse_numeric=true;
+                if(amortized_coarse && coarse_extra_work >= coarse_work.factor_work) {
+                    rebuild_coarse_numeric=true;
+                    coarse_amortized_refresh=true;
+                }
+            }
             const auto coarse_lam_t1 = SteadyClock::now();
 
             SparseCholeskyFactor coarse_factor_local;
             const bool persist_coarse_factor =
-                reuse_coarse_pattern || coarse_numeric_rebuild_period > 1;
+                automatic_coarse || reuse_coarse_pattern || coarse_numeric_rebuild_period > 1;
             SparseCholeskyFactor* coarse_factor_ptr =
                 persist_coarse_factor ? &coarse_factor_cache : &coarse_factor_local;
             const auto coarse_factor_t0 = SteadyClock::now();
@@ -3992,11 +4296,16 @@ SyntheticSE3ExperimentResults runSyntheticSE3Experiment(
                     true
                 );
                 coarse_factor_cache_valid = persist_coarse_factor;
+                coarse_extra_work = 0.0;
             }
             const auto coarse_factor_t1 = SteadyClock::now();
-            const double coarse_factorize_sec = elapsedSeconds(coarse_factor_t0, coarse_factor_t1);
-
-            double sweeps_sec = 0.0;
+            double coarse_factorize_sec = elapsedSeconds(coarse_factor_t0, coarse_factor_t1);
+            bool coarse_factor_current=rebuild_coarse_numeric;
+            int coarse_reuse_attempts=0,coarse_reuse_accepts=0,coarse_reuse_fallbacks=0;
+            int coarse_reuse_iterations=0,coarse_reuse_max_iterations=0;
+            int coarse_reuse_preconditioner_calls=0,coarse_reuse_matvec_calls=0;
+            double coarse_reuse_max_accepted_residual=0;
+            double sweeps_sec = basis_prepass_sec;
             double coarse_eta_sec = 0.0;
             double coarse_solve_sec = coarse_factorize_sec;
             double coarse_backsolve_sec = 0.0;
@@ -4010,7 +4319,7 @@ SyntheticSE3ExperimentResults runSyntheticSE3Experiment(
             double smoother_translation_update_norm_sum = 0.0;
             double smoother_rotation_update_norm_sum = 0.0;
             int smoother_local_rejects_total = 0;
-            Eigen::VectorXd e_now = stackedMeanVector(graph);
+            if (boundary_basis=="none" && basis_prepass=="none") initialize_packed_messages();
             Eigen::VectorXd residual_before_sweeps(basis.total_dim);
             Eigen::VectorXd residual_after_sweeps(basis.total_dim);
             Eigen::VectorXd residual_after_coarse(basis.total_dim);
@@ -4022,12 +4331,33 @@ SyntheticSE3ExperimentResults runSyntheticSE3Experiment(
             Eigen::VectorXd coarse_pcg_matrix_direction(basis.coarse_dim);
             Eigen::VectorXd delta_fine(basis.total_dim);
             int executed_inner_cycles = 0;
+            int coarse_solves=0;
+            const bool cycle_energy_enabled = se3EnvFlagEnabled("HGBP_CYCLE_ENERGY");
+            if(cycle_audit_enabled && !implicit_fine_workspace)
+                throw std::runtime_error("Cycle audit requires the packed fine workspace");
+            CycleEnergyHistory cycle_energy(inner_cycles);
+            std::vector<SE3CycleAuditRow> cycle_audit;
+            int message_lifts=0;
+            double message_lift_sec=0;
+            SE3ResidualCertificate residual_certificate;
+            int residual_stop_checks=0;
+            double residual_stop_sec=0, residual_stop_relative=0;
+            bool residual_stopped=false;
+            if(residual_stop_enabled) {
+                if(!implicit_fine_workspace) throw std::runtime_error("Residual stopping requires packed canonical operator");
+                const auto t0=SteadyClock::now();
+                residual_certificate.initialize(*implicit_fine_workspace,thread_count);
+                residual_stop_sec+=elapsedSeconds(t0,SteadyClock::now());
+            }
             bool have_previous_residual_after_coarse = false;
             double previous_residual_after_coarse_norm = 0.0;
             for (int cyc = 0; cyc < inner_cycles; ++cyc) {
+                SE3CycleAuditRow audit;
+                audit.cycle=cyc+1;
                 double residual_before_sweeps_norm = 0.0;
                 if (have_previous_residual_after_coarse) {
                     residual_before_sweeps_norm = previous_residual_after_coarse_norm;
+                    if (cycle_energy_enabled || cycle_audit_enabled) residual_before_sweeps = residual_after_coarse;
                 } else {
                     assemble_fine_residual(e_now, residual_before_sweeps);
                     residual_before_sweeps_norm = residual_before_sweeps.norm();
@@ -4041,6 +4371,12 @@ SyntheticSE3ExperimentResults runSyntheticSE3Experiment(
                 const bool defer_packed_graph_copy =
                     se3PackedSoADeferGraphCopyEnabled() &&
                     se3PackedSoASweepsEnabled();
+                if(cyc==0 && basis_prepass!="none") {
+                    // Already executed, and included in the packed sweep counters.
+                } else if(smoother=="jacobi") {
+                    if(!implicit_fine_workspace) throw std::runtime_error("Jacobi control requires packed workspace");
+                    blockJacobiSE3PackedIterations(*implicit_fine_workspace,pre_sweeps,thread_count);
+                } else if(smoother=="gbp") {
                 manualSynchronousIterations(
                     graph,
                     pre_sweeps,
@@ -4049,6 +4385,7 @@ SyntheticSE3ExperimentResults runSyntheticSE3Experiment(
                     outer,
                     &problem
                 );
+                }
                 if (!(defer_packed_graph_copy &&
                       tryStackedMeanVectorPackedSoA(graph, thread_count, e_now))) {
                     e_now = stackedMeanVector(graph);
@@ -4080,12 +4417,53 @@ SyntheticSE3ExperimentResults runSyntheticSE3Experiment(
                 last_cycle_residual_before_sweeps = residual_before_sweeps_norm;
                 last_cycle_residual_after_sweeps = residual_after_sweeps_norm;
                 const auto coarse_eta_t0 = SteadyClock::now();
+                if(cycle_audit_enabled) {
+                    audit.initial_residual=residual_before_sweeps_norm;
+                    audit.fine_residual=residual_after_sweeps_norm;
+                    audit.fine_gain=0.5*gbp_delta.dot(residual_before_sweeps+residual_after_sweeps);
+                    audit.fine_energy=gbp_delta.dot(residual_before_sweeps-residual_after_sweeps);
+                }
                 restrictToCoarseInto(basis, residual_after_sweeps, coarse_eta);
                 const auto coarse_eta_t1 = SteadyClock::now();
                 coarse_eta_sec += elapsedSeconds(coarse_eta_t0, coarse_eta_t1);
 
                 const auto coarse_solve_t0 = SteadyClock::now();
-                if (rebuild_coarse_numeric) {
+                double fallback_factor_sec=0;
+                if(se3EnvFlagEnabled("HGBP_SE3_SKIP_COARSE")) {
+                    delta_z.setZero();
+                } else {
+                ++coarse_solves;
+                bool certified_reused=false;
+                if(automatic_coarse && !coarse_factor_current) {
+                    ++coarse_reuse_attempts;
+                    const auto certificate=certifiedCoarsePcg(coarse_lam,coarse_ridge_added_inplace?0.0:1e-8,
+                        coarse_eta,[&](const Eigen::VectorXd& rhs,Eigen::VectorXd& x) {
+                            solveWithSparseCholeskyInto(*coarse_factor_ptr,rhs,x);
+                        },delta_z,coarse_pcg_residual,coarse_pcg_preconditioned_residual,
+                        coarse_pcg_direction,coarse_pcg_matrix_direction);
+                    certified_reused=certificate.accepted;
+                    coarse_reuse_iterations += certificate.iterations;
+                    coarse_reuse_max_iterations = std::max(coarse_reuse_max_iterations, certificate.iterations);
+                    coarse_reuse_preconditioner_calls += certificate.preconditioner_calls;
+                    coarse_reuse_matvec_calls += certificate.matvec_calls;
+                    if(certified_reused) {
+                        if(amortized_coarse) coarse_extra_work += coarse_work.extraWork(certificate);
+                        ++coarse_reuse_accepts;
+                        coarse_reuse_max_accepted_residual=std::max(coarse_reuse_max_accepted_residual,certificate.relative_residual);
+                    } else {
+                        ++coarse_reuse_fallbacks;
+                        const auto t0=SteadyClock::now();
+                        factorizeSparseCholesky(coarse_lam,coarse_ridge_added_inplace?0.0:1e-8,
+                            *coarse_factor_ptr,reuse_coarse_pattern,true);
+                        fallback_factor_sec=elapsedSeconds(t0,SteadyClock::now());
+                        coarse_factorize_sec+=fallback_factor_sec;
+                        coarse_factor_current=true;
+                        coarse_extra_work=0.0;
+                    }
+                }
+                if(certified_reused) {
+                    // delta_z was accepted using the current coarse equation.
+                } else if (coarse_factor_current) {
                     solveWithSparseCholeskyInto(
                         *coarse_factor_ptr,
                         coarse_eta,
@@ -4104,10 +4482,11 @@ SyntheticSE3ExperimentResults runSyntheticSE3Experiment(
                         coarse_pcg_matrix_direction
                     );
                 }
+                }
                 const auto coarse_solve_t1 = SteadyClock::now();
                 const double backsolve_elapsed = elapsedSeconds(coarse_solve_t0, coarse_solve_t1);
                 coarse_solve_sec += backsolve_elapsed;
-                coarse_backsolve_sec += backsolve_elapsed;
+                coarse_backsolve_sec += backsolve_elapsed-fallback_factor_sec;
 
                 const auto inject_t0 = SteadyClock::now();
                 prolongToFineInto(basis, delta_z, delta_fine);
@@ -4132,6 +4511,51 @@ SyntheticSE3ExperimentResults runSyntheticSE3Experiment(
                     e_now = stackedMeanVector(graph);
                 }
                 assemble_fine_residual(e_now, residual_after_coarse);
+                if(cycle_audit_enabled) {
+                    const Eigen::VectorXd actual_coarse_delta=e_now-e_before_gbp_sweeps-gbp_delta;
+                    audit.coarse_residual=residual_after_coarse.norm();
+                    audit.coarse_gain=0.5*actual_coarse_delta.dot(residual_after_sweeps+residual_after_coarse);
+                    audit.coarse_energy=actual_coarse_delta.dot(residual_after_sweeps-residual_after_coarse);
+                    audit.cross_energy=gbp_delta.dot(residual_after_sweeps-residual_after_coarse);
+                }
+                if (cycle_energy_enabled) {
+                    const Eigen::VectorXd unaccelerated = e_now;
+                    if(se3EnvFlagEnabled("HGBP_CYCLE_ENERGY_RESTART")) cycle_energy.clear();
+                    cycle_energy.accept(e_before_gbp_sweeps, residual_before_sweeps,
+                                        e_now, residual_after_coarse);
+                    delta_fine = e_now - unaccelerated;
+                    if (!(defer_packed_graph_copy_after_coarse &&
+                          tryApplyMeanDeltaPackedSoA(graph, delta_fine, thread_count))) {
+                        injectCorrectionKeepMessages(graph, delta_fine);
+                    }
+                }
+                if(cycle_audit_enabled) {
+                    audit.eta_defect_before=measureSE3PackedEtaMismatch(*implicit_fine_workspace);
+                }
+                if(eta_lift!="none") {
+                    if(!implicit_fine_workspace || smoother!="gbp" || se3EnvFlagEnabled("HGBP_SE3_CYCLE_MESSAGE_REBUILD"))
+                        throw std::runtime_error("Eta lift requires GBP and excludes message reconstruction");
+                    const auto lift_t0=SteadyClock::now();
+                    delta_fine=e_now-e_before_gbp_sweeps-gbp_delta;
+                    liftSE3PackedMeanCorrection(*implicit_fine_workspace,delta_fine,eta_lift=="precision",thread_count);
+                    ++message_lifts;
+                    message_lift_sec+=elapsedSeconds(lift_t0,SteadyClock::now());
+                }
+                if(cycle_audit_enabled) {
+                    audit.eta_defect_after=measureSE3PackedEtaMismatch(*implicit_fine_workspace);
+                    audit.final_residual=residual_after_coarse.norm();
+                    audit.total_gain=0.5*(e_now-e_before_gbp_sweeps).dot(residual_before_sweeps+residual_after_coarse);
+                    Eigen::VectorXd true_residual;
+                    assemble_fine_residual(e_now,true_residual);
+                    audit.residual_defect_absolute=(true_residual-residual_after_coarse).norm();
+                    audit.residual_defect_relative=audit.residual_defect_absolute/
+                        std::max({true_residual.norm(),residual_before_sweeps_norm,1e-300});
+                    cycle_audit.push_back(audit);
+                }
+                if(cyc+1<inner_cycles && se3EnvFlagEnabled("HGBP_SE3_CYCLE_MESSAGE_REBUILD")) {
+                    if(!implicit_fine_workspace) throw std::runtime_error("Message rebuild requires packed workspace");
+                    rebuildSE3PackedMessagesAtMean(*implicit_fine_workspace,e_now,residual_after_coarse,thread_count);
+                }
                 const double residual_after_coarse_norm = residual_after_coarse.norm();
                 previous_residual_after_coarse_norm = residual_after_coarse_norm;
                 have_previous_residual_after_coarse = true;
@@ -4142,21 +4566,52 @@ SyntheticSE3ExperimentResults runSyntheticSE3Experiment(
                 const auto inject_t1 = SteadyClock::now();
                 prolong_inject_sec += elapsedSeconds(inject_t0, inject_t1);
                 ++executed_inner_cycles;
+                if(residual_stop_enabled) {
+                    const auto t0=SteadyClock::now();
+                    residual_stop_relative=residual_certificate.relativeResidual(residual_after_coarse);
+                    ++residual_stop_checks;
+                    residual_stopped=SE3ResidualCertificate::accepts(residual_stop_relative) && cyc+1<inner_cycles;
+                    residual_stop_sec+=elapsedSeconds(t0,SteadyClock::now());
+                    if(residual_stopped) break;
+                }
             }
 
             const Eigen::VectorXd e_hat = e_now;
             const double raw_e_hat_norm = e_hat.norm();
             const auto apply_t0 = SteadyClock::now();
-            const double base_obj = results.mg_history.empty()
-                ? nonlinearObjective(problem, mg_poses)
-                : results.mg_history.back().nonlinear_objective;
+            if((precision_initialization!="cold" || (precision_audit_path && precision_audit_path[0])) && implicit_fine_workspace) {
+                const auto warm_t0=SteadyClock::now();
+                precision_warm.capture(*implicit_fine_workspace,mg_poses,
+                    precision_initialization=="warm-transport-balanced"?&e_hat:nullptr,thread_count);
+                precision_warm_sec+=elapsedSeconds(warm_t0,SteadyClock::now());
+            }
+            const double base_raw_obj=results.mg_history.back().nonlinear_objective;
+            const double base_obj=robust_line_search
+                ? results.mg_history.back().nonlinear_huber_objective : base_raw_obj;
             double step_scale = 1.0;
             int line_search_rejects = 0;
             double trial_obj = base_obj;
+            double trial_raw_obj=base_raw_obj;
             SE3PoseVector trial_poses = mg_poses;
+            double outer_pose_update_sec=0,outer_acceptance_sec=0;
+            int objective_evaluations=0;
             while (step_scale >= (1.0 / 1024.0)) {
-                trial_poses = applyPoseDeltas(mg_poses, step_scale * e_hat);
-                trial_obj = nonlinearObjective(problem, trial_poses);
+                const auto update_t0=SteadyClock::now();
+                if(buffered_objective) {
+                    applySE3PoseDeltasInto(mg_poses,e_hat,step_scale,buffered_trial_poses,thread_count);
+                    trial_poses.swap(buffered_trial_poses);
+                } else trial_poses = applyPoseDeltas(mg_poses, step_scale * e_hat);
+                const auto acceptance_t0=SteadyClock::now();
+                outer_pose_update_sec+=elapsedSeconds(update_t0,acceptance_t0);
+                ++objective_evaluations;
+                if(robust_line_search) {
+                    const auto objective=buffered_objective
+                        ? evaluateSE3ObjectivesBuffered(problem,trial_poses,robust_loss_config,objective_workspace,thread_count)
+                        : evaluateSE3Objectives(problem,trial_poses,robust_loss_config);
+                    trial_obj=objective.huber;
+                    trial_raw_obj=objective.raw;
+                } else trial_obj = nonlinearObjective(problem, trial_poses);
+                outer_acceptance_sec+=elapsedSeconds(acceptance_t0,SteadyClock::now());
                 if (std::isfinite(trial_obj) && trial_obj <= base_obj) {
                     break;
                 }
@@ -4166,13 +4621,14 @@ SyntheticSE3ExperimentResults runSyntheticSE3Experiment(
             if (step_scale < (1.0 / 1024.0)) {
                 trial_poses = mg_poses;
                 trial_obj = base_obj;
+                trial_raw_obj=base_raw_obj;
                 step_scale = 0.0;
             }
             mg_poses = trial_poses;
             const auto apply_t1 = SteadyClock::now();
 
             const auto obj_t0 = SteadyClock::now();
-            const double nonlinear_obj = trial_obj;
+            const double nonlinear_obj = robust_line_search ? trial_raw_obj : trial_obj;
             const auto obj_t1 = SteadyClock::now();
             const auto total_t1 = SteadyClock::now();
 
@@ -4237,6 +4693,7 @@ SyntheticSE3ExperimentResults runSyntheticSE3Experiment(
                     basis.full_eigensolver_count,
                     elapsedSeconds(coarse_lam_t0, coarse_lam_t1),
                     elapsedSeconds(joint_t0, joint_t1),
+                    0.0, // No fine-level direct solve in an MG outer iteration.
                     sweeps_sec,
                     graph.sync_factor_pass_sec_accum,
                     graph.sync_variable_pass_sec_accum,
@@ -4253,6 +4710,62 @@ SyntheticSE3ExperimentResults runSyntheticSE3Experiment(
                     relin_stats.total_sec,
                 }
             );
+            if (implicit_fine_workspace != nullptr) {
+                auto& row = results.mg_history.back();
+                row.nonlinear_huber_objective=robust_line_search ? trial_obj : 0;
+                row.basis_prepass_sweeps=basis_prepass!="none" ? pre_sweeps : 0;
+                row.basis_prepass_sec=basis_prepass_sec;
+                row.outer_pose_update_sec=outer_pose_update_sec;
+                row.outer_acceptance_sec=outer_acceptance_sec;
+                row.objective_evaluations=objective_evaluations;
+                const auto& packed = *implicit_fine_workspace;
+                row.precision_checks = packed.precision_checks;
+                row.precision_freezes = packed.precision_freezes;
+                row.precision_thaws = packed.precision_thaws;
+                row.first_precision_freeze_sweep = packed.first_precision_freeze_sweep;
+                row.precision_residual = packed.last_precision_residual;
+                row.full_precision_sweeps = packed.full_precision_sweeps;
+                row.eta_only_sweeps = packed.eta_only_sweeps;
+                row.smoother_total_sweeps = packed.full_precision_sweeps + packed.eta_only_sweeps + packed.defect_mean_sweeps;
+                row.defect_mean_sweeps=packed.defect_mean_sweeps;
+                row.defect_map_builds=packed.defect_map_builds;
+                row.defect_clamps=packed.defect_clamps;
+                row.defect_build_sec=packed.defect_build_sec;
+                row.defect_inverse_residual=packed.defect_inverse_residual;
+                row.jacobi_sweeps=packed.jacobi_sweeps;
+                row.coarse_solves=coarse_solves;
+                row.cycle_message_rebuilds=packed.cycle_message_rebuilds;
+                row.coarse_reuse_attempts=coarse_reuse_attempts;
+                row.coarse_reuse_accepts=coarse_reuse_accepts;
+                row.coarse_reuse_fallbacks=coarse_reuse_fallbacks;
+                row.coarse_reuse_max_accepted_residual=coarse_reuse_max_accepted_residual;
+                row.coarse_reuse_work_ratio=coarse_reuse_work_ratio;
+                row.coarse_reuse_iterations=coarse_reuse_iterations;
+                row.coarse_reuse_max_iterations=coarse_reuse_max_iterations;
+                row.basis_exact_reuse_count=rebuild_basis ? basis.exact_reuse_count : 0;
+                row.basis_exact_cache_sec=rebuild_basis ? basis.exact_cache_sec : 0.0;
+                row.message_lifts=message_lifts;
+                row.message_lift_sec=message_lift_sec;
+                row.residual_stop_checks=residual_stop_checks;
+                row.residual_stop_sec=residual_stop_sec;
+                row.residual_stop_relative=std::isfinite(residual_stop_relative)?residual_stop_relative:-1;
+                row.residual_stopped=residual_stopped;
+                row.cycle_audit=std::move(cycle_audit);
+                row.basis_partial_work_aborts=rebuild_basis ? basis.partial_work_aborts : 0;
+                row.basis_partial_iterations=rebuild_basis ? basis.partial_iterations : 0;
+                row.coarse_reuse_preconditioner_calls=coarse_reuse_preconditioner_calls;
+                row.coarse_reuse_matvec_calls=coarse_reuse_matvec_calls;
+                row.coarse_amortized_refresh=coarse_amortized_refresh;
+                row.coarse_cholmod_supernodal=coarse_factor_ptr->ldlt_solver.supernodal();
+                row.coarse_extra_work_before=coarse_extra_work_before;
+                row.coarse_extra_work_after=coarse_extra_work;
+                row.coarse_factor_work_estimate=coarse_work.factor_work;
+                row.precision_warm_slots=precision_warm_stats.slots;
+                row.precision_warm_projected=precision_warm_stats.projected;
+                row.precision_warm_failed=precision_warm_stats.failed;
+                row.precision_warm_max_projection=precision_warm_stats.max_projection_relative;
+                row.precision_warm_sec=precision_warm_sec;
+            }
             results.mg_pose_history.push_back(mg_poses);
         }
     }
@@ -4324,6 +4837,7 @@ SyntheticSE3ExperimentResults runSyntheticSE3Experiment(
         }
     }
 
+    results.solver_wall_sec = elapsedSeconds(solver_wall_start, SteadyClock::now());
     return results;
 }
 
@@ -4345,8 +4859,42 @@ void writeSyntheticSE3ExperimentResultsJson(
     }
     out << std::setprecision(17);
     out << "{\n";
+    out << "  \"worker_affinity\": \"scoped_ascending_allowed_cpus\",\n";
+    out << "  \"worker_affinity_failures\": " << ScopedWorkerAffinity::failures.load() << ",\n";
+    out << "  \"max_observed_sweep_threads\": " << ScopedWorkerAffinity::max_team.load() << ",\n";
+    out << "  \"basis_backend\": \"exact_band_selected_else_original_partial_eigen\",\n";
+    out << "  \"basis_eigenvalue_scope\": \"selected_for_partial_and_band_full_for_eigen\",\n";
+    out << "  \"basis_band_calls\": " << BandedSymmetricEigenWorkspace::calls.load() << ",\n";
+    out << "  \"basis_band_failures\": " << BandedSymmetricEigenWorkspace::failures.load() << ",\n";
+    out << "  \"solver_wall_sec\": " << jsonNumber(results.solver_wall_sec) << ",\n";
     out << "  \"config\": {\n";
+    out << "    \"outer_line_search_objective\": \""
+        << (se3EnvFlagEnabled("HGBP_SE3_ROBUST_LINE_SEARCH")?"huber":"raw") << "\",\n";
+    out << "    \"buffered_objective\": " << (se3EnvFlagEnabled("HGBP_SE3_BUFFERED_OBJECTIVE")?"true":"false") << ",\n";
+    out << "    \"basis_prepass\": \"" << (std::getenv("HGBP_SE3_BASIS_PREPASS")?
+        std::getenv("HGBP_SE3_BASIS_PREPASS"):"none") << "\",\n";
     out << "    \"num_outer\": " << num_outer << ",\n";
+    out << "    \"adaptive_precision\": "
+        << (se3EnvFlagEnabled("HGBP_SE3_ADAPTIVE_PRECISION") ? "true" : "false") << ",\n";
+    out << "    \"cycle_energy_krylov\": "
+        << (se3EnvFlagEnabled("HGBP_CYCLE_ENERGY") && !se3EnvFlagEnabled("HGBP_CYCLE_ENERGY_RESTART") ? "true" : "false") << ",\n";
+    out << "    \"cycle_line_search\": " << (se3EnvFlagEnabled("HGBP_CYCLE_ENERGY_RESTART")?"true":"false") << ",\n";
+    out << "    \"persistent_sweeps\": " << (se3EnvFlagEnabled("HGBP_SE3_PERSISTENT_SWEEPS")?"true":"false") << ",\n";
+    out << "    \"smoother\": \"" << (std::getenv("HGBP_SE3_SMOOTHER")?std::getenv("HGBP_SE3_SMOOTHER"):"gbp") << "\",\n";
+    out << "    \"cycle_message_rebuild\": " << (se3EnvFlagEnabled("HGBP_SE3_CYCLE_MESSAGE_REBUILD")?"true":"false") << ",\n";
+    out << "    \"automatic_coarse\": " << (se3EnvFlagEnabled("HGBP_SE3_AUTOMATIC_COARSE")?"true":"false") << ",\n";
+    out << "    \"coarse_linear_backend\": \""
+        << (se3EnvFlagEnabled("HGBP_SE3_COARSE_CHOLMOD") ? "cholmod_auto" : "eigen_simplicial_ldlt")
+        << "\",\n";
+    out << "    \"boundary_basis\": \"" << (std::getenv("HGBP_SE3_BOUNDARY_BASIS")?
+        std::getenv("HGBP_SE3_BOUNDARY_BASIS"):"none") << "\",\n";
+    out << "    \"precision_initialization\": \"" << (std::getenv("HGBP_SE3_PRECISION_INITIALIZATION")?std::getenv("HGBP_SE3_PRECISION_INITIALIZATION"):"cold") << "\",\n";
+    out << "    \"diagnostic_precision_audit\": " << ((std::getenv("HGBP_SE3_PRECISION_AUDIT") && std::getenv("HGBP_SE3_PRECISION_AUDIT")[0])?"true":"false") << ",\n";
+    out << "    \"skip_coarse_quality_ablation\": " << (se3EnvFlagEnabled("HGBP_SE3_SKIP_COARSE")?"true":"false") << ",\n";
+    out << "    \"precision_tolerance\": " << SE3PrecisionPolicy::tolerance << ",\n";
+    out << "    \"precision_check_period\": " << SE3PrecisionPolicy::check_period << ",\n";
+    out << "    \"precision_stable_checks\": " << SE3PrecisionPolicy::stable_checks << ",\n";
+    out << "    \"frozen_precision_check_period\": " << SE3PrecisionPolicy::frozen_check_period << ",\n";
     out << "    \"inner_cycles\": " << inner_cycles << ",\n";
     out << "    \"pre_sweeps\": " << pre_sweeps << ",\n";
     out << "    \"group_size\": " << group_size << ",\n";
@@ -4375,9 +4923,28 @@ void writeSyntheticSE3ExperimentResultsJson(
         << (se3SingleThreadRuntimeGuardEnabled() ? "true" : "false") << ",\n";
     out << "    \"direct_enabled\": " << (direct_enabled ? "true" : "false") << ",\n";
     out << "    \"robust_huber_delta\": " << jsonNumber(robust_loss_config.huber_delta) << ",\n";
-    out << "    \"transport_policy\": \"fixed_lambda_eta_shift\",\n";
+    const std::string saved_precision_initialization=std::getenv("HGBP_SE3_PRECISION_INITIALIZATION")?
+        std::getenv("HGBP_SE3_PRECISION_INITIALIZATION"):"cold";
+    out << "    \"transport_policy\": \""
+        << (saved_precision_initialization!="cold"?saved_precision_initialization:
+            (se3EnvFlagEnabled("HGBP_SE3_RESET_TRANSPORT")?"reset":"legacy_outer12_eta_shift")) << "\",\n";
+    out << "    \"legacy_outer12_transport_enabled\": "
+        << (se3EnvFlagEnabled("HGBP_SE3_RESET_TRANSPORT")?"false":"true") << ",\n";
+    out << "    \"message_initialization\": \""
+        << (se3EnvFlagEnabled("HGBP_SE3_BALANCED_INITIALIZATION")?"balanced_after_basis":"legacy_zero_or_transport") << "\",\n";
     out << "    \"reuse_coarse_pattern\": "
         << (se3ReuseCoarsePatternEnabled() ? "true" : "false") << ",\n";
+    out << "    \"exact_basis_cache\": "
+        << (se3EnvFlagEnabled("HGBP_SE3_EXACT_BASIS_CACHE") ? "true" : "false") << ",\n";
+    out << "    \"eta_lift\": \"" << (std::getenv("HGBP_SE3_ETA_LIFT")?std::getenv("HGBP_SE3_ETA_LIFT"):"none") << "\",\n";
+    out << "    \"cycle_audit_enabled\": " << (se3EnvFlagEnabled("HGBP_SE3_CYCLE_AUDIT")?"true":"false") << ",\n";
+    out << "    \"residual_stop_enabled\": " << (se3EnvFlagEnabled("HGBP_SE3_RESIDUAL_STOP")?"true":"false") << ",\n";
+    out << "    \"residual_stop_tolerance\": 0.1,\n";
+    out << "    \"precision_defect\": \"" << (std::getenv("HGBP_SE3_PRECISION_DEFECT")?std::getenv("HGBP_SE3_PRECISION_DEFECT"):"none") << "\",\n";
+    out << "    \"amortized_coarse\": "
+        << (se3EnvFlagEnabled("HGBP_SE3_AMORTIZED_COARSE") ? "true" : "false") << ",\n";
+    out << "    \"predict_partial_budget\": "
+        << (se3EnvFlagEnabled("HGBP_SE3_PREDICT_PARTIAL_BUDGET") ? "true" : "false") << ",\n";
     out << "    \"cached_coarse_lambda\": "
         << (se3CachedCoarseLambdaEnabled() ? "true" : "false") << ",\n";
     out << "    \"cached_coarse_inplace_symmetrize\": "
@@ -4426,6 +4993,21 @@ void writeSyntheticSE3ExperimentResultsJson(
         out << "    {\"outer\": " << row.outer
             << ", \"nonlinear_objective\": " << jsonNumber(row.nonlinear_objective)
             << ", \"raw_e_hat_norm\": " << jsonNumber(row.raw_e_hat_norm)
+            << ", \"nonlinear_huber_objective\": ";
+        if(se3EnvFlagEnabled("HGBP_SE3_ROBUST_LINE_SEARCH")) out << jsonNumber(row.nonlinear_huber_objective);
+        else out << "null";
+        out << ", \"basis_prepass_sweeps\": " << row.basis_prepass_sweeps
+            << ", \"outer_pose_update_sec\": " << jsonNumber(row.outer_pose_update_sec)
+            << ", \"outer_acceptance_sec\": " << jsonNumber(row.outer_acceptance_sec)
+            << ", \"objective_evaluations\": " << row.objective_evaluations
+            << ", \"basis_prepass_sec\": " << jsonNumber(row.basis_prepass_sec)
+            << ", \"precision_checks\": " << row.precision_checks
+            << ", \"precision_freezes\": " << row.precision_freezes
+            << ", \"precision_thaws\": " << row.precision_thaws
+            << ", \"first_precision_freeze_sweep\": " << row.first_precision_freeze_sweep
+            << ", \"precision_residual\": " << jsonNumber(row.precision_residual)
+            << ", \"full_precision_sweeps\": " << row.full_precision_sweeps
+            << ", \"eta_only_sweeps\": " << row.eta_only_sweeps
             << ", \"e_hat_norm\": " << jsonNumber(row.e_hat_norm)
             << ", \"first_cycle_residual_before_sweeps\": "
             << jsonNumber(row.first_cycle_residual_before_sweeps)
@@ -4449,6 +5031,43 @@ void writeSyntheticSE3ExperimentResultsJson(
             << jsonNumber(row.smoother_rotation_update_norm_sum)
             << ", \"smoother_local_rejects_total\": " << row.smoother_local_rejects_total
             << ", \"smoother_total_sweeps\": " << row.smoother_total_sweeps
+            << ", \"jacobi_sweeps\": " << row.jacobi_sweeps
+            << ", \"coarse_solves\": " << row.coarse_solves
+            << ", \"residual_stop_checks\": " << row.residual_stop_checks
+            << ", \"residual_stop_sec\": " << row.residual_stop_sec
+            << ", \"residual_stop_relative\": " << row.residual_stop_relative
+            << ", \"residual_stopped\": " << (row.residual_stopped?"true":"false")
+            << ", \"cycle_message_rebuilds\": " << row.cycle_message_rebuilds
+            << ", \"message_lifts\": " << row.message_lifts
+            << ", \"defect_mean_sweeps\": " << row.defect_mean_sweeps
+            << ", \"defect_map_builds\": " << row.defect_map_builds
+            << ", \"defect_clamps\": " << row.defect_clamps
+            << ", \"defect_build_sec\": " << jsonNumber(row.defect_build_sec)
+            << ", \"defect_inverse_residual\": " << jsonNumber(row.defect_inverse_residual)
+            << ", \"message_lift_sec\": " << jsonNumber(row.message_lift_sec)
+            << ", \"coarse_reuse_attempts\": " << row.coarse_reuse_attempts
+            << ", \"coarse_reuse_accepts\": " << row.coarse_reuse_accepts
+            << ", \"coarse_reuse_fallbacks\": " << row.coarse_reuse_fallbacks
+            << ", \"coarse_reuse_max_accepted_residual\": " << jsonNumber(row.coarse_reuse_max_accepted_residual)
+            << ", \"coarse_reuse_work_ratio\": " << jsonNumber(row.coarse_reuse_work_ratio)
+            << ", \"coarse_reuse_iterations\": " << row.coarse_reuse_iterations
+            << ", \"coarse_reuse_max_iterations\": " << row.coarse_reuse_max_iterations
+            << ", \"basis_exact_reuse_count\": " << row.basis_exact_reuse_count
+            << ", \"basis_exact_cache_sec\": " << jsonNumber(row.basis_exact_cache_sec)
+            << ", \"basis_partial_work_aborts\": " << row.basis_partial_work_aborts
+            << ", \"basis_partial_iterations\": " << row.basis_partial_iterations
+            << ", \"coarse_reuse_preconditioner_calls\": " << row.coarse_reuse_preconditioner_calls
+            << ", \"coarse_reuse_matvec_calls\": " << row.coarse_reuse_matvec_calls
+            << ", \"coarse_amortized_refresh\": " << (row.coarse_amortized_refresh ? "true" : "false")
+            << ", \"coarse_cholmod_supernodal\": " << (row.coarse_cholmod_supernodal ? "true" : "false")
+            << ", \"coarse_extra_work_before\": " << jsonNumber(row.coarse_extra_work_before)
+            << ", \"coarse_extra_work_after\": " << jsonNumber(row.coarse_extra_work_after)
+            << ", \"coarse_factor_work_estimate\": " << jsonNumber(row.coarse_factor_work_estimate)
+            << ", \"precision_warm_slots\": " << row.precision_warm_slots
+            << ", \"precision_warm_projected\": " << row.precision_warm_projected
+            << ", \"precision_warm_failed\": " << row.precision_warm_failed
+            << ", \"precision_warm_max_projection\": " << jsonNumber(row.precision_warm_max_projection)
+            << ", \"precision_warm_sec\": " << jsonNumber(row.precision_warm_sec)
             << ", \"fixed_lambda_hard_start_sweep\": " << row.fixed_lambda_hard_start_sweep
             << ", \"fixed_lambda_effective_start_sweep\": "
             << row.fixed_lambda_effective_start_sweep
@@ -4493,7 +5112,27 @@ void writeSyntheticSE3ExperimentResultsJson(
             << jsonNumber(row.relinearize_reset_sec)
             << ", \"relinearize_total_sec\": "
             << jsonNumber(row.relinearize_total_sec)
-            << "}";
+            << ", \"cycle_audit\": [";
+        for(size_t j=0;j<row.cycle_audit.size();++j) {
+            const auto& a=row.cycle_audit[j];
+            if(j) out<<",";
+            out<<"{\"cycle\":"<<a.cycle
+                <<",\"initial_residual\":"<<jsonNumber(a.initial_residual)
+                <<",\"fine_residual\":"<<jsonNumber(a.fine_residual)
+                <<",\"coarse_residual\":"<<jsonNumber(a.coarse_residual)
+                <<",\"final_residual\":"<<jsonNumber(a.final_residual)
+                <<",\"fine_gain\":"<<jsonNumber(a.fine_gain)
+                <<",\"coarse_gain\":"<<jsonNumber(a.coarse_gain)
+                <<",\"total_gain\":"<<jsonNumber(a.total_gain)
+                <<",\"fine_energy\":"<<jsonNumber(a.fine_energy)
+                <<",\"coarse_energy\":"<<jsonNumber(a.coarse_energy)
+                <<",\"cross_energy\":"<<jsonNumber(a.cross_energy)
+                <<",\"residual_defect_absolute\":"<<jsonNumber(a.residual_defect_absolute)
+                <<",\"residual_defect_relative\":"<<jsonNumber(a.residual_defect_relative)
+                <<",\"eta_defect_before\":"<<jsonNumber(a.eta_defect_before)
+                <<",\"eta_defect_after\":"<<jsonNumber(a.eta_defect_after)<<"}";
+        }
+        out<<"]}";
         out << (i + 1 == results.mg_history.size() ? "\n" : ",\n");
     }
     out << "  ]\n";

@@ -1,4 +1,5 @@
 #include "internal/se2_residual.h"
+#include "internal/scoped_worker_affinity.h"
 
 #include <algorithm>
 #include <atomic>
@@ -759,6 +760,26 @@ PACKED_RESIDUAL_FORCEINLINE bool schurMessage3x3NoDampingAdjugatePackedSym(
     double* PACKED_RESIDUAL_RESTRICT out_eta,
     double* PACKED_RESIDUAL_RESTRICT out_lam6
 ) noexcept {
+    static const bool use_cholesky = getenvInt("HGBP_SE2_CHOLESKY_SCHUR",0) != 0;
+    if (use_cholesky) {
+        Cholesky3x3 chol;
+        if (!factorizeSpd3x3Lower(a00,a10,a20,a11,a21,a22,chol)) return false;
+        const double rhs[3]={eno0,eno1,eno2};
+        const double rows[3][3]={{b00,b01,b02},{b10,b11,b12},{b20,b21,b22}};
+        double solved[3], inverse_rows[3][3];
+        solveSpd3x3(chol,rhs,solved);
+        for (int j=0;j<3;++j) solveSpd3x3(chol,rows[j],inverse_rows[j]);
+        out_eta[0]=eo0-(b00*solved[0]+b01*solved[1]+b02*solved[2]);
+        out_eta[1]=eo1-(b10*solved[0]+b11*solved[1]+b12*solved[2]);
+        out_eta[2]=eo2-(b20*solved[0]+b21*solved[1]+b22*solved[2]);
+        int index=0;
+        for (int col=0;col<3;++col) for(int row=col;row<3;++row) {
+            out_lam6[index]=loo6[index]-(rows[row][0]*inverse_rows[col][0]+
+                rows[row][1]*inverse_rows[col][1]+rows[row][2]*inverse_rows[col][2]);
+            ++index;
+        }
+        return true;
+    }
     const double cof00 = a11 * a22 - a21 * a21;
     const double cof10 = a20 * a21 - a10 * a22;
     const double cof20 = a10 * a21 - a20 * a11;
@@ -801,6 +822,11 @@ PACKED_RESIDUAL_FORCEINLINE void computeUnaryFactorAtNoDamping(
     const SyntheticSE2PackedResidualUnaryFactor& factor = workspace.unary_factors[idx];
     std::memcpy(unaryMsgEtaPtr(workspace, idx), factor.eta, 3 * sizeof(double));
     std::memcpy(unaryMsgLam6Ptr(workspace, idx), factor.lam6, 6 * sizeof(double));
+}
+
+PACKED_RESIDUAL_FORCEINLINE void relaxEta3(double* value, const double* old, double alpha) noexcept {
+    if (alpha == 1.0) return;
+    for (int j = 0; j < 3; ++j) value[j] = old[j] + alpha * (value[j] - old[j]);
 }
 
 PACKED_RESIDUAL_FORCEINLINE bool computeBinaryFactorAtNoDampingNoThrow(
@@ -1012,6 +1038,10 @@ PACKED_RESIDUAL_FORCEINLINE bool computeBinaryFactorAtNoDampingNoThrow(
         }
     }
 
+    const double previous0[3] = {old0_e0, old0_e1, old0_e2};
+    const double previous1[3] = {old1_e0, old1_e1, old1_e2};
+    relaxEta3(out0_eta, previous0, workspace.eta_relaxation);
+    relaxEta3(out1_eta, previous1, workspace.eta_relaxation);
     return true;
 }
 
@@ -1302,6 +1332,8 @@ PACKED_RESIDUAL_FORCEINLINE bool computeFixedEtaFactorSE2(
             return false;
         }
     }
+    relaxEta3(out0, old0, workspace.eta_relaxation);
+    relaxEta3(out1, old1, workspace.eta_relaxation);
     for (int i = 0; i < 3; ++i) {
         msg0[i] = out0[i];
         msg1[i] = out1[i];
@@ -1356,6 +1388,8 @@ PACKED_RESIDUAL_FORCEINLINE bool computeFixedEtaFactorSerialDeltaSE2(
         out1
     );
 
+    relaxEta3(out0, old0, workspace.eta_relaxation);
+    relaxEta3(out1, old1, workspace.eta_relaxation);
     double* delta0 = vec3Ptr(workspace.serial_belief_delta_eta, var0_id);
     double* delta1 = vec3Ptr(workspace.serial_belief_delta_eta, var1_id);
     for (int i = 0; i < 3; ++i) {
@@ -1424,6 +1458,8 @@ PACKED_RESIDUAL_FORCEINLINE bool computeFixedEtaFactorParallelDeltaSE2(
         out1
     );
 
+    relaxEta3(out0, old0, workspace.eta_relaxation);
+    relaxEta3(out1, old1, workspace.eta_relaxation);
     atomicAddDelta3(
         vec3Ptr(workspace.serial_belief_delta_eta, data.var0_id),
         out0[0] - old0[0],
@@ -1638,6 +1674,13 @@ SyntheticSE2PackedResidualWorkspace buildSyntheticSE2PackedResidualWorkspace(
     double tiny_prior
 ) {
     SyntheticSE2PackedResidualWorkspace workspace;
+    workspace.lift_correction_to_messages=getenvInt("HGBP_SE2_MESSAGE_LIFT",0)!=0;
+    workspace.message_initialization=getenvInt("HGBP_SE2_MESSAGE_INITIALIZATION",0);
+    if (const char* alpha = std::getenv("HGBP_SE2_ETA_RELAXATION")) {
+        workspace.eta_relaxation = std::stod(alpha);
+        if (!(workspace.eta_relaxation > 0.0 && workspace.eta_relaxation <= 1.0))
+            throw std::runtime_error("SE2 eta relaxation must be in (0, 1]");
+    }
     workspace.num_vars = static_cast<int>(problem.gt_poses.size());
     workspace.tiny_prior = tiny_prior;
 
@@ -1667,6 +1710,7 @@ SyntheticSE2PackedResidualWorkspace buildSyntheticSE2PackedResidualWorkspace(
     workspace.unary_msg_lam6.resize(6, 0.0);
 
     workspace.binary_factors.resize(problem.edges.size());
+    workspace.adaptive_precision=getenvInt("HGBP_SE2_ADAPTIVE_PRECISION",0)!=0;
     workspace.binary_msg_eta.resize(problem.edges.size() * 2 * 3, 0.0);
     workspace.binary_msg_lam6.resize(problem.edges.size() * 2 * 6, 0.0);
     workspace.binary_msg_eta_alt.resize(problem.edges.size() * 2 * 3, 0.0);
@@ -1723,6 +1767,8 @@ void relinearizeSyntheticSE2PackedResidualWorkspace(
 
     const int n = workspace.num_vars;
     const int thread_count = effectiveThreadCount(num_threads);
+    workspace.jacobi_ready = false;
+    std::fill(workspace.prior_eta.begin(), workspace.prior_eta.end(), 0.0);
     const bool do_parallel = thread_count > 1 && (n >= 128 || problem.edges.size() >= 128);
     if (do_parallel) {
         #pragma omp parallel for schedule(static) num_threads(thread_count)
@@ -1755,6 +1801,16 @@ void relinearizeSyntheticSE2PackedResidualWorkspace(
     workspace.fixed_eta_maps_all_valid = 0;
     std::fill(workspace.serial_belief_delta_eta.begin(), workspace.serial_belief_delta_eta.end(), 0.0);
     workspace.sweeps_since_relinearize = 0;
+    workspace.precision_frozen=false;
+    workspace.precision_stable_checks=0;
+    workspace.precision_checks=workspace.precision_freezes=workspace.precision_thaws=0;
+    workspace.first_precision_freeze_sweep=-1;
+    workspace.last_precision_check_sweep=0;
+    workspace.precision_check_interval=SE2PrecisionPolicy::check_period;
+    workspace.next_precision_check_sweep=SE2PrecisionPolicy::check_period;
+    workspace.last_precision_residual=0;
+    workspace.precision_scales_ready=false;
+    workspace.full_precision_sweeps=workspace.eta_only_sweeps=0;
     workspace.belief_eta_message_consistent = 0;
 
     {
@@ -1820,6 +1876,231 @@ void relinearizeSyntheticSE2PackedResidualWorkspace(
     }
 }
 
+// Keep diagnostic temporaries out of the original fast-math Schur kernel.
+#if defined(_MSC_VER)
+__declspec(noinline)
+#elif defined(__GNUC__)
+__attribute__((noinline))
+#endif
+bool computeBinaryFactorWithPrecisionCheckSE2(SyntheticSE2PackedResidualWorkspace& w,int idx) noexcept {
+    double previous0[6],previous1[6];
+    std::memcpy(previous0,binaryMsgLam6Ptr(w,2*idx),6*sizeof(double));
+    std::memcpy(previous1,binaryMsgLam6Ptr(w,2*idx+1),6*sizeof(double));
+    if(!computeBinaryFactorAtNoDampingNoThrow(w,idx)) return false;
+    const double* scales=w.precision_scales.data()+12*idx;
+    w.precision_residuals[idx]=std::max(
+        scaledSE2PrecisionResidualSquared(binaryMsgLam6Ptr(w,2*idx),previous0,scales),
+        scaledSE2PrecisionResidualSquared(binaryMsgLam6Ptr(w,2*idx+1),previous1,scales+6));
+    return true;
+}
+
+bool checkSE2PrecisionThisSweep(const SyntheticSE2PackedResidualWorkspace& w) noexcept {
+    return w.adaptive_precision && w.sweeps_since_relinearize+1>=w.next_precision_check_sweep;
+}
+
+void completeSE2PrecisionSweep(SyntheticSE2PackedResidualWorkspace& w,bool eta_only,bool check) noexcept {
+    if(eta_only) ++w.eta_only_sweeps; else ++w.full_precision_sweeps;
+    if(!check) return;
+    double residual=0;
+    for(double value:w.precision_residuals) residual=std::max(residual,value);
+    residual=std::sqrt(residual);
+    w.last_precision_residual=residual;
+    w.last_precision_check_sweep=w.sweeps_since_relinearize;
+    ++w.precision_checks;
+    if(std::isfinite(residual) && residual<=SE2PrecisionPolicy::tolerance) {
+        ++w.precision_stable_checks;
+        if(!w.precision_frozen && w.precision_stable_checks>=SE2PrecisionPolicy::stable_checks) {
+            w.precision_frozen=true;
+            ++w.precision_freezes;
+            if(w.first_precision_freeze_sweep<0) w.first_precision_freeze_sweep=w.sweeps_since_relinearize;
+        }
+    } else {
+        if(w.precision_frozen) ++w.precision_thaws;
+        w.precision_frozen=false;
+        w.precision_stable_checks=0;
+    }
+    // Failed checks only delay testing, never skip full GBP. A successful check
+    // returns to the dense schedule, and freezing still requires three passes.
+    w.precision_check_interval=w.precision_frozen ? SE2PrecisionPolicy::frozen_check_period
+        : w.precision_stable_checks>0 ? SE2PrecisionPolicy::check_period
+        : std::min(2*w.precision_check_interval,SE2PrecisionPolicy::max_check_period);
+    w.next_precision_check_sweep=w.sweeps_since_relinearize+w.precision_check_interval;
+}
+
+void blockJacobiSE2PackedIterations(SyntheticSE2PackedResidualWorkspace& w, int sweeps, int threads) {
+    if(sweeps<=0) return;
+    const int n=w.num_vars, count=effectiveThreadCount(threads);
+    if(!w.jacobi_ready) {
+        w.jacobi_diagonal.resize(6*n); w.jacobi_inverse.resize(9*n); w.jacobi_rhs.resize(3*n);
+        w.jacobi_x.resize(3*n); w.jacobi_alt.resize(3*n);
+        for(int v=0;v<n;++v) {
+            double* diag=w.jacobi_diagonal.data()+6*v;
+            double* rhs=w.jacobi_rhs.data()+3*v;
+            std::memcpy(diag,w.prior_lam6.data()+6*v,6*sizeof(double));
+            std::memcpy(rhs,w.prior_eta.data()+3*v,3*sizeof(double));
+            for(int p=w.unary_offsets[v];p<w.unary_offsets[v+1];++p) {
+                const auto& f=w.unary_factors[w.unary_ids[p]];
+                for(int j=0;j<6;++j) diag[j]+=f.lam6[j];
+                for(int j=0;j<3;++j) rhs[j]+=f.eta[j];
+            }
+            for(int p=w.binary_offsets[v];p<w.binary_offsets[v+1];++p) {
+                const int slot=w.binary_slot_ids[p]; const auto& f=w.binary_factors[slot/2];
+                const double* a=slot%2?f.diag1_lam6:f.diag0_lam6;
+                const double* b=slot%2?f.eta1:f.eta0;
+                for(int j=0;j<6;++j) diag[j]+=a[j];
+                for(int j=0;j<3;++j) rhs[j]+=b[j];
+            }
+            Cholesky3x3 chol;
+            if(!factorizeSpd3x3Lower(diag[0],diag[1],diag[2],diag[3],diag[4],diag[5],chol))
+                throw std::runtime_error("Jacobi reference diagonal is not SPD");
+            for(int j=0;j<3;++j) {
+                double unit[3]={0,0,0}; unit[j]=1;
+                solveSpd3x3(chol,unit,w.jacobi_inverse.data()+9*v+3*j);
+            }
+        }
+        w.jacobi_ready=true;
+    }
+    for(int v=0;v<n;++v) {
+        refreshMuAt(w,v);
+        std::memcpy(w.jacobi_x.data()+3*v,w.mu.data()+3*v,3*sizeof(double));
+    }
+    // H <= 2*blockdiag(H) for PSD binary factors. A common omega=2/3
+    // is stable, without dataset-specific spectral estimates or clipping.
+    #pragma omp parallel num_threads(count) if(count>1 && n>=128)
+    {
+        for(int sweep=0;sweep<sweeps;++sweep) {
+            const double* x=(sweep%2?w.jacobi_alt:w.jacobi_x).data();
+            double* y=(sweep%2?w.jacobi_x:w.jacobi_alt).data();
+            #pragma omp for schedule(static)
+            for(int v=0;v<n;++v) {
+                double product[3];
+                beliefEtaFromLamMu(w.jacobi_diagonal.data()+6*v,x+3*v,product);
+                for(int p=w.binary_offsets[v];p<w.binary_offsets[v+1];++p) {
+                    const int slot=w.binary_slot_ids[p]; const auto& f=w.binary_factors[slot/2];
+                    const double* other=x+3*(slot%2?f.var0_id:f.var1_id);
+                    for(int r=0;r<3;++r) for(int c=0;c<3;++c)
+                        product[r]+=f.cross01_lam9[slot%2?c+3*r:r+3*c]*other[c];
+                }
+                double residual[3];
+                for(int j=0;j<3;++j) residual[j]=w.jacobi_rhs[3*v+j]-product[j];
+                const double* inv=w.jacobi_inverse.data()+9*v;
+                for(int r=0;r<3;++r)
+                    y[3*v+r]=x[3*v+r]+(2./3.)*(inv[r]*residual[0]+inv[r+3]*residual[1]+inv[r+6]*residual[2]);
+            }
+        }
+    }
+    const auto& x=sweeps%2?w.jacobi_alt:w.jacobi_x;
+    for(int v=0;v<n;++v) {
+        std::memcpy(w.mu.data()+3*v,x.data()+3*v,3*sizeof(double));
+        beliefEtaFromLamMu(w.belief_lam6.data()+6*v,x.data()+3*v,w.belief_eta.data()+3*v);
+        w.mu_valid[v]=1;
+    }
+    w.belief_eta_message_consistent=0;
+}
+
+void initializeSE2PackedMessagesFromFactors(SyntheticSE2PackedResidualWorkspace& w, int mode, int threads) {
+    if (mode<0 || mode>2) throw std::runtime_error("Unknown SE2 message initialization");
+    if (mode==0) return;
+    const int count=effectiveThreadCount(threads);
+    #pragma omp parallel for schedule(static) num_threads(count) if(count>1 && w.num_vars>=128)
+    for(int f=0;f<static_cast<int>(w.binary_factors.size());++f) {
+        const auto& data=w.binary_factors[f];
+        std::memcpy(binaryMsgEtaPtr(w,2*f),data.eta0,3*sizeof(double));
+        std::memcpy(binaryMsgEtaPtr(w,2*f+1),data.eta1,3*sizeof(double));
+        if(mode==2) {
+            std::memcpy(binaryMsgLam6Ptr(w,2*f),data.diag0_lam6,6*sizeof(double));
+            std::memcpy(binaryMsgLam6Ptr(w,2*f+1),data.diag1_lam6,6*sizeof(double));
+        }
+    }
+    #pragma omp parallel for schedule(static) num_threads(count) if(count>1 && w.num_vars>=128)
+    for(int v=0;v<w.num_vars;++v) updateBelief3DLocalNoMu(w,v);
+    w.belief_eta_message_consistent=1;
+}
+
+void shiftSE2PackedCorrectionReference(SyntheticSE2PackedResidualWorkspace& w,
+                                      const Eigen::VectorXd& delta) {
+    if (delta.size()!=3*w.num_vars) throw std::runtime_error("SE2 correction reference dimension mismatch");
+    // eta_f <- eta_f - H_f * delta preserves the original factorization of the
+    // residual RHS. Moving all of it to near-zero unary priors has different
+    // finite-iteration BP behavior despite the same assembled linear system.
+    double product[3];
+    for(int i=0;i<w.num_vars;++i) {
+        beliefEtaFromLamMu(sym6Ptr(w.prior_lam6,i),delta.data()+3*i,product);
+        for(int d=0;d<3;++d) w.prior_eta[3*i+d]-=product[d];
+    }
+    for(size_t i=0;i<w.unary_factors.size();++i) {
+        auto& f=w.unary_factors[i];
+        beliefEtaFromLamMu(f.lam6,delta.data()+3*f.var_id,product);
+        for(int d=0;d<3;++d) {
+            f.eta[d]-=product[d];
+            w.unary_msg_eta[3*i+d]=f.eta[d];
+        }
+    }
+    for(auto& f:w.binary_factors) {
+        const double* d0=delta.data()+3*f.var0_id;
+        const double* d1=delta.data()+3*f.var1_id;
+        beliefEtaFromLamMu(f.diag0_lam6,d0,product);
+        for(int r=0;r<3;++r) {
+            double cross=0;
+            for(int c=0;c<3;++c) cross+=f.cross01_lam9[r+3*c]*d1[c];
+            f.eta0[r]-=product[r]+cross;
+        }
+        beliefEtaFromLamMu(f.diag1_lam6,d1,product);
+        for(int r=0;r<3;++r) {
+            double cross=0;
+            for(int c=0;c<3;++c) cross+=f.cross01_lam9[c+3*r]*d0[c];
+            f.eta1[r]-=product[r]+cross;
+        }
+    }
+    w.belief_eta=w.prior_eta;
+    for(const auto& f:w.unary_factors)
+        for(int d=0;d<3;++d) w.belief_eta[3*f.var_id+d]+=f.eta[d];
+    w.belief_eta_alt=w.belief_eta;
+    std::fill(w.binary_msg_eta.begin(),w.binary_msg_eta.end(),0.0);
+    std::fill(w.binary_msg_eta_alt.begin(),w.binary_msg_eta_alt.end(),0.0);
+    std::fill(w.mu_valid.begin(),w.mu_valid.end(),0);
+    w.belief_eta_message_consistent=1;
+}
+
+void fineResidualSyntheticSE2PackedInto(
+    const SyntheticSE2PackedResidualWorkspace& w,
+    const Eigen::VectorXd& x, Eigen::VectorXd& residual, int threads
+) {
+    if (x.size() != 3*w.num_vars) throw std::runtime_error("SE2 residual dimension mismatch");
+    residual.resize(x.size());
+    auto row = [&](int i) {
+        const double* local = x.data()+3*i;
+        double product[3];
+        beliefEtaFromLamMu(sym6Ptr(w.prior_lam6,i),local,product);
+        double* out = residual.data()+3*i;
+        for (int d=0;d<3;++d) out[d] = w.prior_eta[3*i+d]-product[d];
+        for (int p=w.unary_offsets[i];p<w.unary_offsets[i+1];++p) {
+            const auto& f = w.unary_factors[w.unary_ids[p]];
+            beliefEtaFromLamMu(f.lam6,local,product);
+            for (int d=0;d<3;++d) out[d] += f.eta[d]-product[d];
+        }
+        for (int p=w.binary_offsets[i];p<w.binary_offsets[i+1];++p) {
+            const int slot = w.binary_slot_ids[p];
+            const auto& f = w.binary_factors[slot/2];
+            const bool second = (slot%2)!=0;
+            const double* other = x.data()+3*(second?f.var0_id:f.var1_id);
+            const double* eta = second?f.eta1:f.eta0;
+            beliefEtaFromLamMu(second?f.diag1_lam6:f.diag0_lam6,local,product);
+            for (int r=0;r<3;++r) {
+                double cross=0.0;
+                for (int c=0;c<3;++c) cross += f.cross01_lam9[second?c+3*r:r+3*c]*other[c];
+                out[r] += eta[r]-product[r]-cross;
+            }
+        }
+    };
+    if (threads>1 && w.num_vars>=128) {
+        #pragma omp parallel for schedule(static) num_threads(threads)
+        for (int i=0;i<w.num_vars;++i) row(i);
+    } else {
+        for (int i=0;i<w.num_vars;++i) row(i);
+    }
+}
+
 void synchronousIterationSyntheticSE2PackedResidualWorkspace(
     SyntheticSE2PackedResidualWorkspace& workspace,
     double& factor_pass_sec_accum,
@@ -1847,7 +2128,22 @@ void synchronousIterationsSyntheticSE2PackedResidualWorkspace(
     }
 
     const int fixed_eta_after = fixedEtaAfterSweep();
-    const bool fixed_eta_enabled = fixed_eta_after >= 0;
+    const bool adaptive=workspace.adaptive_precision;
+    const bool fixed_eta_enabled = adaptive || fixed_eta_after >= 0;
+    if(adaptive && !workspace.precision_scales_ready) {
+        workspace.precision_residuals.resize(workspace.binary_factors.size());
+        workspace.precision_scales.resize(12*workspace.binary_factors.size());
+        for(size_t idx=0;idx<workspace.binary_factors.size();++idx) {
+            const auto& factor=workspace.binary_factors[idx];
+            buildSE2PrecisionScales(factor.diag0_lam6,workspace.precision_scales.data()+12*idx);
+            buildSE2PrecisionScales(factor.diag1_lam6,workspace.precision_scales.data()+12*idx+6);
+        }
+        workspace.precision_scales_ready=true;
+    }
+    if (!fixed_eta_enabled) {
+        workspace.fixedeta_full_lambda_sweeps += static_cast<std::uint64_t>(num_sweeps);
+        workspace.full_precision_sweeps+=num_sweeps;
+    }
 
     const int thread_count = effectiveThreadCount(num_threads);
     const bool do_parallel = thread_count > 1 &&
@@ -1857,8 +2153,10 @@ void synchronousIterationsSyntheticSE2PackedResidualWorkspace(
     if (!do_parallel) {
         for (int sweep = 0; sweep < num_sweeps; ++sweep) {
             const int global_sweep = workspace.sweeps_since_relinearize;
-            const bool use_fixed_lam = fixed_eta_enabled && global_sweep >= fixed_eta_after;
-            const bool use_eta_only = fixed_eta_enabled && global_sweep > fixed_eta_after;
+            const bool check_precision=checkSE2PrecisionThisSweep(workspace);
+            const bool use_fixed_lam = adaptive || (fixed_eta_enabled && global_sweep >= fixed_eta_after);
+            const bool use_eta_only = adaptive ? workspace.precision_frozen && !check_precision
+                : fixed_eta_enabled && global_sweep > fixed_eta_after;
             const bool use_serial_delta =
                 use_eta_only &&
                 fixedEtaSerialDeltaBeliefEnabled() &&
@@ -1883,35 +2181,47 @@ void synchronousIterationsSyntheticSE2PackedResidualWorkspace(
                 }
             }
             const auto factor_t0 = SteadyClock::now();
-            for (int idx = 0; idx < static_cast<int>(workspace.binary_factors.size()); ++idx) {
-                if (use_serial_delta) {
+            // The mode is constant for the whole sweep. Keep separate straight
+            // loops so the serial kernel does not dispatch on every factor.
+            if (use_serial_delta) {
+                for (int idx = 0; idx < static_cast<int>(workspace.binary_factors.size()); ++idx) {
                     if (!computeFixedEtaFactorSerialDeltaSE2(workspace, idx, &fixed_eta_map_builds)) {
                         throw std::runtime_error("SE2 fixed eta update failed");
                     }
-                } else if (use_eta_only) {
+                }
+            } else if (use_eta_only) {
+                for (int idx = 0; idx < static_cast<int>(workspace.binary_factors.size()); ++idx) {
                     if (!computeFixedEtaFactorSE2(workspace, idx, &fixed_eta_map_builds)) {
                         throw std::runtime_error("SE2 fixed eta update failed");
                     }
-                } else {
-                    computeBinaryFactorAtNoDamping(workspace, idx);
-                    if (fixed_eta_enabled) {
-                        workspace.fixed_lam_initialized[static_cast<size_t>(idx)] =
-                            use_fixed_lam ? 1 : 0;
-                        workspace.fixed_eta_map_valid[static_cast<size_t>(idx)] = 0;
+                }
+            } else {
+                if (check_precision) {
+                    for (int idx = 0; idx < static_cast<int>(workspace.binary_factors.size()); ++idx) {
+                        if(!computeBinaryFactorWithPrecisionCheckSE2(workspace,idx))
+                            throw std::runtime_error("SE2 precision check Schur update failed");
                     }
+                } else {
+                    for (int idx = 0; idx < static_cast<int>(workspace.binary_factors.size()); ++idx)
+                        computeBinaryFactorAtNoDamping(workspace, idx);
+                }
+                if (fixed_eta_enabled) {
+                    std::fill(workspace.fixed_lam_initialized.begin(),workspace.fixed_lam_initialized.end(),use_fixed_lam ? 1 : 0);
+                    std::fill(workspace.fixed_eta_map_valid.begin(),workspace.fixed_eta_map_valid.end(),0);
                 }
             }
             const auto factor_t1 = SteadyClock::now();
 
             const auto var_t0 = SteadyClock::now();
-            for (int var_idx = 0; var_idx < workspace.num_vars; ++var_idx) {
-                if (use_serial_delta) {
+            if (use_serial_delta) {
+                for (int var_idx = 0; var_idx < workspace.num_vars; ++var_idx)
                     applySerialBeliefEtaDeltaSE2(workspace, var_idx);
-                } else if (use_eta_only) {
+            } else if (use_eta_only) {
+                for (int var_idx = 0; var_idx < workspace.num_vars; ++var_idx)
                     updateBelief3DLocalEtaOnlyNoMu(workspace, var_idx);
-                } else {
+            } else {
+                for (int var_idx = 0; var_idx < workspace.num_vars; ++var_idx)
                     updateBelief3DLocalNoMu(workspace, var_idx);
-                }
             }
             const auto var_t1 = SteadyClock::now();
 
@@ -1927,11 +2237,12 @@ void synchronousIterationsSyntheticSE2PackedResidualWorkspace(
                     if (use_serial_delta) {
                         ++workspace.fixedeta_serial_delta_sweeps;
                     }
-                } else if (use_fixed_lam) {
+                } else if (use_fixed_lam && !adaptive) {
                     ++workspace.fixedeta_lambda_init_sweeps;
                 } else {
                     ++workspace.fixedeta_full_lambda_sweeps;
                 }
+                completeSE2PrecisionSweep(workspace,use_eta_only,check_precision);
             }
         }
         return;
@@ -1964,14 +2275,22 @@ void synchronousIterationsSyntheticSE2PackedResidualWorkspace(
         : std::vector<std::pair<int, int>>{};
 
     std::vector<int> fixed_eta_map_builds_by_thread(static_cast<size_t>(thread_count), 0);
+    // Serial delta accumulation leaves the last increment in this scratch array.
+    // A later parallel call must not apply that increment a second time.
+    if (fixed_eta_enabled && fixedEtaParallelDeltaBeliefEnabled())
+        std::fill(workspace.serial_belief_delta_eta.begin(), workspace.serial_belief_delta_eta.end(), 0.0);
 
+    const auto sweep_cpu_mask = ScopedWorkerAffinity::availableMask(thread_count);
     #pragma omp parallel num_threads(thread_count) shared(fail_idx, factor_t0, var_t0, factor_pass_batch_sec, variable_pass_batch_sec)
     {
         const int tid = omp_get_thread_num();
+        ScopedWorkerAffinity affinity(sweep_cpu_mask, tid);
         for (int sweep = 0; sweep < num_sweeps; ++sweep) {
             const int global_sweep = fixed_eta_enabled ? workspace.sweeps_since_relinearize : 0;
-            const bool use_fixed_lam_parallel = fixed_eta_enabled && global_sweep >= fixed_eta_after;
-            const bool use_eta_only_parallel = fixed_eta_enabled && global_sweep > fixed_eta_after;
+            const bool check_precision=checkSE2PrecisionThisSweep(workspace);
+            const bool use_fixed_lam_parallel = adaptive || (fixed_eta_enabled && global_sweep >= fixed_eta_after);
+            const bool use_eta_only_parallel = adaptive ? workspace.precision_frozen && !check_precision
+                : fixed_eta_enabled && global_sweep > fixed_eta_after;
             const bool use_parallel_delta =
                 use_eta_only_parallel &&
                 fixedEtaParallelDeltaBeliefEnabled() &&
@@ -2018,7 +2337,8 @@ void synchronousIterationsSyntheticSE2PackedResidualWorkspace(
                         }
                         continue;
                     }
-                    if (!computeBinaryFactorAtNoDampingNoThrow(workspace, idx)) {
+                    if (!(check_precision?computeBinaryFactorWithPrecisionCheckSE2(workspace,idx):
+                          computeBinaryFactorAtNoDampingNoThrow(workspace,idx))) {
                         #pragma omp critical
                         {
                             if (fail_idx < 0) {
@@ -2053,7 +2373,8 @@ void synchronousIterationsSyntheticSE2PackedResidualWorkspace(
                         }
                         continue;
                     }
-                    if (!computeBinaryFactorAtNoDampingNoThrow(workspace, idx)) {
+                    if (!(check_precision?computeBinaryFactorWithPrecisionCheckSE2(workspace,idx):
+                          computeBinaryFactorAtNoDampingNoThrow(workspace,idx))) {
                         #pragma omp critical
                         {
                             if (fail_idx < 0) {
@@ -2070,11 +2391,32 @@ void synchronousIterationsSyntheticSE2PackedResidualWorkspace(
                 fixed_eta_map_builds_by_thread[static_cast<size_t>(tid)] = local_map_builds;
             }
 
+            const auto publish_sweep_state = [&]() noexcept {
+                if(!fixed_eta_enabled) return;
+                int builds=0;
+                for(int count:fixed_eta_map_builds_by_thread) builds+=count;
+                ++workspace.sweeps_since_relinearize;
+                workspace.belief_eta_message_consistent=1;
+                workspace.fixedeta_eta_map_builds+=static_cast<std::uint64_t>(builds);
+                workspace.fixed_eta_maps_all_valid=use_eta_only_parallel?1:0;
+                if(use_eta_only_parallel) {
+                    ++workspace.fixedeta_eta_only_sweeps;
+                    if(use_parallel_delta) ++workspace.fixedeta_serial_delta_sweeps;
+                } else if(use_fixed_lam_parallel && !adaptive) {
+                    ++workspace.fixedeta_lambda_init_sweeps;
+                } else {
+                    ++workspace.fixedeta_full_lambda_sweeps;
+                }
+                completeSE2PrecisionSweep(workspace,use_eta_only_parallel,check_precision);
+            };
+            // Precision checks depend only on completed factor writes. Publish
+            // before the variable barrier so it also orders next-sweep metadata.
             if (use_spin_phase_barriers) {
                 phase_barrier.arrive_and_wait([&]() noexcept {
                     const double now = omp_get_wtime();
                     factor_pass_batch_sec += now - factor_t0;
                     var_t0 = now;
+                    publish_sweep_state();
                 });
             } else {
                 #pragma omp barrier
@@ -2082,6 +2424,7 @@ void synchronousIterationsSyntheticSE2PackedResidualWorkspace(
                 {
                     factor_pass_batch_sec += omp_get_wtime() - factor_t0;
                     var_t0 = omp_get_wtime();
+                    publish_sweep_state();
                 }
             }
 
@@ -2122,57 +2465,12 @@ void synchronousIterationsSyntheticSE2PackedResidualWorkspace(
             if (use_spin_phase_barriers) {
                 phase_barrier.arrive_and_wait([&]() noexcept {
                     variable_pass_batch_sec += omp_get_wtime() - var_t0;
-                    if (fixed_eta_enabled) {
-                        int fixed_eta_map_builds_batch = 0;
-                        for (int count : fixed_eta_map_builds_by_thread) {
-                            fixed_eta_map_builds_batch += count;
-                        }
-                        ++workspace.sweeps_since_relinearize;
-                        workspace.belief_eta_message_consistent = 1;
-                        workspace.fixedeta_eta_map_builds +=
-                            static_cast<std::uint64_t>(fixed_eta_map_builds_batch);
-                        if (use_eta_only_parallel) {
-                            ++workspace.fixedeta_eta_only_sweeps;
-                            workspace.fixed_eta_maps_all_valid = 1;
-                            if (use_parallel_delta) {
-                                ++workspace.fixedeta_serial_delta_sweeps;
-                            }
-                        } else if (use_fixed_lam_parallel) {
-                            ++workspace.fixedeta_lambda_init_sweeps;
-                        } else {
-                            ++workspace.fixedeta_full_lambda_sweeps;
-                        }
-                    }
                 });
             } else {
                 #pragma omp barrier
                 #pragma omp master
                 {
                     variable_pass_batch_sec += omp_get_wtime() - var_t0;
-                    if (fixed_eta_enabled) {
-                        int fixed_eta_map_builds_batch = 0;
-                        for (int count : fixed_eta_map_builds_by_thread) {
-                            fixed_eta_map_builds_batch += count;
-                        }
-                        ++workspace.sweeps_since_relinearize;
-                        workspace.belief_eta_message_consistent = 1;
-                        workspace.fixedeta_eta_map_builds +=
-                            static_cast<std::uint64_t>(fixed_eta_map_builds_batch);
-                        if (use_eta_only_parallel) {
-                            ++workspace.fixedeta_eta_only_sweeps;
-                            workspace.fixed_eta_maps_all_valid = 1;
-                            if (use_parallel_delta) {
-                                ++workspace.fixedeta_serial_delta_sweeps;
-                            }
-                        } else if (use_fixed_lam_parallel) {
-                            ++workspace.fixedeta_lambda_init_sweeps;
-                        } else {
-                            ++workspace.fixedeta_full_lambda_sweeps;
-                        }
-                    }
-                }
-                if (fixed_eta_enabled) {
-                    #pragma omp barrier
                 }
             }
 
@@ -2296,6 +2594,34 @@ void injectCorrectionKeepMessagesSyntheticSE2PackedResidualWorkspace(
         }
     }
     workspace.belief_eta_message_consistent = 0;
+    if (workspace.lift_correction_to_messages) {
+        // Minimum Euclidean change in incoming natural parameters subject to
+        // sum(messages) + prior == the corrected belief. No factor/RHS changes.
+        #pragma omp parallel for schedule(static) num_threads(thread_count) if(do_parallel)
+        for (int v=0;v<workspace.num_vars;++v) {
+            const int begin=workspace.binary_offsets[v],end=workspace.binary_offsets[v+1];
+            if (end==begin) continue;
+            double sum[3];
+            std::memcpy(sum,vec3Ptr(workspace.prior_eta,v),3*sizeof(double));
+            for(int p=workspace.unary_offsets[v];p<workspace.unary_offsets[v+1];++p) {
+                const double* eta=unaryMsgEtaPtr(workspace,workspace.unary_ids[p]);
+                for(int j=0;j<3;++j) sum[j]+=eta[j];
+            }
+            for(int p=begin;p<end;++p) {
+                const double* eta=binaryMsgEtaPtr(workspace,workspace.binary_slot_ids[p]);
+                for(int j=0;j<3;++j) sum[j]+=eta[j];
+            }
+            const double* target=vec3Ptr(workspace.belief_eta,v);
+            const double step[3]={(target[0]-sum[0])/(end-begin),
+                (target[1]-sum[1])/(end-begin),(target[2]-sum[2])/(end-begin)};
+            for(int p=begin;p<end;++p) {
+                double* eta=binaryMsgEtaPtr(workspace,workspace.binary_slot_ids[p]);
+                for(int j=0;j<3;++j) eta[j]+=step[j];
+            }
+        }
+        // Conservative: the next ordinary belief pass certifies consistency,
+        // including isolated variables, before the delta-belief path is used.
+    }
 }
 
 }  // namespace slam

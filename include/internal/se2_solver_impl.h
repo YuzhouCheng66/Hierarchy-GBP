@@ -105,9 +105,22 @@ struct OuterMGRow {
     int basis_partial_converged = 0;
     int basis_partial_fallback = 0;
     int basis_partial_total_iters = 0;
+    int gbp_sweeps_executed = 0;
+    int jacobi_sweeps_executed = 0;
+    int coarse_solves = 0;
+    int full_precision_sweeps = 0;
+    int eta_only_sweeps = 0;
+    int precision_checks = 0;
+    int precision_freezes = 0;
+    int precision_thaws = 0;
+    int first_precision_freeze_sweep = -1;
+    double precision_residual = 0.0;
 };
 
 struct ExperimentResults {
+    double solver_wall_sec = 0.0;
+    double hgbp_solver_wall_sec = 0.0;
+    double direct_solver_wall_sec = 0.0;
     int num_poses = 0;
     int num_edges = 0;
     double initial_objective = 0.0;
@@ -151,6 +164,12 @@ gbp::FactorGraph buildLinearizedResidualGraph(
     const std::vector<Eigen::Vector3d>& base_poses,
     double tiny_prior = 1e-12,
     const RobustLossConfig& robust_loss_config = {}
+);
+
+// Benchmark reference only; never called by the H-GBP solver.
+ExperimentResults runSyntheticSE2DirectReference(
+    const SyntheticSE2Problem& problem, int num_outer,
+    const RobustLossConfig& robust_loss_config
 );
 
 ExperimentResults runSyntheticSE2Experiment(

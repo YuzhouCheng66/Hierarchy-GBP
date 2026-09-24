@@ -1,353 +1,158 @@
 cmake_minimum_required(VERSION 3.20)
-
-# Keep compiler sanity checks on the same runtime as the benchmark build.
 set(CMAKE_TRY_COMPILE_CONFIGURATION Release)
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
-
 project(HierarchyGBP LANGUAGES CXX)
-
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+include(CTest)
+option(HGBP_BUILD_BA "Build BA (requires the compiled RootBA dependency)." ON)
 
-option(HGBP_ENABLE_ASAN "Build with MSVC AddressSanitizer for memory diagnostics." OFF)
-
-set(HGBP_DEPENDENCY_ROOT "" CACHE PATH
-    "Dependency workspace containing external/eigen, vcpkg_installed/x64-windows, and external_baselines/rootba.")
-if(NOT HGBP_DEPENDENCY_ROOT AND DEFINED ENV{HGBP_DEPENDENCY_ROOT})
-    set(HGBP_DEPENDENCY_ROOT "$ENV{HGBP_DEPENDENCY_ROOT}" CACHE PATH
-        "Dependency workspace containing the benchmark dependencies." FORCE)
-endif()
-
-set(_hgbp_eigen_default "")
-set(_hgbp_vcpkg_default "")
-set(_hgbp_rootba_default "")
-if(HGBP_DEPENDENCY_ROOT)
-    set(_hgbp_eigen_default "${HGBP_DEPENDENCY_ROOT}/external/eigen")
-    set(_hgbp_vcpkg_default "${HGBP_DEPENDENCY_ROOT}/vcpkg_installed/x64-windows")
-    set(_hgbp_rootba_default "${HGBP_DEPENDENCY_ROOT}/external_baselines/rootba")
-endif()
-if(DEFINED ENV{HGBP_EIGEN_DIR})
-    set(_hgbp_eigen_default "$ENV{HGBP_EIGEN_DIR}")
-endif()
-if(DEFINED ENV{HGBP_VCPKG_INSTALLED_DIR})
-    set(_hgbp_vcpkg_default "$ENV{HGBP_VCPKG_INSTALLED_DIR}")
-endif()
-if(DEFINED ENV{HGBP_ROOTBA_DIR})
-    set(_hgbp_rootba_default "$ENV{HGBP_ROOTBA_DIR}")
-endif()
-
-set(HGBP_EIGEN_DIR "${_hgbp_eigen_default}" CACHE PATH "Eigen include directory.")
-set(HGBP_VCPKG_INSTALLED_DIR "${_hgbp_vcpkg_default}" CACHE PATH
-    "SuiteSparse/OpenBLAS vcpkg installation directory.")
-set(HGBP_ROOTBA_DIR "${_hgbp_rootba_default}" CACHE PATH
-    "RootBA checkout used by the optimized BA linearization.")
-
-foreach(_dependency HGBP_EIGEN_DIR HGBP_VCPKG_INSTALLED_DIR HGBP_ROOTBA_DIR)
-    if(NOT IS_DIRECTORY "${${_dependency}}")
-        message(FATAL_ERROR
-            "${_dependency}='${${_dependency}}' is not a directory. "
-            "Set HGBP_DEPENDENCY_ROOT or pass the three dependency paths explicitly.")
+set(HGBP_DEPENDENCY_ROOT "$ENV{HGBP_DEPENDENCY_ROOT}" CACHE PATH "Dependency workspace.")
+foreach(_dep EIGEN VCPKG_INSTALLED ROOTBA)
+    if(_dep STREQUAL "EIGEN")
+        set(_suffix external/eigen)
+    elseif(_dep STREQUAL "VCPKG_INSTALLED")
+        set(_suffix vcpkg_installed/x64-windows)
+    else()
+        set(_suffix external_baselines/rootba)
+    endif()
+    set(_default "${HGBP_DEPENDENCY_ROOT}/${_suffix}")
+    if(DEFINED ENV{HGBP_${_dep}_DIR})
+        set(_default "$ENV{HGBP_${_dep}_DIR}")
+    endif()
+    set(HGBP_${_dep}_DIR "${_default}" CACHE PATH "${_dep} directory.")
+    if(NOT (_dep STREQUAL "ROOTBA" AND NOT HGBP_BUILD_BA)
+       AND NOT IS_DIRECTORY "${HGBP_${_dep}_DIR}")
+        message(FATAL_ERROR "Set HGBP_${_dep}_DIR or HGBP_DEPENDENCY_ROOT.")
     endif()
 endforeach()
-
 find_package(OpenMP REQUIRED)
 
-add_library(hgbp_se3
-    src/gaussian.cpp
-    src/factor.cpp
-    src/variable.cpp
-    src/factor_graph.cpp
-    src/se3_internal_residual.cpp
-    src/se3_solver.cpp
-)
+function(hgbp_compile target)
+    target_compile_definitions(${target} PRIVATE EIGEN_NO_DEBUG)
+    if(MSVC)
+        target_compile_options(${target} PRIVATE /bigobj /O2 /Ob2 /Gy /Gw /arch:AVX2 /DNDEBUG /wd4392 /w14505)
+        target_link_options(${target} PRIVATE /OPT:REF /OPT:ICF /INCREMENTAL:NO)
+    else()
+        target_compile_options(${target} PRIVATE -O3)
+    endif()
+endfunction()
 
-target_include_directories(hgbp_se3
-    PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${HGBP_EIGEN_DIR}
-        ${HGBP_VCPKG_INSTALLED_DIR}/include
-        ${HGBP_VCPKG_INSTALLED_DIR}/include/suitesparse
-)
-
-target_compile_definitions(hgbp_se3 PUBLIC EIGEN_NO_DEBUG)
-target_link_directories(hgbp_se3 PUBLIC "${HGBP_VCPKG_INSTALLED_DIR}/lib")
-
-target_link_libraries(hgbp_se3
-    PUBLIC
-        OpenMP::OpenMP_CXX
-    PRIVATE
-        cholmod
-        suitesparseconfig
-        amd
-        colamd
-        camd
-        ccolamd
-        lapack
-        openblas
-)
-
+set(_sparse_libraries cholmod suitesparseconfig amd colamd camd ccolamd lapack openblas)
+set(_common_sources src/gaussian.cpp src/factor.cpp src/variable.cpp src/factor_graph.cpp)
+add_library(hgbp_se2 ${_common_sources}
+    src/se2_internal_sync.cpp src/se2_internal_group_sync.cpp src/se2_internal_dense_sync.cpp
+    src/se2_internal_basis.cpp src/se2_internal_coarse.cpp src/se2_internal_residual.cpp src/se2_solver.cpp)
+add_library(hgbp_se3 ${_common_sources}
+    src/se3_internal_residual.cpp src/se3_precision_defect.cpp src/se3_precision_warm.cpp
+    src/se3_warm_audit.cpp src/se3_solver.cpp)
+foreach(_space se2 se3)
+    target_include_directories(hgbp_${_space} PUBLIC include ${HGBP_EIGEN_DIR}
+        ${HGBP_VCPKG_INSTALLED_DIR}/include ${HGBP_VCPKG_INSTALLED_DIR}/include/suitesparse)
+    target_link_directories(hgbp_${_space} PUBLIC ${HGBP_VCPKG_INSTALLED_DIR}/lib)
+    target_link_libraries(hgbp_${_space} PUBLIC OpenMP::OpenMP_CXX PRIVATE ${_sparse_libraries})
+    hgbp_compile(hgbp_${_space})
+    add_executable(${_space}_benchmark src/${_space}_benchmark.cpp)
+    set_target_properties(${_space}_benchmark PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/pgo")
+    target_link_libraries(${_space}_benchmark PRIVATE hgbp_${_space})
+    hgbp_compile(${_space}_benchmark)
+    if(MSVC)
+        # Match the validated PGO kernels, including frame-pointer/code-generation flags.
+        target_compile_options(hgbp_${_space} PRIVATE /Zi /Zo /Oy-)
+        target_compile_options(${_space}_benchmark PRIVATE /Zi /Zo /Oy-)
+        target_link_options(${_space}_benchmark PRIVATE /DEBUG:FULL)
+    endif()
+endforeach()
 if(MSVC)
-    target_compile_options(hgbp_se3 PRIVATE
-        /bigobj
-        $<$<CONFIG:Release>:/O2>
-        $<$<CONFIG:Release>:/Ob2>
-        $<$<CONFIG:Release>:/Gy>
-        $<$<CONFIG:Release>:/Gw>
-        $<$<CONFIG:Release>:/arch:AVX2>
-        $<$<CONFIG:Release>:/DNDEBUG>
-        $<$<CONFIG:RelWithDebInfo>:/O2>
-        $<$<CONFIG:RelWithDebInfo>:/Ob2>
-        $<$<CONFIG:RelWithDebInfo>:/Gy>
-        $<$<CONFIG:RelWithDebInfo>:/Gw>
-        $<$<CONFIG:RelWithDebInfo>:/arch:AVX2>
-        $<$<CONFIG:RelWithDebInfo>:/DNDEBUG>
-        $<$<CONFIG:RelWithDebInfo>:/Zi>
-        $<$<CONFIG:RelWithDebInfo>:/Zo>
-        $<$<CONFIG:RelWithDebInfo>:/Oy->
-    )
-    target_link_options(hgbp_se3 PRIVATE
-        $<$<CONFIG:Release>:/OPT:REF>
-        $<$<CONFIG:Release>:/OPT:ICF>
-        $<$<CONFIG:Release>:/INCREMENTAL:NO>
-        $<$<CONFIG:RelWithDebInfo>:/OPT:REF>
-        $<$<CONFIG:RelWithDebInfo>:/OPT:ICF>
-        $<$<CONFIG:RelWithDebInfo>:/INCREMENTAL:NO>
-        $<$<CONFIG:RelWithDebInfo>:/DEBUG:FASTLINK>
-    )
-else()
-    target_compile_options(hgbp_se3 PRIVATE
-        $<$<CONFIG:Release>:-O3>
-        $<$<CONFIG:RelWithDebInfo>:-O3>
-        $<$<CONFIG:RelWithDebInfo>:-g>
-    )
+    set_source_files_properties(src/se2_internal_residual.cpp PROPERTIES COMPILE_OPTIONS /fp:fast)
+    set(_banded_import "${CMAKE_CURRENT_BINARY_DIR}/openblas_banded.lib")
+    add_custom_command(OUTPUT "${_banded_import}"
+        COMMAND "${CMAKE_LINKER}" /LIB /NOLOGO /MACHINE:X64
+            "/DEF:${CMAKE_CURRENT_SOURCE_DIR}/runtime/openblas_banded.def" "/OUT:${_banded_import}"
+        DEPENDS runtime/openblas_banded.def VERBATIM)
+    add_custom_target(openblas_banded_import DEPENDS "${_banded_import}")
+    add_dependencies(hgbp_se3 openblas_banded_import)
+    target_link_libraries(hgbp_se3 PRIVATE "${_banded_import}")
 endif()
 
-add_library(hgbp_se2
-    src/gaussian.cpp
-    src/factor.cpp
-    src/variable.cpp
-    src/factor_graph.cpp
-    src/se2_internal_sync.cpp
-    src/se2_internal_group_sync.cpp
-    src/se2_internal_dense_sync.cpp
-    src/se2_internal_basis.cpp
-    src/se2_internal_coarse.cpp
-    src/se2_internal_residual.cpp
-    src/se2_solver.cpp
-)
-
-target_include_directories(hgbp_se2
-    PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${HGBP_EIGEN_DIR}
-        ${HGBP_VCPKG_INSTALLED_DIR}/include
-        ${HGBP_VCPKG_INSTALLED_DIR}/include/suitesparse
-)
-
-target_compile_definitions(hgbp_se2 PUBLIC EIGEN_NO_DEBUG)
-target_link_directories(hgbp_se2 PUBLIC "${HGBP_VCPKG_INSTALLED_DIR}/lib")
-
-target_link_libraries(hgbp_se2
-    PUBLIC
-        OpenMP::OpenMP_CXX
-    PRIVATE
-        cholmod
-        suitesparseconfig
-        amd
-        colamd
-        camd
-        ccolamd
-        lapack
-        openblas
-)
-
-if(MSVC)
-    set_source_files_properties(
-        src/se2_internal_residual.cpp
-        PROPERTIES COMPILE_OPTIONS "/fp:fast"
-    )
-    target_compile_options(hgbp_se2 PRIVATE
-        /bigobj
-        $<$<CONFIG:Release>:/O2>
-        $<$<CONFIG:Release>:/Ob2>
-        $<$<CONFIG:Release>:/Gy>
-        $<$<CONFIG:Release>:/Gw>
-        $<$<CONFIG:Release>:/arch:AVX2>
-        $<$<CONFIG:Release>:/DNDEBUG>
-        $<$<CONFIG:RelWithDebInfo>:/O2>
-        $<$<CONFIG:RelWithDebInfo>:/Ob2>
-        $<$<CONFIG:RelWithDebInfo>:/Gy>
-        $<$<CONFIG:RelWithDebInfo>:/Gw>
-        $<$<CONFIG:RelWithDebInfo>:/arch:AVX2>
-        $<$<CONFIG:RelWithDebInfo>:/DNDEBUG>
-        $<$<CONFIG:RelWithDebInfo>:/Zi>
-        $<$<CONFIG:RelWithDebInfo>:/Zo>
-        $<$<CONFIG:RelWithDebInfo>:/Oy->
-    )
-    target_link_options(hgbp_se2 PRIVATE
-        $<$<CONFIG:Release>:/OPT:REF>
-        $<$<CONFIG:Release>:/OPT:ICF>
-        $<$<CONFIG:Release>:/INCREMENTAL:NO>
-        $<$<CONFIG:RelWithDebInfo>:/OPT:REF>
-        $<$<CONFIG:RelWithDebInfo>:/OPT:ICF>
-        $<$<CONFIG:RelWithDebInfo>:/INCREMENTAL:NO>
-        $<$<CONFIG:RelWithDebInfo>:/DEBUG:FASTLINK>
-    )
-else()
-    target_compile_options(hgbp_se2 PRIVATE
-        $<$<CONFIG:Release>:-O3>
-        $<$<CONFIG:RelWithDebInfo>:-O3>
-        $<$<CONFIG:RelWithDebInfo>:-g>
-    )
-endif()
-
-add_executable(se3_benchmark src/se3_benchmark.cpp)
-target_link_libraries(se3_benchmark PRIVATE hgbp_se3)
-
-add_executable(se2_benchmark src/se2_benchmark.cpp)
-target_link_libraries(se2_benchmark PRIVATE hgbp_se2)
-
-add_executable(ba_solver src/ba_solver.cpp)
-target_include_directories(ba_solver PRIVATE
-    ${HGBP_EIGEN_DIR}
-    ${HGBP_VCPKG_INSTALLED_DIR}/include
-    ${HGBP_VCPKG_INSTALLED_DIR}/include/suitesparse
-    ${HGBP_ROOTBA_DIR}/src
-    ${HGBP_ROOTBA_DIR}/external/Sophus
-    ${HGBP_ROOTBA_DIR}/external/visit_struct/include
-    ${HGBP_ROOTBA_DIR}/external/wise_enum
-    ${HGBP_ROOTBA_DIR}/external/enum-flags/include
-    ${HGBP_ROOTBA_DIR}/external/nameof/include
-    ${HGBP_ROOTBA_DIR}/external/toml11
-    ${HGBP_ROOTBA_DIR}/external/json
-    ${HGBP_ROOTBA_DIR}/external/basalt-headers/include
-    ${HGBP_ROOTBA_DIR}/external/magic_enum
-    ${HGBP_ROOTBA_DIR}/external/pprint
-    ${HGBP_ROOTBA_DIR}/external/cereal/include
-    ${HGBP_ROOTBA_DIR}/conda_env/Library/include
-)
-target_link_directories(ba_solver PRIVATE
-    ${HGBP_VCPKG_INSTALLED_DIR}/lib
-    ${HGBP_ROOTBA_DIR}/build-win/src/rootba/Release
-    ${HGBP_ROOTBA_DIR}/conda_env/Library/lib
-)
-target_compile_definitions(ba_solver PRIVATE
-    ROOTBA_DISABLE_ASSERTS
-    ROOTBA_INSTANTIATIONS_DOUBLE
-    ROOTBA_INSTANTIATIONS_STATIC_LMB
-    CEREAL_THREAD_SAFE=1
-    FMT_SHARED
-    GLOG_USE_GLOG_EXPORT
-    GLOG_USE_GFLAGS
-    GLOG_NO_ABBREVIATED_SEVERITIES
-    GFLAGS_IS_A_DLL=1
-)
-target_link_libraries(ba_solver PRIVATE
-    OpenMP::OpenMP_CXX
-    rootba
-    tbb12
-    glog
-    gflags
-    fmt
-    cholmod
-    suitesparseconfig
-    amd
-    colamd
-    camd
-    ccolamd
-    lapack
-    openblas
-)
-
-if(MSVC)
-    target_compile_options(se3_benchmark PRIVATE
-        $<$<CONFIG:Release>:/O2>
-        $<$<CONFIG:Release>:/Ob2>
-        $<$<CONFIG:Release>:/Gy>
-        $<$<CONFIG:Release>:/Gw>
-        $<$<CONFIG:Release>:/arch:AVX2>
-        $<$<CONFIG:Release>:/DNDEBUG>
-        $<$<CONFIG:RelWithDebInfo>:/O2>
-        $<$<CONFIG:RelWithDebInfo>:/Ob2>
-        $<$<CONFIG:RelWithDebInfo>:/Gy>
-        $<$<CONFIG:RelWithDebInfo>:/Gw>
-        $<$<CONFIG:RelWithDebInfo>:/arch:AVX2>
-        $<$<CONFIG:RelWithDebInfo>:/DNDEBUG>
-        $<$<CONFIG:RelWithDebInfo>:/Zi>
-        $<$<CONFIG:RelWithDebInfo>:/Zo>
-        $<$<CONFIG:RelWithDebInfo>:/Oy->
-    )
-    target_link_options(se3_benchmark PRIVATE
-        $<$<CONFIG:Release>:/OPT:REF>
-        $<$<CONFIG:Release>:/OPT:ICF>
-        $<$<CONFIG:Release>:/INCREMENTAL:NO>
-        $<$<CONFIG:RelWithDebInfo>:/OPT:REF>
-        $<$<CONFIG:RelWithDebInfo>:/OPT:ICF>
-        $<$<CONFIG:RelWithDebInfo>:/INCREMENTAL:NO>
-        $<$<CONFIG:RelWithDebInfo>:/DEBUG:FASTLINK>
-    )
-    target_compile_options(se2_benchmark PRIVATE
-        $<$<CONFIG:Release>:/O2>
-        $<$<CONFIG:Release>:/Ob2>
-        $<$<CONFIG:Release>:/Gy>
-        $<$<CONFIG:Release>:/Gw>
-        $<$<CONFIG:Release>:/arch:AVX2>
-        $<$<CONFIG:Release>:/DNDEBUG>
-        $<$<CONFIG:RelWithDebInfo>:/O2>
-        $<$<CONFIG:RelWithDebInfo>:/Ob2>
-        $<$<CONFIG:RelWithDebInfo>:/Gy>
-        $<$<CONFIG:RelWithDebInfo>:/Gw>
-        $<$<CONFIG:RelWithDebInfo>:/arch:AVX2>
-        $<$<CONFIG:RelWithDebInfo>:/DNDEBUG>
-        $<$<CONFIG:RelWithDebInfo>:/Zi>
-        $<$<CONFIG:RelWithDebInfo>:/Zo>
-        $<$<CONFIG:RelWithDebInfo>:/Oy->
-    )
-    target_link_options(se2_benchmark PRIVATE
-        $<$<CONFIG:Release>:/OPT:REF>
-        $<$<CONFIG:Release>:/OPT:ICF>
-        $<$<CONFIG:Release>:/INCREMENTAL:NO>
-        $<$<CONFIG:RelWithDebInfo>:/OPT:REF>
-        $<$<CONFIG:RelWithDebInfo>:/OPT:ICF>
-        $<$<CONFIG:RelWithDebInfo>:/INCREMENTAL:NO>
-        $<$<CONFIG:RelWithDebInfo>:/DEBUG:FASTLINK>
-    )
-    target_compile_options(ba_solver PRIVATE
-        /bigobj
-        /Zc:__cplusplus
-        $<$<CONFIG:Release>:/O2>
-        $<$<CONFIG:Release>:/Ob2>
-        $<$<CONFIG:Release>:/Gy>
-        $<$<CONFIG:Release>:/Gw>
-        $<$<CONFIG:Release>:/arch:AVX2>
-        $<$<CONFIG:Release>:/DNDEBUG>
-        $<$<CONFIG:RelWithDebInfo>:/O2>
-        $<$<CONFIG:RelWithDebInfo>:/Ob2>
-        $<$<CONFIG:RelWithDebInfo>:/Gy>
-        $<$<CONFIG:RelWithDebInfo>:/Gw>
-        $<$<CONFIG:RelWithDebInfo>:/arch:AVX2>
-        $<$<CONFIG:RelWithDebInfo>:/DNDEBUG>
-    )
-    target_link_options(ba_solver PRIVATE
-        $<$<CONFIG:Release>:/OPT:REF>
-        $<$<CONFIG:Release>:/OPT:ICF>
-        $<$<CONFIG:Release>:/INCREMENTAL:NO>
-        $<$<CONFIG:RelWithDebInfo>:/OPT:REF>
-        $<$<CONFIG:RelWithDebInfo>:/OPT:ICF>
-        $<$<CONFIG:RelWithDebInfo>:/INCREMENTAL:NO>
-    )
-endif()
-
-if(MSVC)
-    foreach(_target hgbp_se3 hgbp_se2 se3_benchmark se2_benchmark ba_solver)
-        target_compile_options(${_target} PRIVATE /wd4392 /w14505)
+if(HGBP_BUILD_BA)
+    add_library(hgbp_ba_dependencies INTERFACE)
+    target_include_directories(hgbp_ba_dependencies INTERFACE ${HGBP_EIGEN_DIR}
+        ${HGBP_VCPKG_INSTALLED_DIR}/include ${HGBP_VCPKG_INSTALLED_DIR}/include/suitesparse
+        ${HGBP_ROOTBA_DIR}/src ${HGBP_ROOTBA_DIR}/conda_env/Library/include)
+    foreach(_include Sophus visit_struct/include wise_enum enum-flags/include nameof/include
+            toml11 json basalt-headers/include magic_enum pprint cereal/include)
+        target_include_directories(hgbp_ba_dependencies INTERFACE ${HGBP_ROOTBA_DIR}/external/${_include})
     endforeach()
+    target_link_directories(hgbp_ba_dependencies INTERFACE ${HGBP_VCPKG_INSTALLED_DIR}/lib
+        ${HGBP_ROOTBA_DIR}/build-win/src/rootba/Release ${HGBP_ROOTBA_DIR}/conda_env/Library/lib)
+    target_compile_definitions(hgbp_ba_dependencies INTERFACE ROOTBA_DISABLE_ASSERTS ROOTBA_INSTANTIATIONS_DOUBLE
+        ROOTBA_INSTANTIATIONS_STATIC_LMB CEREAL_THREAD_SAFE=1 FMT_SHARED GLOG_USE_GLOG_EXPORT
+        GLOG_USE_GFLAGS GLOG_NO_ABBREVIATED_SEVERITIES GFLAGS_IS_A_DLL=1)
+    target_link_libraries(hgbp_ba_dependencies INTERFACE OpenMP::OpenMP_CXX rootba tbb12 glog gflags fmt ${_sparse_libraries})
+    add_executable(ba_solver src/ba_solver.cpp)
+    set_target_properties(ba_solver PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/ba")
+    target_link_libraries(ba_solver PRIVATE hgbp_ba_dependencies)
+    hgbp_compile(ba_solver)
+    if(MSVC)
+        target_compile_options(ba_solver PRIVATE /Zc:__cplusplus)
+    endif()
 endif()
 
-if(HGBP_ENABLE_ASAN AND MSVC)
-    foreach(_target hgbp_se3 hgbp_se2 se3_benchmark se2_benchmark ba_solver)
-        target_compile_options(${_target} PRIVATE /fsanitize=address /Zi /Od)
-        target_link_options(${_target} PRIVATE /INCREMENTAL:NO)
+if(BUILD_TESTING)
+    function(hgbp_test name library)
+        add_executable(${name} tests/${name}.cpp)
+        target_link_libraries(${name} PRIVATE ${library})
+        if(library STREQUAL "hgbp_ba_dependencies")
+            set_target_properties(${name} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/ba")
+        else()
+            set_target_properties(${name} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/pgo")
+        endif()
+        hgbp_compile(${name})
+        add_test(NAME ${name} COMMAND ${name})
+        set_tests_properties(${name} PROPERTIES ENVIRONMENT "OPENBLAS_NUM_THREADS=1;MKL_NUM_THREADS=1;OMP_NUM_THREADS=1")
+    endfunction()
+    foreach(_test serial_reciprocal_test banded_symmetric_eigen_test
+            se3_schur_solve_test se3_precision_test se3_boundary_test se3_objective_test
+            se3_eta_lift_test se3_precision_defect_test)
+        hgbp_test(${_test} hgbp_se3)
     endforeach()
+    if(MSVC)
+        target_compile_options(serial_reciprocal_test PRIVATE /fp:precise)
+        target_compile_options(se3_schur_solve_test PRIVATE /fp:precise)
+    endif()
+    foreach(_test se2_precision_test se2_residual_test)
+        hgbp_test(${_test} hgbp_se2)
+    endforeach()
+    foreach(_test coarse_cholesky_test exact_basis_cache_test partial_budget_test
+            worker_affinity_test basis_workspace_test)
+        hgbp_test(${_test} hgbp_se3)
+    endforeach()
+    if(MSVC)
+        target_compile_options(se2_precision_test PRIVATE /fp:fast)
+    endif()
+    set_property(TEST se2_precision_test APPEND PROPERTY ENVIRONMENT
+        "GBP_SE2_FIXED_ETA_AFTER_SWEEP=-1" "HGBP_SE2_ADAPTIVE_PRECISION=0"
+        "GBP_SE2_FIXED_ETA_SERIAL_DELTA=1" "GBP_SE2_FIXED_ETA_PARALLEL_DELTA=0" "GBP_FASTJITTER_ABS_JITTER=1e-7")
+    set_property(TEST se2_residual_test APPEND PROPERTY ENVIRONMENT
+        "GBP_SE2_FIXED_ETA_AFTER_SWEEP=-1" "HGBP_SE2_ETA_RELAXATION=1")
+    foreach(_delta 0 1)
+        add_test(NAME se2_fixed_eta_delta_${_delta} COMMAND se2_residual_test)
+        set_tests_properties(se2_fixed_eta_delta_${_delta} PROPERTIES ENVIRONMENT
+            "OPENBLAS_NUM_THREADS=1;GBP_SE2_FIXED_ETA_AFTER_SWEEP=8;HGBP_SE2_ETA_RELAXATION=1;GBP_SE2_FIXED_ETA_SERIAL_DELTA=1;GBP_SE2_FIXED_ETA_PARALLEL_DELTA=${_delta}")
+    endforeach()
+    if(HGBP_BUILD_BA)
+        hgbp_test(ba_model_test hgbp_ba_dependencies)
+        hgbp_test(ba_operator_test hgbp_ba_dependencies)
+        if(MSVC)
+            target_compile_options(ba_model_test PRIVATE /Zc:__cplusplus)
+            target_compile_options(ba_operator_test PRIVATE /Zc:__cplusplus)
+        endif()
+    endif()
+    find_package(Python3 COMPONENTS Interpreter)
+    if(Python3_FOUND)
+        add_test(NAME runner_test COMMAND ${Python3_EXECUTABLE} -m unittest discover -s tests -p test_runner.py)
+        set_tests_properties(runner_test PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+    endif()
 endif()

@@ -1,0 +1,5 @@
+LIBRARY openblas.dll
+EXPORTS
+LAPACKE_dsbevx_work
+LAPACKE_dsbtrd_work
+LAPACKE_dstemr_work

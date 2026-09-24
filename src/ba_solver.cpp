@@ -1,4 +1,5 @@
 #include "ba_internal.h"
+#include <queue>
 
 #include <tbb/blocked_range.h>
 #include <tbb/global_control.h>
@@ -9,17 +10,21 @@
 
 namespace {
 
+#include "ba_aggregation.h"
+
 struct HGBPConfig {
-    int min_pair_observations = 1;
-    double pair_backbone_min_coverage = 0.9;
-    int pair_sample_cap = 0;
-    bool pair_sample_rescale = true;
-    bool unreduced_unary = false;
-    bool no_pose_scaling = false;
+    std::string aggregation = "connected";
+    std::string coarse_operator = "additive";
+    int graph_neighbors = 4;
+    int coarse_groups = 24;
+    double linear_rel_tol = 0.1;
+    double variance_rel_tol = 1e-6;
+    std::string linear_controller = "fcg";
+    std::string gbp_model = "normalized";
+    int pair_sample_cap = 16;
     double initial_lambda = 1e-4;
-    double pair_factor_scale = 0.3;
+    double pair_factor_scale = 1.0;
     int krylov_start_outer = 1;
-    bool use_jacobi_smoother = false;
 };
 
 HGBPConfig parseHGBPConfig(
@@ -33,68 +38,78 @@ HGBPConfig parseHGBPConfig(
     filtered_storage.emplace_back(argv[0]);
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
-        if (arg == "--initial-lambda" && i + 1 < argc) {
+        if (arg == "--aggregation" && i + 1 < argc) {
+            config.aggregation = argv[++i];
+            if (config.aggregation != "connected") {
+                throw std::runtime_error("--aggregation must be connected");
+            }
+        } else if (arg == "--coarse-operator" && i + 1 < argc) {
+            config.coarse_operator = argv[++i];
+            if (config.coarse_operator != "additive") {
+                throw std::runtime_error("--coarse-operator must be additive");
+            }
+        } else if (arg == "--graph-neighbors" && i + 1 < argc) {
+            parseInt(argv[++i], config.graph_neighbors);
+        } else if (arg == "--coarse-groups" && i + 1 < argc) {
+            parseInt(argv[++i], config.coarse_groups);
+        } else if (arg == "--linear-rel-tol" && i + 1 < argc) {
+            parseDouble(argv[++i], config.linear_rel_tol);
+        } else if (arg == "--variance-rel-tol" && i + 1 < argc) {
+            parseDouble(argv[++i], config.variance_rel_tol);
+        } else if (arg == "--linear-controller" && i + 1 < argc) {
+            config.linear_controller = argv[++i];
+            if (config.linear_controller != "fcg") {
+                throw std::runtime_error("--linear-controller must be fcg");
+            }
+        } else if (arg == "--gbp-model" && i + 1 < argc) {
+            config.gbp_model = argv[++i];
+            if (config.gbp_model != "normalized") {
+                throw std::runtime_error("--gbp-model must be normalized");
+            }
+        } else if (arg == "--initial-lambda" && i + 1 < argc) {
             parseDouble(argv[++i], config.initial_lambda);
-        } else if (arg == "--min-pair-observations" &&
-                   i + 1 < argc) {
-            parseInt(argv[++i], config.min_pair_observations);
-        } else if (arg == "--pair-backbone-min-coverage" &&
-                   i + 1 < argc) {
-            parseDouble(argv[++i], config.pair_backbone_min_coverage);
         } else if (arg == "--pair-sample-cap" && i + 1 < argc) {
             parseInt(argv[++i], config.pair_sample_cap);
-        } else if (arg == "--pair-sample-no-rescale") {
-            config.pair_sample_rescale = false;
-        } else if (arg == "--unreduced-unary") {
-            config.unreduced_unary = true;
-        } else if (arg == "--no-pose-scaling") {
-            config.no_pose_scaling = true;
         } else if (arg == "--pair-factor-scale" && i + 1 < argc) {
             parseDouble(argv[++i], config.pair_factor_scale);
+            if (config.pair_factor_scale != 1.0) {
+                throw std::runtime_error("--pair-factor-scale must be 1");
+            }
         } else if (arg == "--krylov-start-outer" && i + 1 < argc) {
             parseInt(argv[++i], config.krylov_start_outer);
-        } else if (arg == "--fine-smoother" && i + 1 < argc) {
-            const std::string smoother = argv[++i];
-            if (smoother == "gbp") {
-                config.use_jacobi_smoother = false;
-            } else if (smoother == "jacobi") {
-                config.use_jacobi_smoother = true;
-            } else {
-                throw std::runtime_error(
-                    "--fine-smoother must be gbp or jacobi");
+            if (config.krylov_start_outer != 1) {
+                throw std::runtime_error("--krylov-start-outer must be 1");
             }
-        } else if (arg == "--help" || arg == "-h") {
-            std::cout
-                << "Usage: ba_solver --problem-file <BAL.txt> "
-                   "[--out-json <path>]\n"
-                << "  --outer N --mg-cycles C --pre-sweeps K "
-                   "--gbp-full-sweeps K\n"
-                << "  --group-size G --build-threads T "
-                   "--gbp-threads T --message-damping X\n"
-                << "  --initial-lambda X --pair-factor-scale X\n"
-                << "  --min-pair-observations N --pair-sample-cap N\n"
-                << "  --pair-backbone-min-coverage X "
-                   "--krylov-start-outer N\n"
-                << "  --fine-smoother gbp|jacobi\n"
-                << "  [--pair-sample-no-rescale] [--unreduced-unary] "
-                   "[--no-pose-scaling]\n";
-            std::exit(0);
+        } else if (arg == "--fine-smoother" && i + 1 < argc) {
+            if (std::string(argv[++i]) != "gbp") {
+                throw std::runtime_error("--fine-smoother must be gbp");
+            }
         } else {
+            if (arg == "--help" || arg == "-h") {
+                std::cout
+                    << "Uniform BA: additive + FCG + normalized GBP + connected aggregates\n"
+                    << "  --aggregation connected --coarse-operator additive\n"
+                    << "  --linear-controller fcg --gbp-model normalized --fine-smoother gbp\n"
+                    << "  --graph-neighbors <4> --coarse-groups <24> --pair-sample-cap <16>\n"
+                    << "  --linear-rel-tol <0.1> --variance-rel-tol <1e-6>\n"
+                    << "  --initial-lambda <1e-4> --pair-factor-scale 1 --krylov-start-outer 1\n";
+            }
             filtered_storage.push_back(arg);
         }
     }
-    config.min_pair_observations =
-        std::max(1, config.min_pair_observations);
-    config.pair_backbone_min_coverage = std::clamp(
-        config.pair_backbone_min_coverage, 0.0, 1.0);
-    config.pair_sample_cap =
-        std::max(0, config.pair_sample_cap);
-    config.initial_lambda =
-        std::max(1e-16, config.initial_lambda);
-    config.pair_factor_scale =
-        std::max(1e-16, config.pair_factor_scale);
-    config.krylov_start_outer =
-        std::max(1, config.krylov_start_outer);
+    if (config.graph_neighbors < 1 || config.coarse_groups < 1 ||
+        config.pair_sample_cap < 1) {
+        throw std::runtime_error("graph-neighbors, coarse-groups and pair-sample-cap must be positive");
+    }
+    if (config.linear_rel_tol < 0.0 || config.linear_rel_tol >= 1.0) {
+        throw std::runtime_error("linear-rel-tol must be in [0,1)");
+    }
+    if (config.variance_rel_tol <= 0.0 || config.variance_rel_tol >= 1.0) {
+        throw std::runtime_error("variance-rel-tol must be in (0,1)");
+    }
+    if (config.initial_lambda < 1e-16) {
+        throw std::runtime_error("initial-lambda must be at least 1e-16");
+    }
     filtered_argv.reserve(filtered_storage.size());
     for (std::string& arg : filtered_storage) {
         filtered_argv.push_back(arg.data());
@@ -160,6 +175,8 @@ struct RootHGBPTopology {
     bool spanning_backbone_used = false;
 };
 
+#include "ba_cross_cache.h"
+
 void compactRootPairEdges(
     PackedBlockSchurPattern& pattern,
     RootHGBPBuildPlan& plan
@@ -183,8 +200,7 @@ void compactRootPairEdges(
 RootHGBPTopology buildRootHGBPTopology(
     const BALProblem& problem,
     const RootProblem& root_problem,
-    int min_pair_observations,
-    double pair_backbone_min_coverage,
+    int graph_neighbors,
     int requested_threads
 ) {
     const auto t0 = Clock::now();
@@ -229,9 +245,6 @@ RootHGBPTopology buildRootHGBPTopology(
         requested_threads,
         static_cast<int>(point_count),
         n);
-    std::vector<std::vector<int>> pair_count_by_thread(
-        static_cast<size_t>(topology_threads),
-        std::vector<int>(dense_size, 0));
     int invalid_camera = 0;
 #if defined(_OPENMP)
 #pragma omp parallel for num_threads(topology_threads) schedule(static) reduction(|:invalid_camera)
@@ -240,13 +253,6 @@ RootHGBPTopology buildRootHGBPTopology(
          p_index < static_cast<int>(point_count);
          ++p_index) {
         const size_t p = static_cast<size_t>(p_index);
-#if defined(_OPENMP)
-        const int tid = omp_get_thread_num();
-#else
-        const int tid = 0;
-#endif
-        std::vector<int>& local_pair_count =
-            pair_count_by_thread[static_cast<size_t>(tid)];
         const int edge_base = plan.block_offset[p];
         int edge_cursor = edge_base;
         for (const auto& [camera_index, observation] :
@@ -261,54 +267,76 @@ RootHGBPTopology buildRootHGBPTopology(
             plan.free_camera[static_cast<size_t>(edge)] = camera;
             plan.global_edge[static_cast<size_t>(edge)] = edge;
         }
-        const int edge_end = plan.block_offset[p + 1];
-        for (int a = edge_base; a < edge_end; ++a) {
-            for (int b = a + 1; b < edge_end; ++b) {
-                const size_t ca = static_cast<size_t>(
-                    plan.free_camera[static_cast<size_t>(a)]);
-                const size_t cb = static_cast<size_t>(
-                    plan.free_camera[static_cast<size_t>(b)]);
-                if (ca == cb) {
-                    continue;
-                }
-                ++local_pair_count[
-                    ca * static_cast<size_t>(n) + cb];
-                ++local_pair_count[
-                    cb * static_cast<size_t>(n) + ca];
-            }
-        }
     }
     if (invalid_camera != 0) {
         throw std::runtime_error(
             "RootBA camera index is outside H-GBP topology");
     }
-#if defined(_OPENMP)
-#pragma omp parallel for num_threads(topology_threads) schedule(static)
-#endif
-    for (int dense_index = 0;
-         dense_index < static_cast<int>(dense_size);
-         ++dense_index) {
-        int count = 0;
-        for (const std::vector<int>& local :
-             pair_count_by_thread) {
-            count += local[static_cast<size_t>(dense_index)];
+    std::vector<int> camera_observations(static_cast<size_t>(n), 0);
+    for (int camera : plan.free_camera) {
+        ++camera_observations[static_cast<size_t>(camera)];
+    }
+    std::vector<int> camera_point_offsets(static_cast<size_t>(n + 1), 0);
+    std::partial_sum(camera_observations.begin(), camera_observations.end(),
+        camera_point_offsets.begin() + 1);
+    std::vector<int> camera_points(plan.free_camera.size());
+    std::vector<int> cursor = camera_point_offsets;
+    for (size_t p = 0; p < point_count; ++p) {
+        for (int e = plan.block_offset[p]; e < plan.block_offset[p + 1]; ++e) {
+            const int camera = plan.free_camera[static_cast<size_t>(e)];
+            camera_points[static_cast<size_t>(cursor[camera]++)] = static_cast<int>(p);
         }
-        pair_count[static_cast<size_t>(dense_index)] = count;
     }
-    for (int c = 0; c < n; ++c) {
-        pair_count[static_cast<size_t>(c) *
-                       static_cast<size_t>(n) +
-                   static_cast<size_t>(c)] = 1;
+    // Each row has one owner: no atomics, thread-local dense matrices, or merge pass.
+#if defined(_OPENMP)
+#pragma omp parallel for num_threads(topology_threads) schedule(dynamic, 1)
+#endif
+    for (int camera = 0; camera < n; ++camera) {
+        int* row = pair_count.data() + static_cast<size_t>(camera) * n;
+        for (int pos = camera_point_offsets[camera];
+             pos < camera_point_offsets[camera + 1]; ++pos) {
+            const int p = camera_points[static_cast<size_t>(pos)];
+            for (int e = plan.block_offset[p]; e < plan.block_offset[p + 1]; ++e) {
+                ++row[plan.free_camera[static_cast<size_t>(e)]];
+            }
+        }
+        row[camera] = 1;
     }
-    pair_count_by_thread.clear();
 
+    // Dimensionless covisibility avoids thresholds tied to a dataset's track density.
+    auto pair_weight = [&](int row, int col) {
+        const int count = pair_count[static_cast<size_t>(row) * n + col];
+        const double denominator = std::sqrt(
+            static_cast<double>(std::max(1, camera_observations[row])) *
+            static_cast<double>(std::max(1, camera_observations[col])));
+        return static_cast<double>(count) / denominator;
+    };
+    std::vector<unsigned char> selected_pair(dense_size, 0);
+    for (int row = 0; row < n; ++row) {
+        std::vector<std::pair<double, int>> neighbors;
+        for (int col = 0; col < n; ++col) {
+            if (row != col && pair_count[static_cast<size_t>(row) * n + col] > 0) {
+                neighbors.emplace_back(pair_weight(row, col), col);
+            }
+        }
+        const int keep = std::min(graph_neighbors, static_cast<int>(neighbors.size()));
+        std::partial_sort(neighbors.begin(), neighbors.begin() + keep, neighbors.end(),
+            [](const auto& a, const auto& b) {
+                return a.first != b.first ? a.first > b.first : a.second < b.second;
+            });
+        selected_pair[static_cast<size_t>(row) * n + row] = 1;
+        for (int k = 0; k < keep; ++k) {
+            const int col = neighbors[static_cast<size_t>(k)].second;
+            selected_pair[static_cast<size_t>(row) * n + col] = 1;
+            selected_pair[static_cast<size_t>(col) * n + row] = 1;
+        }
+    }
     std::vector<unsigned char> strong_active(static_cast<size_t>(n), 0);
     for (int row = 0; row < n; ++row) {
         const size_t base =
             static_cast<size_t>(row) * static_cast<size_t>(n);
         for (int col = row + 1; col < n; ++col) {
-            if (pair_count[base + static_cast<size_t>(col)] >=
-                min_pair_observations) {
+            if (selected_pair[base + static_cast<size_t>(col)]) {
                 ++topology.strong_camera_pairs;
                 strong_active[static_cast<size_t>(row)] = 1;
                 strong_active[static_cast<size_t>(col)] = 1;
@@ -318,41 +346,17 @@ RootHGBPTopology buildRootHGBPTopology(
     topology.strong_active_cameras = static_cast<int>(std::count(
         strong_active.begin(), strong_active.end(),
         static_cast<unsigned char>(1)));
-    const double strong_coverage = n > 0
-        ? static_cast<double>(topology.strong_active_cameras) /
-              static_cast<double>(n)
-        : 1.0;
-    topology.spanning_backbone_used =
-        pair_backbone_min_coverage > 0.0 &&
-        strong_coverage < pair_backbone_min_coverage;
-
-    std::vector<unsigned char> selected_pair;
-    if (topology.spanning_backbone_used) {
-        selected_pair.assign(dense_size, 0);
-        for (int row = 0; row < n; ++row) {
-            const size_t base =
-                static_cast<size_t>(row) * static_cast<size_t>(n);
-            selected_pair[base + static_cast<size_t>(row)] = 1;
-            for (int col = row + 1; col < n; ++col) {
-                if (pair_count[base + static_cast<size_t>(col)] >=
-                    min_pair_observations) {
-                    selected_pair[base + static_cast<size_t>(col)] = 1;
-                    selected_pair[
-                        static_cast<size_t>(col) * static_cast<size_t>(n) +
-                        static_cast<size_t>(row)] = 1;
-                }
-            }
-        }
-
+    topology.spanning_backbone_used = true;
+    {
         // Preserve a strongest path through every covisibility component
         // while adding only O(num_cameras) pair factors.
-        std::vector<int> best_weight(static_cast<size_t>(n), 0);
+        std::vector<double> best_weight(static_cast<size_t>(n), 0.0);
         std::vector<int> parent(static_cast<size_t>(n), -1);
         std::vector<unsigned char> in_forest(static_cast<size_t>(n), 0);
         int inserted = 0;
         while (inserted < n) {
             int vertex = -1;
-            int weight = 0;
+            double weight = 0.0;
             for (int camera = 0; camera < n; ++camera) {
                 if (!in_forest[static_cast<size_t>(camera)] &&
                     best_weight[static_cast<size_t>(camera)] > weight) {
@@ -382,14 +386,11 @@ RootHGBPTopology buildRootHGBPTopology(
                     static_cast<size_t>(predecessor) * static_cast<size_t>(n) +
                     static_cast<size_t>(vertex)] = 1;
             }
-            const size_t base =
-                static_cast<size_t>(vertex) * static_cast<size_t>(n);
             for (int neighbor = 0; neighbor < n; ++neighbor) {
                 if (in_forest[static_cast<size_t>(neighbor)]) {
                     continue;
                 }
-                const int candidate =
-                    pair_count[base + static_cast<size_t>(neighbor)];
+                const double candidate = pair_weight(vertex, neighbor);
                 if (candidate > best_weight[static_cast<size_t>(neighbor)]) {
                     best_weight[static_cast<size_t>(neighbor)] = candidate;
                     parent[static_cast<size_t>(neighbor)] = vertex;
@@ -405,9 +406,7 @@ RootHGBPTopology buildRootHGBPTopology(
         const size_t dense_index =
             static_cast<size_t>(row) * static_cast<size_t>(n) +
             static_cast<size_t>(col);
-        return topology.spanning_backbone_used
-            ? selected_pair[dense_index] != 0
-            : pair_count[dense_index] >= min_pair_observations;
+        return selected_pair[dense_index] != 0;
     };
 
     std::vector<int> component_parent(static_cast<size_t>(n));
@@ -638,8 +637,7 @@ RootHGBPTopology buildRootHGBPTopology(
 
 void resetRootFastHGBPWorkspaceValues(
     FastHGBPSystem& sys,
-    double damping,
-    bool reset_messages
+    double damping
 ) {
     SchurGBPWorkspace& ws = sys.ws;
     ws.belief_lam_inv_valid = false;
@@ -649,11 +647,8 @@ void resetRootFastHGBPWorkspaceValues(
         unary.diagonal().array() = damping;
     }
 
-    // Eta-only first sweeps overwrite eta and do not read lambda messages.
-    if (reset_messages) {
-        zeroPlainEigenStorage(ws.msg_lam);
-        zeroPlainEigenStorage(ws.msg_eta);
-    }
+    zeroPlainEigenStorage(ws.msg_lam);
+    zeroPlainEigenStorage(ws.msg_eta);
     if (sys.rhs_blocks.size() !=
         static_cast<size_t>(sys.free_cameras)) {
         sys.rhs_blocks.resize(
@@ -676,6 +671,8 @@ using Mat23List =
 using Vec2List =
     std::vector<Vec2, Eigen::aligned_allocator<Vec2>>;
 
+#include "ba_point_schur.h"
+
 struct PackedRootLandmarks {
     std::vector<int> point_offset;
     std::vector<int> camera_id;
@@ -687,7 +684,7 @@ struct PackedRootLandmarks {
     Mat23List Jl;
     Vec2List residual;
     Mat3List Hll;
-    Mat3List Hll_inv;
+    Mat3List Hll_factor;
     Vec3List bl;
     Vec3List Jl_scale;
     std::vector<Eigen::VectorXd> pose_diag2_by_thread;
@@ -696,6 +693,8 @@ struct PackedRootLandmarks {
     Eigen::VectorXd schur_scaled_x;
     std::vector<int> numerical_failures;
     bool camera_cache_valid = false;
+    int schur_max_point_degree = -1;
+    std::vector<Vec2List> schur_projected_by_thread;
 };
 
 PackedRootLandmarks makePackedRootLandmarks(
@@ -716,7 +715,7 @@ PackedRootLandmarks makePackedRootLandmarks(
     packed.Jl.resize(observation_count);
     packed.residual.resize(observation_count);
     packed.Hll.resize(point_count);
-    packed.Hll_inv.resize(point_count);
+    packed.Hll_factor.resize(point_count);
     packed.bl.resize(point_count);
     packed.Jl_scale.resize(point_count);
 
@@ -974,7 +973,7 @@ void packedRootExactSchurMultiplyInto(
     const int camera_count =
         static_cast<int>(packed.camera_rotation.size());
     const int point_count =
-        static_cast<int>(packed.Hll_inv.size());
+        static_cast<int>(packed.Hll_factor.size());
     const Eigen::Index dimension =
         static_cast<Eigen::Index>(9 * camera_count);
     if (x.size() != dimension ||
@@ -984,6 +983,17 @@ void packedRootExactSchurMultiplyInto(
     }
     const int threads = effectiveBuildThreads(
         requested_threads, point_count, camera_count);
+    if (packed.schur_max_point_degree < 0) {
+        packed.schur_max_point_degree = 0;
+        for (int p = 0; p < point_count; ++p) {
+            packed.schur_max_point_degree = std::max(packed.schur_max_point_degree,
+                packed.point_offset[p + 1] - packed.point_offset[p]);
+        }
+    }
+    packed.schur_projected_by_thread.resize(static_cast<size_t>(threads));
+    for (Vec2List& scratch : packed.schur_projected_by_thread) {
+        scratch.resize(static_cast<size_t>(packed.schur_max_point_degree));
+    }
     packed.thread_matvec.resize(static_cast<size_t>(threads));
     for (Eigen::VectorXd& local : packed.thread_matvec) {
         if (local.size() != dimension) {
@@ -1009,6 +1019,8 @@ void packedRootExactSchurMultiplyInto(
 #endif
         Eigen::VectorXd& local =
             packed.thread_matvec[static_cast<size_t>(tid)];
+        Vec2* GBP_RESTRICT projections =
+            packed.schur_projected_by_thread[static_cast<size_t>(tid)].data();
 #if defined(_OPENMP)
 #pragma omp for schedule(dynamic, 512)
 #endif
@@ -1033,6 +1045,8 @@ void packedRootExactSchurMultiplyInto(
                     projected.y() +=
                         packed.Jc[e](1, col) * camera_x[col];
                 }
+                // Store once after accumulating in registers; reuse in the transpose pass.
+                projections[edge - begin] = projected;
                 const Mat23& jl = packed.Jl[e];
                 point_projection.x() +=
                     jl(0, 0) * projected.x() +
@@ -1044,22 +1058,13 @@ void packedRootExactSchurMultiplyInto(
                     jl(0, 2) * projected.x() +
                     jl(1, 2) * projected.y();
             }
-            const Vec3 eliminated_projection =
-                packed.Hll_inv[p] * point_projection;
+            const Vec3 eliminated_projection = solvePoint3(packed.Hll_factor[p], point_projection);
             for (int edge = begin; edge < end; ++edge) {
                 const size_t e = static_cast<size_t>(edge);
                 const int camera = packed.camera_id[e];
                 const Eigen::Index offset =
                     static_cast<Eigen::Index>(9 * camera);
-                Vec2 projected = Vec2::Zero();
-                const double* GBP_RESTRICT camera_x =
-                    scaled_x_data + offset;
-                for (int col = 0; col < 9; ++col) {
-                    projected.x() +=
-                        packed.Jc[e](0, col) * camera_x[col];
-                    projected.y() +=
-                        packed.Jc[e](1, col) * camera_x[col];
-                }
+                const Vec2& projected = projections[edge - begin];
                 const Mat23& jl = packed.Jl[e];
                 const double reduced_x =
                     projected.x() -
@@ -1152,6 +1157,7 @@ bool linearizePackedRootLandmark(
         bl.array().isFinite().all();
 }
 
+template <bool BuildDiagonal = true>
 GBP_FORCE_INLINE void accumulateRootPairBlock(
     const PackedBlockSchurPattern& pattern,
     const Mat93List& edge_EBinv,
@@ -1161,7 +1167,8 @@ GBP_FORCE_INLINE void accumulateRootPairBlock(
     bool sample_rescale,
     Mat9& block,
     Mat9& factor_lam_i,
-    Mat9& factor_lam_j
+    Mat9& factor_lam_j,
+    const std::vector<int>* cached_slots = nullptr
 ) {
     block.setZero();
     factor_lam_i.setZero();
@@ -1190,12 +1197,14 @@ GBP_FORCE_INLINE void accumulateRootPairBlock(
                        ref_count) /
                       (2LL * sample_count))
             : begin + sample;
-        const int edge_a =
+        const int retained_a =
             pattern.slot_pair_edge_a_global[
                 static_cast<size_t>(ref)];
-        const int edge_b =
+        const int retained_b =
             pattern.slot_pair_edge_b_global[
                 static_cast<size_t>(ref)];
+        const int edge_a = cached_slots ? (*cached_slots)[retained_a] : retained_a;
+        const int edge_b = cached_slots ? (*cached_slots)[retained_b] : retained_b;
         const double* GBP_RESTRICT a =
             edge_EBinv[static_cast<size_t>(edge_a)].data();
         const double* GBP_RESTRICT b =
@@ -1233,19 +1242,23 @@ GBP_FORCE_INLINE void accumulateRootPairBlock(
                 }
             }
         }
-        const int edge_i = transpose ? edge_b : edge_a;
-        const int edge_j = transpose ? edge_a : edge_b;
-        factor_lam_i.noalias() += sample_weight *
-            edge_EBinv[static_cast<size_t>(edge_i)] *
-            edge_E[static_cast<size_t>(edge_i)].transpose();
-        factor_lam_j.noalias() += sample_weight *
-            edge_EBinv[static_cast<size_t>(edge_j)] *
-            edge_E[static_cast<size_t>(edge_j)].transpose();
+        if constexpr (BuildDiagonal) {
+            const int edge_i = transpose ? edge_b : edge_a;
+            const int edge_j = transpose ? edge_a : edge_b;
+            factor_lam_i.noalias() += sample_weight *
+                edge_EBinv[static_cast<size_t>(edge_i)] *
+                edge_E[static_cast<size_t>(edge_i)].transpose();
+            factor_lam_j.noalias() += sample_weight *
+                edge_EBinv[static_cast<size_t>(edge_j)] *
+                edge_E[static_cast<size_t>(edge_j)].transpose();
+        }
     }
-    factor_lam_i =
-        0.5 * (factor_lam_i + factor_lam_i.transpose()).eval();
-    factor_lam_j =
-        0.5 * (factor_lam_j + factor_lam_j.transpose()).eval();
+    if constexpr (BuildDiagonal) {
+        factor_lam_i =
+            0.5 * (factor_lam_i + factor_lam_i.transpose()).eval();
+        factor_lam_j =
+            0.5 * (factor_lam_j + factor_lam_j.transpose()).eval();
+    }
 }
 
 GBP_FORCE_INLINE void accumulateRootUnaryBlock(
@@ -1282,43 +1295,6 @@ GBP_FORCE_INLINE void accumulateRootUnaryBlock(
     }
 }
 
-GBP_FORCE_INLINE Mat3 invertDampedSymmetric3x3(
-    const Mat3& matrix,
-    double damping
-) noexcept {
-    const double a00 = matrix(0, 0) + damping;
-    const double a10 = matrix(1, 0);
-    const double a20 = matrix(2, 0);
-    const double a11 = matrix(1, 1) + damping;
-    const double a21 = matrix(2, 1);
-    const double a22 = matrix(2, 2) + damping;
-    const double cof00 = a11 * a22 - a21 * a21;
-    const double cof10 = a20 * a21 - a10 * a22;
-    const double cof20 = a10 * a21 - a20 * a11;
-    const double cof11 = a00 * a22 - a20 * a20;
-    const double cof21 = a10 * a20 - a00 * a21;
-    const double cof22 = a00 * a11 - a10 * a10;
-    const double determinant =
-        a00 * cof00 + a10 * cof10 + a20 * cof20;
-    if (!(determinant > 0.0) || !std::isfinite(determinant)) {
-        Mat3 fallback = matrix;
-        fallback.diagonal().array() += damping;
-        return fallback.inverse().eval();
-    }
-    const double inverse_determinant = 1.0 / determinant;
-    Mat3 inverse;
-    inverse(0, 0) = cof00 * inverse_determinant;
-    inverse(1, 0) = cof10 * inverse_determinant;
-    inverse(2, 0) = cof20 * inverse_determinant;
-    inverse(0, 1) = inverse(1, 0);
-    inverse(1, 1) = cof11 * inverse_determinant;
-    inverse(2, 1) = cof21 * inverse_determinant;
-    inverse(0, 2) = inverse(2, 0);
-    inverse(1, 2) = inverse(2, 1);
-    inverse(2, 2) = cof22 * inverse_determinant;
-    return inverse;
-}
-
 void buildPackedHGBPSystemInto(
     FastHGBPSystem& sys,
     const PackedBlockSchurPattern& pattern,
@@ -1331,24 +1307,23 @@ void buildPackedHGBPSystemInto(
     int pair_sample_cap,
     bool pair_sample_rescale,
     double pair_factor_scale,
-    bool unreduced_unary,
-    bool reset_messages,
     bool fused_linearize_build,
-    bool scale_pose_columns,
     double pose_scaling_epsilon,
     Eigen::VectorXd& pose_scaling,
-    RootBuildBreakdown& breakdown
+    RootBuildBreakdown& breakdown,
+    const RootCrossCachePlan& cross_cache
 ) {
     const auto t0 = Clock::now();
     initializeFastHGBPSystemStructure(sys, pattern);
     resetRootFastHGBPWorkspaceValues(
-        sys, damping, reset_messages);
+        sys, damping);
     sys.linearized_cost = 0.0;
 
-    sys.edge_E.resize(
-        static_cast<size_t>(build_plan.retained_edge_count));
-    sys.edge_EBinv.resize(
-        static_cast<size_t>(build_plan.retained_edge_count));
+    if (cross_cache.sample_cap != pair_sample_cap) {
+        throw std::runtime_error("Cross cache does not match the unchanged pair sampler");
+    }
+    const std::vector<int>& cross_slots = cross_cache.edge_slot;
+    sys.edge_E.resize(static_cast<size_t>(cross_cache.slot_count));
 
     const size_t point_count = landmarks.Hll.size();
     if (build_plan.block_offset.size() != point_count + 1) {
@@ -1382,10 +1357,7 @@ void buildPackedHGBPSystemInto(
         const Eigen::Index pose_dimension =
             static_cast<Eigen::Index>(
                 9 * problem.num_cameras());
-        landmarks.pose_diag2_by_thread.resize(
-            scale_pose_columns
-                ? static_cast<size_t>(parallel_threads)
-                : 0);
+        landmarks.pose_diag2_by_thread.resize(static_cast<size_t>(parallel_threads));
         landmarks.numerical_failures.assign(
             static_cast<size_t>(parallel_threads), 0);
         for (Eigen::VectorXd& local :
@@ -1405,7 +1377,7 @@ void buildPackedHGBPSystemInto(
         zeroPlainEigenStorage(
             sys.build_accum[static_cast<size_t>(tid)].diag_blocks);
         landmarks.thread_rhs[static_cast<size_t>(tid)].setZero();
-        if (fused_linearize_build && scale_pose_columns) {
+        if (fused_linearize_build) {
             landmarks
                 .pose_diag2_by_thread[static_cast<size_t>(tid)]
                 .setZero();
@@ -1416,8 +1388,9 @@ void buildPackedHGBPSystemInto(
         elapsed(t0, setup_t1);
 
     const auto point_t0 = Clock::now();
+    int point_factorization_failed = 0;
 #if defined(_OPENMP)
-#pragma omp parallel num_threads(parallel_threads)
+#pragma omp parallel num_threads(parallel_threads) reduction(|:point_factorization_failed)
 #endif
     {
         int tid = 0;
@@ -1439,20 +1412,18 @@ void buildPackedHGBPSystemInto(
                     landmarks,
                     p,
                     pose_scaling_epsilon,
-                    scale_pose_columns
-                        ? &landmarks.pose_diag2_by_thread[
-                              static_cast<size_t>(tid)]
-                        : nullptr)) {
+                    &landmarks.pose_diag2_by_thread[static_cast<size_t>(tid)])) {
                 ++landmarks.numerical_failures[
                     static_cast<size_t>(tid)];
                 continue;
             }
 
-            const Mat3 Binv = invertDampedSymmetric3x3(
-                landmarks.Hll[p], damping);
-            landmarks.Hll_inv[p] = Binv;
-            const Vec3 Hll_inv_bl =
-                Binv * landmarks.bl[p];
+            Mat3& L = landmarks.Hll_factor[p];
+            if (!factorDampedPoint3(landmarks.Hll[p], damping, L)) {
+                point_factorization_failed = 1;
+                continue;
+            }
+            const Vec3 Hll_inv_bl = solvePoint3(L, landmarks.bl[p]);
             const int plan_begin = build_plan.block_offset[p];
             const int plan_end = build_plan.block_offset[p + 1];
             for (int plan_pos = plan_begin;
@@ -1482,63 +1453,37 @@ void buildPackedHGBPSystemInto(
                         Jc(1, k) * reduced_residual.y();
                 }
                 const int retained_edge =
-                    build_plan.retained_edge_slot[
+                    cross_slots[
                         static_cast<size_t>(global_edge)];
                 const bool pair_uses_edge = retained_edge >= 0;
-                const bool reduce_unary = !unreduced_unary;
-                const bool need_cross =
-                    pair_uses_edge || reduce_unary;
-                if (need_cross) {
-                    const Mat93 E = Jc.transpose() * Jp;
-                    const Mat93 EBinv = E * Binv;
-                    if (pair_uses_edge) {
-                        sys.edge_E[
-                            static_cast<size_t>(retained_edge)] =
-                            E;
-                        sys.edge_EBinv[
-                            static_cast<size_t>(retained_edge)] =
-                            EBinv;
-                    }
-                    accumulateRootUnaryBlock(
-                        local_diag[static_cast<size_t>(fc)],
-                        Jc,
-                        reduce_unary ? &E : nullptr,
-                        reduce_unary ? &EBinv : nullptr,
-                        1.0);
-                } else {
-                    accumulateRootUnaryBlock(
-                        local_diag[static_cast<size_t>(fc)],
-                        Jc,
-                        nullptr,
-                        nullptr,
-                        1.0);
+                Mat93 E = Jc.transpose() * Jp;
+                whitenPointCross(E, L);
+                if (pair_uses_edge) {
+                    sys.edge_E[static_cast<size_t>(retained_edge)] = E;
                 }
+                accumulateRootUnaryBlock(
+                    local_diag[static_cast<size_t>(fc)], Jc, &E, &E, 1.0);
             }
         }
     }
     const auto point_t1 = Clock::now();
+    if (point_factorization_failed) throw std::runtime_error("Damped landmark block is not SPD");
     breakdown.point_sec =
         elapsed(point_t0, point_t1);
 
     if (fused_linearize_build) {
-        if (scale_pose_columns) {
-            Eigen::VectorXd pose_diagonal =
-                Eigen::VectorXd::Zero(
-                    static_cast<Eigen::Index>(
-                        9 * problem.num_cameras()));
-            for (const Eigen::VectorXd& local :
-                 landmarks.pose_diag2_by_thread) {
-                pose_diagonal.noalias() += local;
-            }
-            pose_scaling =
-                (pose_scaling_epsilon +
-                 pose_diagonal.array().sqrt())
-                    .inverse();
-        } else {
-            pose_scaling.setOnes(
+        Eigen::VectorXd pose_diagonal =
+            Eigen::VectorXd::Zero(
                 static_cast<Eigen::Index>(
                     9 * problem.num_cameras()));
+        for (const Eigen::VectorXd& local :
+             landmarks.pose_diag2_by_thread) {
+            pose_diagonal.noalias() += local;
         }
+        pose_scaling =
+            (pose_scaling_epsilon +
+             pose_diagonal.array().sqrt())
+                .inverse();
         const bool valid_linearization = std::all_of(
             landmarks.numerical_failures.begin(),
             landmarks.numerical_failures.end(),
@@ -1612,16 +1557,10 @@ void buildPackedHGBPSystemInto(
         SchurGBPEdge& edge =
             sys.ws.edges[static_cast<size_t>(eidx)];
         edge.factor_scale = pair_factor_scale;
-        accumulateRootPairBlock(
-            pattern,
-            sys.edge_EBinv,
-            sys.edge_E,
-            edge.slot_ij,
-            pair_sample_cap,
-            pair_sample_rescale,
-            edge.aij,
-            edge.factor_lam_i,
-            edge.factor_lam_j);
+        // Normalization discards pair diagonals; keep only sampled cross blocks.
+        accumulateRootPairBlock<false>(pattern, sys.edge_E, sys.edge_E, edge.slot_ij,
+            pair_sample_cap, pair_sample_rescale, edge.aij,
+            edge.factor_lam_i, edge.factor_lam_j, &cross_cache.retained_slot);
         const auto scale_i =
             pose_scaling.segment<9>(9 * edge.i);
         const auto scale_j =
@@ -1633,16 +1572,6 @@ void buildPackedHGBPSystemInto(
             }
         }
         edge.aji = edge.aij.transpose();
-        for (int col = 0; col < 9; ++col) {
-            for (int row = 0; row < 9; ++row) {
-                edge.factor_lam_i(row, col) *=
-                    pair_factor_scale *
-                    scale_i[row] * scale_i[col];
-                edge.factor_lam_j(row, col) *=
-                    pair_factor_scale *
-                    scale_j[row] * scale_j[col];
-            }
-        }
         const int pos_i =
             sys.edge_row_pos_i[static_cast<size_t>(eidx)];
         const int pos_j =
@@ -1694,6 +1623,8 @@ void refreshPSDPairPreconditioner(
     }
 }
 
+#include "ba_gbp_model.h"
+
 struct RootHGBPResult {
     double total_sec = 0.0;
     double preprocessor_sec = 0.0;
@@ -1705,6 +1636,7 @@ struct RootHGBPResult {
     int retained_camera_pairs = 0;
     long long retained_pair_references = 0;
     int retained_observations = 0;
+    int cached_cross_blocks = 0;
     int strong_camera_pairs = 0;
     int strong_active_cameras = 0;
     int pair_graph_active_cameras = 0;
@@ -1712,6 +1644,7 @@ struct RootHGBPResult {
     int pair_graph_largest_component = 0;
     bool pair_spanning_backbone_used = false;
     double grouping_cut_ratio = 0.0;
+    int disconnected_groups = 0;
     std::vector<double> costs;
     std::vector<double> outer_sec;
     std::vector<double> linearize_sec;
@@ -1739,6 +1672,10 @@ struct RootHGBPResult {
     std::vector<int> groups;
     std::vector<int> full_sweeps;
     std::vector<int> eta_sweeps;
+    std::vector<int> trial_evaluations;
+    std::vector<int> linear_cycles;
+    std::vector<int> accepted_search_directions, true_schur_products;
+    std::vector<double> variance_defect;
 };
 
 void schurGBPFirstZeroMessageSweep(
@@ -1865,8 +1802,8 @@ Eigen::VectorXd solveFastHGBPWithFixedGroups(
     const Args& args,
     const std::vector<std::vector<int>>& groups,
     FastHGBPCoarseWorkspace& coarse_workspace,
-    bool use_jacobi_smoother,
-    bool gcr_active,
+    double linear_rel_tol,
+    double variance_rel_tol,
     PackedGBPStats& stats
 ) {
     stats = PackedGBPStats{};
@@ -1879,53 +1816,43 @@ Eigen::VectorXd solveFastHGBPWithFixedGroups(
     stats.threads = gbp_threads;
     stats.reused_workspace = true;
 
-    if (use_jacobi_smoother) {
-#if defined(_OPENMP)
-#pragma omp parallel for num_threads(gbp_threads) schedule(static) if(gbp_threads > 1)
-#endif
-        for (int camera = 0; camera < ws.n; ++camera) {
-            const Mat9& loaded = schurGBPPreconditionerLambda(ws, camera);
-            ws.belief_lam[static_cast<size_t>(camera)] = loaded;
-            ws.next_belief_lam[static_cast<size_t>(camera)] = loaded;
-        }
-        ws.belief_lam_inv_valid = false;
-    }
-
     Eigen::VectorXd x =
         Eigen::VectorXd::Zero(9 * sys.free_cameras);
     Eigen::VectorXd rhs;
     fastHGBPRhsVectorInto(sys, rhs);
     Eigen::VectorXd residual = rhs;
-    if (args.coarse_scale > 0.0 && !groups.empty()) {
+    const double target_residual2 = linear_rel_tol * linear_rel_tol * rhs.squaredNorm();
+    if (!groups.empty()) {
         const auto coarse_t0 = Clock::now();
-        buildFastHGBPCoarseWorkspace(
-            coarse_workspace, sys, groups);
-        stats.coarse_solve_sec +=
-            elapsed(coarse_t0, Clock::now());
+        buildFastHGBPCoarseWorkspace(coarse_workspace, sys, groups);
+        stats.coarse_solve_sec += elapsed(coarse_t0, Clock::now());
     }
 
-    int remaining_full_sweeps = args.gbp_full_sweeps;
-    bool fixed_maps_ready = false;
-    if (gcr_active && !use_jacobi_smoother) {
-        for (int sweep = 0; sweep < remaining_full_sweeps; ++sweep) {
-            const auto sweep_t0 = Clock::now();
-            if (sweep == 0) {
-                schurGBPFirstZeroMessageSweep(
-                    ws, args.message_damping, gbp_threads);
-            } else {
-                schurGBPSweep(
-                    ws, args.message_damping, gbp_threads);
-            }
-            stats.full_sec += elapsed(sweep_t0, Clock::now());
-            ++stats.full_sweeps;
+    for (int sweep = 0; sweep < args.gbp_full_sweeps; ++sweep) {
+        const auto sweep_t0 = Clock::now();
+        if (sweep == 0) {
+            schurGBPFirstZeroMessageSweep(
+                ws, args.message_damping, gbp_threads);
+        } else {
+            schurGBPSweep(
+                ws, args.message_damping, gbp_threads);
         }
-        remaining_full_sweeps = 0;
-        const auto map_t0 = Clock::now();
-        buildSchurGBPFixedEtaMaps(ws, gbp_threads);
-        buildSchurGBPBeliefLambdaInverses(ws, gbp_threads);
-        stats.fixed_map_sec += elapsed(map_t0, Clock::now());
-        fixed_maps_ready = true;
+        stats.full_sec += elapsed(sweep_t0, Clock::now());
+        ++stats.full_sweeps;
+        if (variance_rel_tol > 0.0) {
+            double change2 = 0.0, norm2 = 0.0;
+            for (size_t slot = 0; slot < ws.msg_lam.size(); ++slot) {
+                change2 += (ws.msg_lam[slot] - ws.next_msg_lam[slot]).squaredNorm();
+                norm2 += ws.msg_lam[slot].squaredNorm();
+            }
+            stats.variance_defect = std::sqrt(change2 / std::max(1e-300, norm2));
+            if (stats.variance_defect <= variance_rel_tol) break;
+        }
     }
+    const auto map_t0 = Clock::now();
+    buildSchurGBPFixedEtaMaps(ws, gbp_threads);
+    buildSchurGBPBeliefLambdaInverses(ws, gbp_threads);
+    stats.fixed_map_sec += elapsed(map_t0, Clock::now());
 
     Eigen::VectorXd cycle_delta;
     Eigen::VectorXd cycle_matvec;
@@ -1933,188 +1860,104 @@ Eigen::VectorXd solveFastHGBPWithFixedGroups(
     Eigen::VectorXd coarse_delta;
     Eigen::VectorXd coarse_matvec;
     Eigen::VectorXd exact_cycle_matvec;
-    std::vector<Eigen::VectorXd> gcr_directions;
-    std::vector<Eigen::VectorXd> gcr_products;
-    std::vector<double> gcr_curvature;
-    if (gcr_active) {
-        gcr_directions.reserve(static_cast<size_t>(args.mg_cycles));
-        gcr_products.reserve(static_cast<size_t>(args.mg_cycles));
-        gcr_curvature.reserve(static_cast<size_t>(args.mg_cycles));
-    }
+    std::vector<Eigen::VectorXd> fcg_directions;
+    std::vector<Eigen::VectorXd> fcg_products;
+    std::vector<double> fcg_curvature;
+    fcg_directions.reserve(static_cast<size_t>(args.mg_cycles));
+    fcg_products.reserve(static_cast<size_t>(args.mg_cycles));
+    fcg_curvature.reserve(static_cast<size_t>(args.mg_cycles));
     for (int cycle = 0; cycle < args.mg_cycles; ++cycle) {
-        if (gcr_active || cycle != 0) {
-            resetSchurGBPEtaMessages(
-                ws, residual, gbp_threads);
-        }
-
-        if (gcr_active && !use_jacobi_smoother) {
-            const auto eta_t0 = Clock::now();
-            schurGBPFixedEtaSweeps(
-                ws,
-                args.message_damping,
-                args.pre_sweeps,
-                eta_threads);
-            stats.eta_sec += elapsed(eta_t0, Clock::now());
-            stats.eta_sweeps += args.pre_sweeps;
-        }
-
-        const int full_this_cycle =
-            use_jacobi_smoother || gcr_active
-                ? 0
-                : std::min(args.pre_sweeps, remaining_full_sweeps);
-        if (!use_jacobi_smoother && full_this_cycle > 0) {
-            for (int sweep = 0;
-                 sweep < full_this_cycle;
-                 ++sweep) {
-                const auto sweep_t0 = Clock::now();
-                if (cycle == 0 && sweep == 0) {
-                    schurGBPFirstZeroMessageSweep(
-                        ws,
-                        args.message_damping,
-                        gbp_threads);
-                    stats.full_sec +=
-                        elapsed(sweep_t0, Clock::now());
-                    ++stats.full_sweeps;
-                } else {
-                    schurGBPSweep(
-                        ws,
-                        args.message_damping,
-                        gbp_threads);
-                    stats.full_sec +=
-                        elapsed(sweep_t0, Clock::now());
-                    ++stats.full_sweeps;
-                }
-            }
-            remaining_full_sweeps -= full_this_cycle;
-        }
-        if (!use_jacobi_smoother &&
-            !gcr_active &&
-            full_this_cycle < args.pre_sweeps) {
-            if (!fixed_maps_ready) {
-                const auto map_t0 = Clock::now();
-                buildSchurGBPFixedEtaMaps(
-                    ws, gbp_threads);
-                buildSchurGBPBeliefLambdaInverses(
-                    ws, gbp_threads);
-                stats.fixed_map_sec +=
-                    elapsed(map_t0, Clock::now());
-                fixed_maps_ready = true;
-            }
-            const auto eta_t0 = Clock::now();
-            schurGBPFixedEtaSweeps(
-                ws,
-                args.message_damping,
-                args.pre_sweeps - full_this_cycle,
-                eta_threads);
-            stats.eta_sec +=
-                elapsed(eta_t0, Clock::now());
-            stats.eta_sweeps +=
-                args.pre_sweeps - full_this_cycle;
-        }
+        resetSchurGBPEtaMessages(ws, residual, gbp_threads);
+        const auto eta_t0 = Clock::now();
+        schurGBPFixedEtaSweeps(
+            ws, args.message_damping, args.pre_sweeps, eta_threads);
+        stats.eta_sec += elapsed(eta_t0, Clock::now());
+        stats.eta_sweeps += args.pre_sweeps;
 
         const auto mean_t0 = Clock::now();
         schurGBPMeanInto(ws, gbp_threads, cycle_delta);
         stats.mean_sec += elapsed(mean_t0, Clock::now());
 
+        // Both additive corrections use the same residual. Keep the accepted
+        // arithmetic and timer boundaries, including the zero model products.
         const auto residual_t0 = Clock::now();
-        fastHGBPMultiplyInto(
-            sys, cycle_delta, cycle_matvec, gbp_threads);
+        cycle_matvec.setZero(residual.size());
         cycle_residual = residual;
         cycle_residual.noalias() -= cycle_matvec;
-        stats.coarse_residual_sec +=
-            elapsed(residual_t0, Clock::now());
+        stats.coarse_residual_sec += elapsed(residual_t0, Clock::now());
 
-        if (args.coarse_scale > 0.0) {
-            const auto coarse_t0 = Clock::now();
-            solveFastHGBPCoarseCorrectionInto(
-                coarse_workspace,
-                cycle_residual,
-                coarse_delta);
-            if (args.coarse_scale != 1.0) {
-                coarse_delta *= args.coarse_scale;
-            }
-            stats.coarse_solve_sec +=
-                elapsed(coarse_t0, Clock::now());
-            cycle_delta.noalias() += coarse_delta;
+        const auto coarse_t0 = Clock::now();
+        solveFastHGBPCoarseCorrectionInto(coarse_workspace, cycle_residual, coarse_delta);
+        stats.coarse_solve_sec += elapsed(coarse_t0, Clock::now());
+        cycle_delta.noalias() += coarse_delta;
 
-            const auto coarse_mv_t0 = Clock::now();
-            fastCoarseAPMultiplyInto(
-                coarse_workspace,
-                coarse_matvec,
-                gbp_threads,
-                args.coarse_scale);
-            stats.coarse_residual_sec +=
-                elapsed(coarse_mv_t0, Clock::now());
-            cycle_matvec.noalias() += coarse_matvec;
+        const auto coarse_mv_t0 = Clock::now();
+        coarse_matvec.setZero(residual.size());
+        stats.coarse_residual_sec += elapsed(coarse_mv_t0, Clock::now());
+        cycle_matvec.noalias() += coarse_matvec;
+
+        const auto exact_t0 = Clock::now();
+        packedRootExactSchurMultiplyInto(
+            exact_landmarks, pose_scaling, exact_damping,
+            cycle_delta, requestedGBPThreads(args), exact_cycle_matvec);
+        ++stats.true_schur_products;
+        const Eigen::VectorXd raw_direction = cycle_delta;
+        const Eigen::VectorXd raw_product = exact_cycle_matvec;
+        for (size_t previous = 0; previous < fcg_directions.size(); ++previous) {
+            const double beta = -fcg_directions[previous].dot(exact_cycle_matvec) /
+                fcg_curvature[previous];
+            cycle_delta.noalias() += beta * fcg_directions[previous];
+            exact_cycle_matvec.noalias() += beta * fcg_products[previous];
         }
-
-        double alpha = 1.0;
-        if (gcr_active) {
-            const auto exact_t0 = Clock::now();
-            packedRootExactSchurMultiplyInto(
-                exact_landmarks,
-                pose_scaling,
-                exact_damping,
-                cycle_delta,
-                gbp_threads,
-                exact_cycle_matvec);
-            const Eigen::VectorXd raw_direction = cycle_delta;
-            const Eigen::VectorXd raw_product = exact_cycle_matvec;
-            for (size_t previous = 0;
-                 previous < gcr_directions.size();
-                 ++previous) {
-                const double beta =
-                    -gcr_products[previous].dot(exact_cycle_matvec) /
-                    gcr_curvature[previous];
-                cycle_delta.noalias() +=
-                    beta * gcr_directions[previous];
-                exact_cycle_matvec.noalias() +=
-                    beta * gcr_products[previous];
-            }
-            double denominator = exact_cycle_matvec.squaredNorm();
-            double numerator = residual.dot(exact_cycle_matvec);
-            if (!(std::isfinite(numerator) &&
-                  std::isfinite(denominator) &&
-                  denominator > 0.0)) {
-                gcr_directions.clear();
-                gcr_products.clear();
-                gcr_curvature.clear();
-                cycle_delta = raw_direction;
-                exact_cycle_matvec = raw_product;
-                denominator = exact_cycle_matvec.squaredNorm();
-                numerator = residual.dot(exact_cycle_matvec);
-            }
-            alpha = std::isfinite(numerator) &&
-                            std::isfinite(denominator) &&
-                            denominator > 0.0
-                ? numerator / denominator
-                : 0.0;
-            if (alpha != 0.0 && std::isfinite(denominator)) {
-                gcr_directions.push_back(cycle_delta);
-                gcr_products.push_back(exact_cycle_matvec);
-                gcr_curvature.push_back(denominator);
-            }
-            residual.noalias() -= alpha * exact_cycle_matvec;
-            stats.exact_residual_sec +=
-                elapsed(exact_t0, Clock::now());
-        } else {
-            residual.noalias() -= alpha * cycle_matvec;
+        double denominator = cycle_delta.dot(exact_cycle_matvec);
+        double numerator = residual.dot(cycle_delta);
+        if (!(std::isfinite(numerator) &&
+              std::isfinite(denominator) &&
+              denominator > 0.0)) {
+            fcg_directions.clear();
+            fcg_products.clear();
+            fcg_curvature.clear();
+            cycle_delta = raw_direction;
+            exact_cycle_matvec = raw_product;
+            denominator = cycle_delta.dot(exact_cycle_matvec);
+            numerator = residual.dot(cycle_delta);
         }
+        const double alpha = std::isfinite(numerator) &&
+                                 std::isfinite(denominator) &&
+                                 denominator > 0.0
+            ? numerator / denominator
+            : 0.0;
+        if (alpha != 0.0 && std::isfinite(denominator)) {
+            fcg_directions.push_back(cycle_delta);
+            fcg_products.push_back(exact_cycle_matvec);
+            fcg_curvature.push_back(denominator);
+        }
+        residual.noalias() -= alpha * exact_cycle_matvec;
+        if (alpha != 0.0) ++stats.accepted_search_directions;
+        stats.exact_residual_sec += elapsed(exact_t0, Clock::now());
         x.noalias() += alpha * cycle_delta;
+        ++stats.cycles;
+        if (linear_rel_tol > 0.0 &&
+            residual.squaredNorm() <= target_residual2) {
+            break;
+        }
     }
     stats.relative_linear_residual =
-        residual.norm() / std::max(1.0, rhs.norm());
+        residual.norm() / std::max(1e-300, rhs.norm());
+    stats.model_decrease = 0.5 * x.dot(rhs + residual);
     return x;
 }
 
-double backSubstitutePackedRoot(
+BAStepModel backSubstitutePackedRoot(
     RootProblem& problem,
     const PackedRootLandmarks& packed,
     const Eigen::VectorXd& pose_increment,
-    double landmark_damping
+    double landmark_damping,
+    Vec3List& point_increment
 ) {
+    point_increment.resize(packed.Hll.size());
     auto body = [&](const tbb::blocked_range<size_t>& range,
-                    double model_decrease) {
+                    BAStepModel model) {
         for (size_t p = range.begin(); p != range.end(); ++p) {
             Vec3 tmp = Vec3::Zero();
             double pose_model = 0.0;
@@ -2132,28 +1975,35 @@ double backSubstitutePackedRoot(
                 pose_model += projected_increment.dot(
                     0.5 * projected_increment +
                     packed.residual[e]);
+                model.linear_decrease -=
+                    projected_increment.dot(packed.residual[e]);
             }
 
-            Vec3 landmark_increment =
-                -packed.Hll_inv[p] * tmp;
+            Vec3 landmark_increment = -solvePoint3(packed.Hll_factor[p], tmp);
             const double landmark_model =
                 0.5 * landmark_increment.dot(tmp) -
                 0.5 * landmark_damping *
                     landmark_increment.squaredNorm();
-            model_decrease -=
+            model.full_decrease -=
                 pose_model + landmark_model;
+            model.linear_decrease -= landmark_increment.dot(packed.bl[p]);
             landmark_increment.array() *=
                 packed.Jl_scale[p].array();
+            point_increment[p] = landmark_increment;
             problem.landmarks()[p].p_w += landmark_increment;
         }
-        return model_decrease;
+        return model;
     };
     return tbb::parallel_reduce(
         tbb::blocked_range<size_t>(
             0, packed.Hll.size(), 128),
-        0.0,
+        BAStepModel{},
         body,
-        std::plus<double>());
+        [](BAStepModel a, const BAStepModel& b) {
+            a.full_decrease += b.full_decrease;
+            a.linear_decrease += b.linear_decrease;
+            return a;
+        });
 }
 
 void applyRootCameraIncrementDirect(
@@ -2189,11 +2039,13 @@ RootHGBPResult runRootHGBP(
         buildRootHGBPTopology(
             input_problem,
             problem,
-            lab.min_pair_observations,
-            lab.pair_backbone_min_coverage,
+            lab.graph_neighbors,
             threads);
     const PackedBlockSchurPattern& pattern = topology.pattern;
     const RootHGBPBuildPlan& build_plan = topology.build_plan;
+    const RootCrossCachePlan cross_cache =
+        makeRootCrossCachePlan(pattern, build_plan, lab.pair_sample_cap);
+    result.cached_cross_blocks = cross_cache.slot_count;
     result.retained_camera_pairs =
         (pattern.row_ptr.back() - pattern.free_cameras) / 2;
     result.retained_pair_references =
@@ -2238,6 +2090,7 @@ RootHGBPResult runRootHGBP(
     Eigen::VectorXd root_b;
     std::vector<std::vector<int>> fixed_groups;
     double fixed_cut_ratio = 0.0;
+    Vec3List point_increment;
 
     for (int outer = 1; outer <= args.outer; ++outer) {
         const auto outer_t0 = Clock::now();
@@ -2255,47 +2108,41 @@ RootHGBPResult runRootHGBP(
             lambda,
             args.build_threads,
             lab.pair_sample_cap,
-            lab.pair_sample_rescale,
-            lab.pair_factor_scale,
-            lab.unreduced_unary,
             true,
+            lab.pair_factor_scale,
             fuse_linearize_build,
-            !lab.no_pose_scaling,
             pose_scaling_epsilon,
             pose_scaling,
-            build_breakdown);
+            build_breakdown,
+            cross_cache);
+        normalizeBAGBPCanonicalPairs(fast_system, args.build_threads);
         refreshPSDPairPreconditioner(
             fast_system, args.build_threads);
         const auto build_t1 = Clock::now();
 
         int group_count = 0;
+        refreshPackedRootCameraCache(problem, packed_landmarks);
         PackedGBPStats stats;
         const auto solve_t0 = Clock::now();
         if (fixed_groups.empty()) {
-            fixed_groups = buildCovisGroups(
-                fast_system,
-                args.group_size);
+            const int target = std::max(2, (fast_system.free_cameras + lab.coarse_groups - 1) / lab.coarse_groups);
+            fixed_groups = buildConnectedBAGroups(fast_system, target);
+            result.disconnected_groups = baDisconnectedGroups(fast_system, fixed_groups);
             fixed_cut_ratio =
                 schurCutRatio(fast_system, fixed_groups);
         }
         group_count = static_cast<int>(fixed_groups.size());
-        Args solve_args = args;
-        const bool gcr_active =
-            outer >= lab.krylov_start_outer;
-        if (!gcr_active) {
-            solve_args.mg_cycles = 1;
-        }
         Eigen::VectorXd increment =
             solveFastHGBPWithFixedGroups(
                 fast_system,
                 packed_landmarks,
                 pose_scaling,
                 lambda,
-                solve_args,
+                args,
                 fixed_groups,
                 coarse_workspace,
-                lab.use_jacobi_smoother,
-                gcr_active,
+                lab.linear_rel_tol,
+                lab.variance_rel_tol,
                 stats);
         const double linear_residual =
             stats.relative_linear_residual;
@@ -2304,15 +2151,15 @@ RootHGBPResult runRootHGBP(
         const auto backup_t0 = Clock::now();
         problem.backup();
         const auto backup_t1 = Clock::now();
-        double model_decrease = 0.0;
         const auto back_substitute_t0 = Clock::now();
         Eigen::VectorXd physical_increment =
             increment.cwiseProduct(pose_scaling);
-        model_decrease = backSubstitutePackedRoot(
+        const BAStepModel step_model = backSubstitutePackedRoot(
             problem,
             packed_landmarks,
             physical_increment,
-            lambda);
+            lambda,
+            point_increment);
         applyRootCameraIncrementDirect(
             problem, physical_increment);
         packed_landmarks.camera_cache_valid = false;
@@ -2321,25 +2168,57 @@ RootHGBPResult runRootHGBP(
         const auto metric_t0 = Clock::now();
         refreshPackedRootCameraCache(
             problem, packed_landmarks);
-        const RootMetrics trial_metrics =
+        RootMetrics trial_metrics =
             computePackedRootMetrics(
                 problem, packed_landmarks, false);
+        double alpha = 1.0;
+        double quality = 0.0;
+        int trial_evaluations = 1;
+        bool accepted = false;
+        for (int trial = 0; trial <= 8; ++trial) {
+            const double predicted_decrease = step_model.decrease(alpha);
+            const double actual_decrease =
+                0.5 * (metrics.cost2 - trial_metrics.cost2);
+            quality = actual_decrease / predicted_decrease;
+            accepted = std::isfinite(quality) &&
+                step_model.linear_decrease > 0.0 &&
+                predicted_decrease > 0.0 &&
+                actual_decrease > 0.0 &&
+                actual_decrease >= 1e-4 * alpha * step_model.linear_decrease;
+            if (accepted || trial == 8 ||
+                !std::isfinite(step_model.linear_decrease) ||
+                step_model.linear_decrease <= 0.0) {
+                break;
+            }
+            // Backtrack the same full BA direction, not a newly eliminated point step.
+            alpha *= 0.5;
+            problem.restore();
+            tbb::parallel_for(
+                tbb::blocked_range<size_t>(0, point_increment.size(), 128),
+                [&](const tbb::blocked_range<size_t>& range) {
+                    for (size_t p = range.begin(); p != range.end(); ++p) {
+                        problem.landmarks()[p].p_w += alpha * point_increment[p];
+                    }
+                });
+            applyRootCameraIncrementDirect(problem, alpha * physical_increment);
+            packed_landmarks.camera_cache_valid = false;
+            refreshPackedRootCameraCache(problem, packed_landmarks);
+            trial_metrics = computePackedRootMetrics(problem, packed_landmarks, false);
+            ++trial_evaluations;
+        }
         const auto metric_t1 = Clock::now();
-        const double actual_decrease =
-            0.5 * (metrics.cost2 - trial_metrics.cost2);
-        const double quality =
-            actual_decrease / model_decrease;
-        const bool accepted =
-            std::isfinite(model_decrease) &&
-            std::isfinite(quality) &&
-            model_decrease > 0.0 &&
-            quality > 0.0;
 
         if (accepted) {
             metrics = trial_metrics;
-            lambda *= std::max(
+            double damping_multiplier = std::max(
                 1.0 / 3.0,
                 1.0 - std::pow(2.0 * quality - 1.0, 3.0));
+            // A backtracked step is evidence that the full-step trust region was too large.
+            // Good agreement only at a tiny alpha must not decrease damping again.
+            if (alpha < 1.0) {
+                damping_multiplier = std::max(damping_multiplier, 1.0 / alpha);
+            }
+            lambda *= damping_multiplier;
             lambda = std::max(1e-16, lambda);
             lambda_vee = 2.0;
             need_linearization = true;
@@ -2388,7 +2267,12 @@ RootHGBPResult runRootHGBP(
         result.gbp_coarse_solve_sec.push_back(
             stats.coarse_solve_sec);
         result.accepted_alpha.push_back(
-            accepted ? 1.0 : 0.0);
+            accepted ? alpha : 0.0);
+        result.trial_evaluations.push_back(trial_evaluations);
+        result.linear_cycles.push_back(stats.cycles);
+        result.accepted_search_directions.push_back(stats.accepted_search_directions);
+        result.true_schur_products.push_back(stats.true_schur_products);
+        result.variance_defect.push_back(stats.variance_defect);
         result.lambda.push_back(lambda);
         result.step_quality.push_back(quality);
         result.linear_residual.push_back(linear_residual);
@@ -2447,13 +2331,25 @@ void writeRootHGBPJson(
     out << std::setprecision(17);
     out << "{\n";
     out << "  \"solver\": \"hgbp_ba\",\n";
+    out << "  \"coarse_operator\": \"" << lab.coarse_operator << "\",\n";
+    out << "  \"aggregation\": \"" << lab.aggregation << "\",\n";
+    out << "  \"disconnected_groups\": " << result.disconnected_groups << ",\n";
+    out << "  \"linear_controller\": \"" << lab.linear_controller << "\",\n";
+    out << "  \"gbp_model\": \"" << lab.gbp_model << "\",\n";
+    out << "  \"diagnostic_only\": " << "false" << ",\n";
+    out << "  \"variance_rel_tol\": " << lab.variance_rel_tol << ",\n";
+    out << "  \"configuration_policy\": \"normalized_covisibility_uniform_v1\",\n";
+    out << "  \"graph_neighbors\": " << lab.graph_neighbors << ",\n";
+    out << "  \"coarse_groups_budget\": " << lab.coarse_groups << ",\n";
+    out << "  \"linear_rel_tol\": " << lab.linear_rel_tol << ",\n";
     out << "  \"num_cameras\": " << problem.num_cameras << ",\n";
     out << "  \"num_points\": " << problem.num_points << ",\n";
     out << "  \"num_observations\": " << problem.num_observations << ",\n";
     out << "  \"outer\": " << args.outer << ",\n";
     out << "  \"threads\": " << requestedGBPThreads(args) << ",\n";
     out << "  \"build_threads\": " << args.build_threads << ",\n";
-    out << "  \"group_size\": " << args.group_size << ",\n";
+    out << "  \"group_size\": " << (args.coarse_scale > 0.0 ?
+        std::max(2, (problem.num_cameras + lab.coarse_groups - 1) / lab.coarse_groups) : 0) << ",\n";
     out << "  \"mg_cycles\": " << args.mg_cycles << ",\n";
     out << "  \"pre_sweeps\": " << args.pre_sweeps << ",\n";
     out << "  \"gbp_full_sweeps\": " << args.gbp_full_sweeps << ",\n";
@@ -2463,24 +2359,24 @@ void writeRootHGBPJson(
     out << "  \"pair_factor_scale\": "
         << lab.pair_factor_scale << ",\n";
     out << "  \"pair_backbone_min_coverage\": "
-        << lab.pair_backbone_min_coverage << ",\n";
+        << 0.9 << ",\n";
     out << "  \"krylov_start_outer\": "
         << lab.krylov_start_outer << ",\n";
     out << "  \"fine_smoother\": \""
-        << (lab.use_jacobi_smoother ? "jacobi" : "gbp")
+        << "gbp"
         << "\",\n";
     out << "  \"min_pair_observations\": "
-        << lab.min_pair_observations << ",\n";
+        << 1 << ",\n";
     out << "  \"pair_sample_cap\": "
         << lab.pair_sample_cap << ",\n";
     out << "  \"pair_sample_rescale\": "
-        << (lab.pair_sample_rescale ? "true" : "false")
+        << "true"
         << ",\n";
     out << "  \"unreduced_unary\": "
-        << (lab.unreduced_unary ? "true" : "false")
+        << "false"
         << ",\n";
     out << "  \"no_pose_scaling\": "
-        << (lab.no_pose_scaling ? "true" : "false")
+        << "false"
         << ",\n";
     out << "  \"preprocessor_sec\": " << result.preprocessor_sec << ",\n";
     out << "  \"preprocessor_linearization_sec\": "
@@ -2498,6 +2394,10 @@ void writeRootHGBPJson(
         << result.retained_pair_references << ",\n";
     out << "  \"retained_observations\": "
         << result.retained_observations << ",\n";
+    out << "  \"cached_cross_blocks\": "
+        << result.cached_cross_blocks << ",\n";
+    out << "  \"cross_cache_bytes\": "
+        << static_cast<unsigned long long>(result.cached_cross_blocks) * sizeof(Mat93) << ",\n";
     out << "  \"strong_camera_pairs\": "
         << result.strong_camera_pairs << ",\n";
     out << "  \"strong_active_cameras\": "
@@ -2555,6 +2455,16 @@ void writeRootHGBPJson(
     writeDoubleArray(out, result.gbp_coarse_solve_sec);
     out << ",\n  \"accepted_alpha\": ";
     writeDoubleArray(out, result.accepted_alpha);
+    out << ",\n  \"trial_evaluations\": ";
+    writeIntArray(out, result.trial_evaluations);
+    out << ",\n  \"linear_cycles\": ";
+    writeIntArray(out, result.linear_cycles);
+    out << ",\n  \"accepted_search_directions\": ";
+    writeIntArray(out, result.accepted_search_directions);
+    out << ",\n  \"true_schur_products\": ";
+    writeIntArray(out, result.true_schur_products);
+    out << ",\n  \"variance_defect\": ";
+    writeDoubleArray(out, result.variance_defect);
     out << ",\n  \"lambda\": ";
     writeDoubleArray(out, result.lambda);
     out << ",\n  \"step_quality\": ";

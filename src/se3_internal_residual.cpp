@@ -1,10 +1,14 @@
 #include "internal/se3_residual.h"
+#include "internal/scoped_worker_affinity.h"
+#include "internal/se3_schur_solve.h"
+#include "internal/finite_double.h"
 
 #include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
+#include <limits>
 #include <stdexcept>
 
 #include <omp.h>
@@ -296,7 +300,7 @@ SE3_PACKED_FORCEINLINE void stabilizeEta6(
     const double max_scaled = max_rel_update * eta_ref;
     if (!(diff_sq > max_scaled * max_scaled)) return;
     const double rel = std::sqrt(diff_sq) / eta_ref;
-    if (!std::isfinite(rel) || rel <= max_rel_update) return;
+    if (!finiteDouble(rel) || rel <= max_rel_update) return;
     const double step = max_rel_update / std::max(rel, 1e-300);
     for (int i = 0; i < 6; ++i) {
         out_eta[i] = old_eta[i] + step * (out_eta[i] - old_eta[i]);
@@ -310,11 +314,14 @@ void stabilizeMessage6(
     const double* ref_lam,
     double max_rel_update,
     double* out_eta,
-    double* out_lam
+    double* out_lam,
+    const double* cached_reference_norms = nullptr
 ) noexcept {
     if (!(max_rel_update > 0.0)) return;
-    const double lam_ref = std::max(1.0, std::max(froNormSym21(old_lam), froNormSym21(ref_lam)));
-    const double eta_ref = std::max(1.0, std::max(std::sqrt(sqNorm6(old_eta)), std::sqrt(sqNorm6(ref_eta))));
+    const double ref_lam_norm = cached_reference_norms ? cached_reference_norms[0] : froNormSym21(ref_lam);
+    const double ref_eta_norm = cached_reference_norms ? cached_reference_norms[1] : std::sqrt(sqNorm6(ref_eta));
+    const double lam_ref = std::max(1.0, std::max(froNormSym21(old_lam), ref_lam_norm));
+    const double eta_ref = std::max(1.0, std::max(std::sqrt(sqNorm6(old_eta)), ref_eta_norm));
     double eta_diff_sq = 0.0;
     for (int i = 0; i < 6; ++i) {
         const double d = out_eta[i] - old_eta[i];
@@ -324,7 +331,7 @@ void stabilizeMessage6(
     const double rel_eta = std::sqrt(eta_diff_sq) / eta_ref;
     const double rel_lam = std::sqrt(lam_diff_sq) / lam_ref;
     const double rel = std::sqrt(rel_eta * rel_eta + rel_lam * rel_lam);
-    if (!std::isfinite(rel) || rel <= max_rel_update) return;
+    if (!finiteDouble(rel) || rel <= max_rel_update) return;
     const double step = max_rel_update / std::max(rel, 1e-300);
     for (int i = 0; i < 6; ++i) {
         out_eta[i] = old_eta[i] + step * (out_eta[i] - old_eta[i]);
@@ -645,13 +652,7 @@ SE3_PACKED_FORCEINLINE void solveSpd6LowerCrossEtaRepeatedRaw(
     const double* eta_rhs,
     double* out
 ) noexcept {
-    solveSpd6LowerOneRaw(l, cross_rhs_col_major + 0, out + 0);
-    solveSpd6LowerOneRaw(l, cross_rhs_col_major + 6, out + 6);
-    solveSpd6LowerOneRaw(l, cross_rhs_col_major + 12, out + 12);
-    solveSpd6LowerOneRaw(l, cross_rhs_col_major + 18, out + 18);
-    solveSpd6LowerOneRaw(l, cross_rhs_col_major + 24, out + 24);
-    solveSpd6LowerOneRaw(l, cross_rhs_col_major + 30, out + 30);
-    solveSpd6LowerOneRaw(l, eta_rhs, out + 36);
+    solveSpd6CrossEtaBatched(l, cross_rhs_col_major, eta_rhs, out);
 }
 
 SE3_PACKED_FORCEINLINE void solveSpd6LowerCrossEtaPackedRepeatedRaw(
@@ -660,13 +661,7 @@ SE3_PACKED_FORCEINLINE void solveSpd6LowerCrossEtaPackedRepeatedRaw(
     const double* eta_rhs,
     double* out
 ) noexcept {
-    solveSpd6LowerOnePackedRaw(l, cross_rhs_col_major + 0, out + 0);
-    solveSpd6LowerOnePackedRaw(l, cross_rhs_col_major + 6, out + 6);
-    solveSpd6LowerOnePackedRaw(l, cross_rhs_col_major + 12, out + 12);
-    solveSpd6LowerOnePackedRaw(l, cross_rhs_col_major + 18, out + 18);
-    solveSpd6LowerOnePackedRaw(l, cross_rhs_col_major + 24, out + 24);
-    solveSpd6LowerOnePackedRaw(l, cross_rhs_col_major + 30, out + 30);
-    solveSpd6LowerOnePackedRaw(l, eta_rhs, out + 36);
+    solveSpd6CrossEtaPackedBatched(l, cross_rhs_col_major, eta_rhs, out);
 }
 
 SE3_PACKED_FORCEINLINE double dotCrossSolvedRow6(
@@ -728,6 +723,36 @@ SE3_PACKED_FORCEINLINE void projectSchurTargetRaw(
     out_eta_projected[5] = dotCrossSolvedRow6(cross_target_other, se, 5);
 }
 
+double normalizedPrecisionResidual(
+    const double* candidate, const double* old, const double* diagonal
+) noexcept {
+    // Diagonal normalization prevents rotation units from hiding translation drift.
+    constexpr int diag_ids[6] = {0, 2, 5, 9, 14, 20};
+    double root_diagonal[6];
+    for (int i=0;i<6;++i)
+        root_diagonal[i]=std::sqrt(std::max(std::abs(diagonal[diag_ids[i]]),1e-30));
+    double delta2 = 0.0;
+    double current2 = 0.0;
+    double old2 = 0.0;
+    for (int col = 0, k = 0; col < 6; ++col) {
+        for (int row = 0; row <= col; ++row, ++k) {
+            const double scale = root_diagonal[row] * root_diagonal[col];
+            const double a = candidate[k] / scale;
+            const double b = old[k] / scale;
+            if (!finiteDouble(a) || !finiteDouble(b)) {
+                return std::numeric_limits<double>::infinity();
+            }
+            const double weight = row == col ? 1.0 : 2.0;
+            delta2 += weight * (a - b) * (a - b);
+            current2 += weight * a * a;
+            old2 += weight * b * b;
+        }
+    }
+    // A zero-information tree message needs an absolute tolerance in these
+    // normalized units, not a relative test against cancellation roundoff.
+    return std::sqrt(delta2 / std::max({current2, old2, 1.0}));
+}
+
 bool computeFullTargetRaw(
     const double* eta_target,
     const double* eta_other,
@@ -745,7 +770,9 @@ bool computeFullTargetRaw(
     double max_rel_update,
     bool use_l21_cholesky,
     double* out_eta,
-    double* out_lam
+    double* out_lam,
+    double* precision_residual = nullptr,
+    const double* cached_reference_norms = nullptr
 ) noexcept {
     double solved[42];
     if (use_l21_cholesky) {
@@ -772,6 +799,9 @@ bool computeFullTargetRaw(
 
     double eta_projected[6];
     projectSchurTargetRaw(diag_target, cross_target_other, solved, out_lam, eta_projected);
+    if (precision_residual != nullptr) {
+        *precision_residual = normalizedPrecisionResidual(out_lam, old_target_lam, diag_target);
+    }
     for (int row = 0; row < 6; ++row) {
         out_eta[row] = eta_target[row] - eta_projected[row];
     }
@@ -785,7 +815,8 @@ bool computeFullTargetRaw(
         diag_target,
         max_rel_update,
         out_eta,
-        out_lam
+        out_lam,
+        cached_reference_norms
     );
     return true;
 }
@@ -805,13 +836,14 @@ SE3_PACKED_FORCEINLINE void writeMat6RowMajorRaw(
     }
 }
 
-void computeFullLambdaFactor(
+double computeFullLambdaFactor(
     SyntheticSE3PackedSoAWorkspace& w,
     int idx,
     bool mark_fixed_initialized,
     double eta_damping,
     double max_rel_update,
-    bool use_l21_cholesky
+    bool use_l21_cholesky,
+    bool measure_precision = false
 ) {
     const int slot0 = 2 * idx;
     const int slot1 = slot0 + 1;
@@ -840,6 +872,11 @@ void computeFullLambdaFactor(
     double raw1_eta[6];
     double raw0_lam[21];
     double raw1_lam[21];
+    double precision0 = std::numeric_limits<double>::infinity();
+    double precision1 = std::numeric_limits<double>::infinity();
+    const double* norms = nullptr;
+    if (use_l21_cholesky && w.binary_reference_norms_valid)
+        norms = w.binary_reference_norms.data() + 4*static_cast<size_t>(idx);
     const bool raw0_ok = computeFullTargetRaw(
         eta0,
         eta1,
@@ -857,7 +894,9 @@ void computeFullLambdaFactor(
         max_rel_update,
         use_l21_cholesky,
         raw0_eta,
-        raw0_lam
+        raw0_lam,
+        measure_precision ? &precision0 : nullptr,
+        norms
     );
     const bool raw1_ok = computeFullTargetRaw(
         eta1,
@@ -876,7 +915,9 @@ void computeFullLambdaFactor(
         max_rel_update,
         use_l21_cholesky,
         raw1_eta,
-        raw1_lam
+        raw1_lam,
+        measure_precision ? &precision1 : nullptr,
+        norms ? norms+2 : nullptr
     );
     if (raw0_ok && raw1_ok) {
         copy6(raw0_eta, binaryMsgEtaPtr(w, slot0));
@@ -885,7 +926,7 @@ void computeFullLambdaFactor(
         copy21(raw1_lam, binaryMsgLam21Ptr(w, slot1));
         w.fixed_lam_initialized[static_cast<size_t>(idx)] = mark_fixed_initialized ? 1 : 0;
         w.fixed_eta_map_valid[static_cast<size_t>(idx)] = 0;
-        return;
+        return measure_precision ? std::max(precision0, precision1) : 0.0;
     }
 
     Vec6 eno0;
@@ -941,6 +982,8 @@ void computeFullLambdaFactor(
 
     w.fixed_lam_initialized[static_cast<size_t>(idx)] = mark_fixed_initialized ? 1 : 0;
     w.fixed_eta_map_valid[static_cast<size_t>(idx)] = 0;
+    // A fallback solve must not certify precision convergence.
+    return std::numeric_limits<double>::infinity();
 }
 
 bool buildFixedEtaMapsForFactor(SyntheticSE3PackedSoAWorkspace& w, int idx) {
@@ -1131,6 +1174,74 @@ bool refreshMuAt(SyntheticSE3PackedSoAWorkspace& w, int var_idx) {
     return true;
 }
 
+void completePrecisionSweep(SyntheticSE3PackedSoAWorkspace& w, bool eta_only, bool check, int global_sweep) {
+    ++w.sweeps_since_relinearize;
+    if(eta_only) ++w.eta_only_sweeps;
+    else ++w.full_precision_sweeps;
+    if(!check) return;
+    double residual=0;
+    for(double value:w.precision_residuals) residual=std::max(residual,value);
+    ++w.precision_checks;
+    w.last_precision_check_sweep=global_sweep;
+    w.last_precision_residual=residual;
+    if(finiteDouble(residual) && residual<=SE3PrecisionPolicy::tolerance) {
+        ++w.precision_stable_checks;
+        if(!w.precision_frozen && w.precision_stable_checks>=SE3PrecisionPolicy::stable_checks) {
+            w.precision_frozen=true;
+            ++w.precision_freezes;
+            if(w.first_precision_freeze_sweep<0) w.first_precision_freeze_sweep=w.sweeps_since_relinearize;
+        }
+    } else {
+        if(w.precision_frozen) ++w.precision_thaws;
+        w.precision_frozen=false;
+        w.precision_stable_checks=0;
+    }
+}
+
+void persistentPackedSweeps(SyntheticSE3PackedSoAWorkspace& w, int sweeps, int threads,
+                           int fixed_start, double damping, double update_limit) {
+    const auto allowed_cpus = ScopedWorkerAffinity::availableMask(threads);
+    #pragma omp parallel num_threads(threads)
+    {
+        ScopedWorkerAffinity affinity(allowed_cpus,omp_get_thread_num());
+        if(omp_get_thread_num()==0) ScopedWorkerAffinity::observeTeam(omp_get_num_threads());
+        for(int sweep=0;sweep<sweeps;++sweep) {
+            const int global=w.sweeps_since_relinearize;
+            const bool check=w.adaptive_precision && (w.precision_frozen
+                ? global-w.last_precision_check_sweep>=SE3PrecisionPolicy::frozen_check_period
+                : (global+1)%SE3PrecisionPolicy::check_period==0);
+            const bool fixed=w.adaptive_precision || (fixed_start>=0 && global>=fixed_start);
+            const bool eta_only=w.adaptive_precision ? w.precision_frozen && !check
+                : fixed_start>=0 && global>fixed_start;
+            if(eta_only && w.fixed_eta_maps_all_valid) {
+                #pragma omp for schedule(static)
+                for(int f=0;f<w.num_binary_factors;++f)
+                    computeFixedEtaFactorHotSync(w,f,damping,update_limit);
+            } else if(eta_only) {
+                #pragma omp for schedule(static)
+                for(int f=0;f<w.num_binary_factors;++f)
+                    computeFixedEtaFactor(w,f,damping,update_limit,nullptr);
+            } else {
+                #pragma omp for schedule(static)
+                for(int f=0;f<w.num_binary_factors;++f) {
+                    const double residual=computeFullLambdaFactor(w,f,fixed,damping,update_limit,false,check);
+                    if(check) w.precision_residuals[f]=residual;
+                }
+            }
+            // The factor barrier makes all certificates available. This metadata
+            // update can overlap the variable pass: that pass only uses the local
+            // eta_only flag. Its ending barrier publishes metadata for next sweep.
+            #pragma omp single nowait
+            {
+                w.fixed_eta_maps_all_valid=eta_only?1:0;
+                completePrecisionSweep(w,eta_only,check,global);
+            }
+            #pragma omp for schedule(static)
+            for(int v=0;v<w.num_vars;++v) updateBeliefAt(w,v,eta_only,sweep+1==sweeps);
+        }
+    }
+}
+
 #undef SE3_PACKED_FORCEINLINE
 
 }  // namespace
@@ -1228,6 +1339,26 @@ void relinearizeSyntheticSE3PackedSoAWorkspaceFromGraph(
         throw std::runtime_error("SE3 packed SoA topology mismatch: factor count");
     }
     w.sweeps_since_relinearize = 0;
+    w.binary_reference_norms_valid = false;
+    w.jacobi_ready=false;
+    w.defect_ready=false;
+    w.defect_mean_sweeps=0;
+    w.defect_map_builds=0;
+    w.defect_clamps=0;
+    w.defect_build_sec=0;
+    w.defect_inverse_residual=0;
+    w.jacobi_sweeps=0;
+    w.cycle_message_rebuilds=0;
+    w.precision_frozen = false;
+    w.precision_stable_checks = 0;
+    w.precision_checks = 0;
+    w.precision_freezes = 0;
+    w.precision_thaws = 0;
+    w.first_precision_freeze_sweep = -1;
+    w.last_precision_check_sweep = -1;
+    w.last_precision_residual = 0.0;
+    w.full_precision_sweeps = 0;
+    w.eta_only_sweeps = 0;
     for (int i = 0; i < w.num_vars; ++i) {
         const gbp::VariableNode& var = *graph.var_nodes[static_cast<size_t>(i)];
         copy6(var.prior.etaData(), vec6Ptr(w.prior_eta, i));
@@ -1306,6 +1437,219 @@ void relinearizeSyntheticSE3PackedSoAWorkspaceFromGraph(
         copy6(vec6Ptr(w.unary_eta, 0), vec6Ptr(w.unary_msg_eta, 0));
         copy21(sym21Ptr(w.unary_lam21, 0), sym21Ptr(w.unary_msg_lam21, 0));
     }
+}
+
+void blockJacobiSE3PackedIterations(SyntheticSE3PackedSoAWorkspace& w, int sweeps, int num_threads) {
+    if(sweeps<=0) return;
+    const int n=w.num_vars, threads=effectiveThreadCount(num_threads);
+    if(!w.jacobi_ready) {
+        w.jacobi_diagonal.resize(21*n); w.jacobi_inverse.resize(36*n); w.jacobi_rhs.resize(6*n);
+        w.jacobi_x.resize(6*n); w.jacobi_alt.resize(6*n);
+        #pragma omp parallel for schedule(static) num_threads(threads) if(threads>1)
+        for(int v=0;v<n;++v) {
+            double* diag=sym21Ptr(w.jacobi_diagonal,v);
+            double* rhs=vec6Ptr(w.jacobi_rhs,v);
+            copy21(sym21Ptr(w.prior_lam21,v),diag); copy6(vec6Ptr(w.prior_eta,v),rhs);
+            for(int p=w.unary_offsets[v];p<w.unary_offsets[v+1];++p) {
+                const int f=w.unary_ids[p];
+                const double* a=sym21Ptr(w.unary_lam21,f),*b=vec6Ptr(w.unary_eta,f);
+                for(int j=0;j<21;++j) diag[j]+=a[j];
+                for(int j=0;j<6;++j) rhs[j]+=b[j];
+            }
+            for(int p=w.binary_offsets[v];p<w.binary_offsets[v+1];++p) {
+                const int slot=w.binary_slot_ids[p],f=slot/2;
+                const double* a=sym21Ptr(slot%2?w.binary_diag1_lam21:w.binary_diag0_lam21,f);
+                const double* b=vec6Ptr(slot%2?w.binary_eta1:w.binary_eta0,f);
+                for(int j=0;j<21;++j) diag[j]+=a[j];
+                for(int j=0;j<6;++j) rhs[j]+=b[j];
+            }
+            Mat6 a; mat6FromSym21(diag,a);
+            const Mat6 inv=solveMatWithFallback(a,Mat6::Identity());
+            std::copy(inv.data(),inv.data()+36,mat36Ptr(w.jacobi_inverse,v));
+        }
+        w.jacobi_ready=true;
+    }
+    #pragma omp parallel num_threads(threads) if(threads>1)
+    {
+        #pragma omp for schedule(static)
+        for(int v=0;v<n;++v) {
+            if(!refreshMuAt(w,v)) throw std::runtime_error("Jacobi initialization has nonfinite mean");
+            copy6(vec6Ptr(w.mu,v),vec6Ptr(w.jacobi_x,v));
+        }
+        // PSD unary/binary factors imply H <= 2*blockdiag(H). Shared omega=2/3.
+        for(int sweep=0;sweep<sweeps;++sweep) {
+            const double* x=(sweep%2?w.jacobi_alt:w.jacobi_x).data();
+            double* y=(sweep%2?w.jacobi_x:w.jacobi_alt).data();
+            #pragma omp for schedule(static)
+            for(int v=0;v<n;++v) {
+                double product[6]; sym21MatVec6Raw(sym21Ptr(w.jacobi_diagonal,v),x+6*v,product);
+                for(int p=w.binary_offsets[v];p<w.binary_offsets[v+1];++p) {
+                    const int slot=w.binary_slot_ids[p], f=slot/2;
+                    const double* z=x+6*(slot%2?w.binary_var0_id[f]:w.binary_var1_id[f]);
+                    const double* a=mat36Ptr(slot%2?w.binary_cross10_lam36:w.binary_cross01_lam36,f);
+                    for(int r=0;r<6;++r) product[r]+=a[r]*z[0]+a[r+6]*z[1]+a[r+12]*z[2]+a[r+18]*z[3]+a[r+24]*z[4]+a[r+30]*z[5];
+                }
+                double r[6]; for(int j=0;j<6;++j) r[j]=w.jacobi_rhs[6*v+j]-product[j];
+                const double* a=mat36Ptr(w.jacobi_inverse,v);
+                for(int j=0;j<6;++j)
+                    y[6*v+j]=x[6*v+j]+(2./3.)*(a[j]*r[0]+a[j+6]*r[1]+a[j+12]*r[2]+a[j+18]*r[3]+a[j+24]*r[4]+a[j+30]*r[5]);
+            }
+        }
+        const auto& x=sweeps%2?w.jacobi_alt:w.jacobi_x;
+        #pragma omp for schedule(static)
+        for(int v=0;v<n;++v) {
+            copy6(x.data()+6*v,vec6Ptr(w.mu,v));
+            sym21MatVec6Raw(sym21Ptr(w.belief_lam21,v),x.data()+6*v,vec6Ptr(w.belief_eta,v));
+            w.mu_valid[v]=1;
+        }
+    }
+    w.jacobi_sweeps+=sweeps;
+}
+
+void rebuildSE3PackedMessagesAtMean(SyntheticSE3PackedSoAWorkspace& w,
+    const Eigen::VectorXd& mean, const Eigen::VectorXd& residual, int num_threads) {
+    if(mean.size()!=6*w.num_vars || residual.size()!=mean.size())
+        throw std::runtime_error("SE3 message reconstruction dimension mismatch");
+    const int threads=effectiveThreadCount(num_threads);
+    // m_fi = Lambda_fi*x_i + (b_fi - H_fi*x) - r_i/degree(i).
+    // The final term makes sum(m_fi)+unary+prior == belief_Lambda*x.
+    // At r=0 this is the Gaussian BP eta fixed point when Lambda is fixed.
+    #pragma omp parallel for schedule(static) num_threads(threads) if(threads>1)
+    for(int f=0;f<w.num_binary_factors;++f) {
+        for(int side=0;side<2;++side) {
+            const int slot=2*f+side;
+            const int i=side?w.binary_var1_id[f]:w.binary_var0_id[f];
+            const int j=side?w.binary_var0_id[f]:w.binary_var1_id[f];
+            const double* x=mean.data()+6*i,*y=mean.data()+6*j;
+            double lam_x[6],diag_x[6];
+            sym21MatVec6Raw(binaryMsgLam21Ptr(w,slot),x,lam_x);
+            sym21MatVec6Raw(sym21Ptr(side?w.binary_diag1_lam21:w.binary_diag0_lam21,f),x,diag_x);
+            const double* cross=mat36Ptr(side?w.binary_cross10_lam36:w.binary_cross01_lam36,f);
+            const double* eta=vec6Ptr(side?w.binary_eta1:w.binary_eta0,f);
+            double* message=binaryMsgEtaPtr(w,slot);
+            const double degree=static_cast<double>(w.binary_offsets[i+1]-w.binary_offsets[i]);
+            for(int d=0;d<6;++d)
+                message[d]=lam_x[d]+eta[d]-diag_x[d]-
+                    (cross[d]*y[0]+cross[d+6]*y[1]+cross[d+12]*y[2]+cross[d+18]*y[3]+cross[d+24]*y[4]+cross[d+30]*y[5])-
+                    residual[6*i+d]/degree;
+        }
+    }
+    #pragma omp parallel for schedule(static) num_threads(threads) if(threads>1)
+    for(int i=0;i<w.num_vars;++i) {
+        updateBeliefAt(w,i,false,false);
+        // For isolated variables there is no FV state to initialize.
+        if(w.binary_offsets[i+1]>w.binary_offsets[i]) {
+            copy6(mean.data()+6*i,vec6Ptr(w.mu,i));
+            w.mu_valid[i]=1;
+        }
+    }
+    ++w.cycle_message_rebuilds;
+}
+
+void recomputeSE3PackedBeliefs(SyntheticSE3PackedSoAWorkspace& w,int num_threads) {
+    const int threads=effectiveThreadCount(num_threads);
+    #pragma omp parallel for schedule(static) num_threads(threads) if(threads>1)
+    for(int i=0;i<w.num_vars;++i) updateBeliefAt(w,i,false,false);
+}
+
+double measureSE3PackedEtaMismatch(const SyntheticSE3PackedSoAWorkspace& w) {
+    double difference2=0, target2=0;
+    for(int v=0;v<w.num_vars;++v) {
+        double sum[6]; copy6(vec6Ptr(w.prior_eta,v),sum);
+        for(int p=w.unary_offsets[v];p<w.unary_offsets[v+1];++p) {
+            const double* message=vec6Ptr(w.unary_msg_eta,w.unary_ids[p]);
+            for(int d=0;d<6;++d) sum[d]+=message[d];
+        }
+        for(int p=w.binary_offsets[v];p<w.binary_offsets[v+1];++p) {
+            const double* message=binaryMsgEtaPtr(w,w.binary_slot_ids[p]);
+            for(int d=0;d<6;++d) sum[d]+=message[d];
+        }
+        const double* eta=vec6Ptr(w.belief_eta,v);
+        for(int d=0;d<6;++d) {
+            const double error=eta[d]-sum[d];
+            difference2+=error*error; target2+=eta[d]*eta[d];
+        }
+    }
+    return std::sqrt(difference2/std::max(target2,1e-300));
+}
+
+void liftSE3PackedMeanCorrection(SyntheticSE3PackedSoAWorkspace& w,
+    const Eigen::VectorXd& delta, bool precision_weighted, int num_threads) {
+    if(delta.size()!=6*w.num_vars || !delta.allFinite())
+        throw std::runtime_error("SE3 eta lift requires a finite mean correction");
+    const int threads=effectiveThreadCount(num_threads);
+    auto lift_variable=[&](int v) {
+        const int begin=w.binary_offsets[v],end=w.binary_offsets[v+1];
+        double target[6],base[6],sum[6];
+        copy6(vec6Ptr(w.belief_eta,v),target);
+        copy6(vec6Ptr(w.prior_eta,v),base);
+        for(int p=w.unary_offsets[v];p<w.unary_offsets[v+1];++p) {
+            const double* message=vec6Ptr(w.unary_msg_eta,w.unary_ids[p]);
+            for(int d=0;d<6;++d) base[d]+=message[d];
+        }
+        copy6(base,sum);
+        for(int p=begin;p<end;++p) {
+            const int slot=w.binary_slot_ids[p];
+            double* message=binaryMsgEtaPtr(w,slot);
+            if(precision_weighted) {
+                double shifted[6];
+                sym21MatVec6Raw(binaryMsgLam21Ptr(w,slot),delta.data()+6*v,shifted);
+                for(int d=0;d<6;++d) message[d]+=shifted[d];
+            }
+            for(int d=0;d<6;++d) sum[d]+=message[d];
+        }
+        if(begin==end) {
+            double difference=0,scale=0;
+            for(int d=0;d<6;++d) { difference+=std::abs(target[d]-sum[d]); scale+=std::abs(target[d])+std::abs(sum[d]); }
+            return difference<=128*std::numeric_limits<double>::epsilon()*std::max(scale,1e-300);
+        }
+        double correction[6];
+        for(int d=0;d<6;++d) correction[d]=(target[d]-sum[d])/double(end-begin);
+        copy6(base,sum);
+        for(int p=begin;p<end;++p) {
+            double* message=binaryMsgEtaPtr(w,w.binary_slot_ids[p]);
+            for(int d=0;d<6;++d) {
+                message[d]+=correction[d];
+                sum[d]+=message[d];
+            }
+        }
+        // Use the actual message sum. Cached target mu is unchanged up to the
+        // usual roundoff of belief_eta=belief_lambda*mu, not a different solve.
+        copy6(sum,vec6Ptr(w.belief_eta,v));
+        return true;
+    };
+    int failed=0;
+    if(threads>1) {
+        #pragma omp parallel for schedule(static) num_threads(threads) reduction(+:failed)
+        for(int v=0;v<w.num_vars;++v) if(!lift_variable(v)) ++failed;
+    } else for(int v=0;v<w.num_vars;++v) if(!lift_variable(v)) ++failed;
+    if(failed) throw std::runtime_error("Cannot lift a nonzero correction through an isolated variable");
+}
+
+void initializeBalancedSE3PackedMessages(SyntheticSE3PackedSoAWorkspace& w, int num_threads) {
+    if(w.sweeps_since_relinearize!=0)
+        throw std::runtime_error("Balanced initialization requires a fresh SE3 linearization");
+    const int threads=effectiveThreadCount(num_threads);
+    // Each eta starts at its factor gradient. Their sum is the assembled b,
+    // so b=0 is stationary even when individual factor gradients are nonzero.
+    #pragma omp parallel for schedule(static) num_threads(threads) if(threads>1)
+    for(int f=0;f<w.num_binary_factors;++f) {
+        copy6(vec6Ptr(w.binary_eta0,f),binaryMsgEtaPtr(w,2*f));
+        copy6(vec6Ptr(w.binary_eta1,f),binaryMsgEtaPtr(w,2*f+1));
+        copy21(sym21Ptr(w.binary_diag0_lam21,f),binaryMsgLam21Ptr(w,2*f));
+        copy21(sym21Ptr(w.binary_diag1_lam21,f),binaryMsgLam21Ptr(w,2*f+1));
+    }
+    for(int f=0;f<w.num_unary_factors;++f) {
+        copy6(vec6Ptr(w.unary_eta,f),vec6Ptr(w.unary_msg_eta,f));
+        copy21(sym21Ptr(w.unary_lam21,f),sym21Ptr(w.unary_msg_lam21,f));
+    }
+    std::fill(w.fixed_lam_initialized.begin(),w.fixed_lam_initialized.end(),0);
+    std::fill(w.fixed_eta_map_valid.begin(),w.fixed_eta_map_valid.end(),0);
+    w.fixed_eta_maps_all_valid=0;
+    w.precision_frozen=false;
+    w.precision_stable_checks=0;
+    #pragma omp parallel for schedule(static) num_threads(threads) if(threads>1)
+    for(int v=0;v<w.num_vars;++v) updateBeliefAt(w,v,false,false);
 }
 
 void assembleJointEtaSyntheticSE3PackedSoAWorkspaceInto(
@@ -1442,17 +1786,39 @@ void synchronousIterationsSyntheticSE3PackedSoAWorkspace(
     if (num_sweeps <= 0) return;
     const int thread_count = effectiveThreadCount(num_threads);
     const bool collect_stats = stats != nullptr;
+    if (thread_count == 1 && !w.binary_reference_norms_valid) {
+        w.binary_reference_norms.resize(static_cast<size_t>(w.num_binary_factors)*4);
+        for (int f=0; f<w.num_binary_factors; ++f) {
+            double* norm=w.binary_reference_norms.data()+4*static_cast<size_t>(f);
+            norm[0]=froNormSym21(sym21Ptr(w.binary_diag0_lam21,f));
+            norm[1]=std::sqrt(sqNorm6(vec6Ptr(w.binary_eta0,f)));
+            norm[2]=froNormSym21(sym21Ptr(w.binary_diag1_lam21,f));
+            norm[3]=std::sqrt(sqNorm6(vec6Ptr(w.binary_eta1,f)));
+        }
+        w.binary_reference_norms_valid=true;
+    }
     const bool use_l21_cholesky = packedSoAL21CholeskyEnabled(thread_count);
     const bool use_hot_fixed_eta_kernel =
         packedSoAHotFixedEtaKernelEnabled(thread_count);
     SyntheticSE3PackedSoAStats local_stats;
+    if (w.adaptive_precision) w.precision_residuals.resize(w.num_binary_factors);
+    if(w.persistent_sweeps && thread_count>1 && !collect_stats) {
+        persistentPackedSweeps(w,num_sweeps,thread_count,fixed_lam_after_sweep,eta_damping,max_rel_update);
+        return;
+    }
 
     for (int sweep = 0; sweep < num_sweeps; ++sweep) {
         const int global_sweep = w.sweeps_since_relinearize;
+        const bool check_precision = w.adaptive_precision && (
+            w.precision_frozen
+                ? global_sweep - w.last_precision_check_sweep >= SE3PrecisionPolicy::frozen_check_period
+                : (global_sweep + 1) % SE3PrecisionPolicy::check_period == 0);
         const bool use_fixed_lam =
-            fixed_lam_after_sweep >= 0 && global_sweep >= fixed_lam_after_sweep;
+            w.adaptive_precision ||
+            (fixed_lam_after_sweep >= 0 && global_sweep >= fixed_lam_after_sweep);
         const bool use_eta_only =
-            fixed_lam_after_sweep >= 0 && global_sweep > fixed_lam_after_sweep;
+            w.adaptive_precision ? (w.precision_frozen && !check_precision) :
+            (fixed_lam_after_sweep >= 0 && global_sweep > fixed_lam_after_sweep);
         const bool use_hot_eta =
             use_eta_only &&
             use_hot_fixed_eta_kernel &&
@@ -1483,14 +1849,16 @@ void synchronousIterationsSyntheticSE3PackedSoAWorkspace(
             } else {
                 #pragma omp parallel for schedule(static) num_threads(thread_count)
                 for (int idx = 0; idx < w.num_binary_factors; ++idx) {
-                    computeFullLambdaFactor(
+                    const double local_residual = computeFullLambdaFactor(
                         w,
                         idx,
                         use_fixed_lam,
                         eta_damping,
                         max_rel_update,
-                        use_l21_cholesky
+                        use_l21_cholesky,
+                        check_precision
                     );
+                    if (check_precision) w.precision_residuals[idx] = local_residual;
                 }
             }
         } else {
@@ -1504,14 +1872,16 @@ void synchronousIterationsSyntheticSE3PackedSoAWorkspace(
                 }
             } else {
                 for (int idx = 0; idx < w.num_binary_factors; ++idx) {
-                    computeFullLambdaFactor(
+                    const double local_residual = computeFullLambdaFactor(
                         w,
                         idx,
                         use_fixed_lam,
                         eta_damping,
                         max_rel_update,
-                        use_l21_cholesky
+                        use_l21_cholesky,
+                        check_precision
                     );
+                    if (check_precision) w.precision_residuals[idx] = local_residual;
                 }
             }
         }
@@ -1537,7 +1907,7 @@ void synchronousIterationsSyntheticSE3PackedSoAWorkspace(
             var_t1 = SteadyClock::now();
         }
 
-        ++w.sweeps_since_relinearize;
+        completePrecisionSweep(w,use_eta_only,check_precision,global_sweep);
         if (collect_stats) {
             ++local_stats.sweeps;
             if (use_eta_only) {

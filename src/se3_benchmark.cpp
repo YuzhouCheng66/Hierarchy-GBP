@@ -2,7 +2,6 @@
 #include <exception>
 #include <iostream>
 #include <limits>
-#include <numeric>
 #include <stdexcept>
 #include <string>
 
@@ -79,7 +78,7 @@ bool applyProcessAffinityMask(const std::string& text, DWORD_PTR& previous_proce
 }
 #endif
 
-void configureFastSE3Path(
+void configureUniformSE3Path(
     int fixed_lambda_after_sweeps,
     int final_direct_polish_steps,
     int basis_rebuild_period,
@@ -117,13 +116,12 @@ void configureFastSE3Path(
         std::to_string(implicit_fine_operator_threads)
     );
     setEnv("GBP_SE3_IMPLICIT_FINE_OPERATOR_COMPARE", "0");
-    setEnv("GBP_SE3_FIXED_LAMBDA_LATE_START_OUTER", "12");
+    setEnv("GBP_SE3_FIXED_LAMBDA_LATE_START_OUTER", "-1");
     setEnv("GBP_SE3_FIXED_LAMBDA_AFTER_SWEEPS_LATE", "10");
     setEnv("GBP_SE3_FIXED_LAMBDA_AFTER_SWEEPS", std::to_string(fixed_lambda_after_sweeps));
     setEnv("GBP_SE3_FIXED_LAMBDA_6D_INV_CACHE_START_OUTER", "12");
     setEnv("GBP_SE3_PARTIAL_BASIS_EIGEN", "1");
-    // Keep the solver default: hot fixed-eta is enabled for 1-thread and
-    // disabled for multi-thread unless explicitly overridden by the caller.
+    // Packed kernels retain their validated serial/parallel selection.
     setEnv("GBP_SE3_FINAL_DIRECT_POLISH_STEPS", std::to_string(final_direct_polish_steps));
     setEnv("GBP_SE3_PARTIAL_BASIS_RESIDUAL_CHECK_PERIOD", "1");
     setEnv("GBP_SE3_BASIS_REBUILD_PERIOD", std::to_string(basis_rebuild_period));
@@ -132,8 +130,9 @@ void configureFastSE3Path(
     setEnv("GBP_SE3_PARTIAL_BASIS_LARGE_GROUP_MIN_GROUPS", "350");
     setEnv(
         "GBP_SE3_PARTIAL_BASIS_LARGE_GROUP_ACCEPT_RESIDUAL_TOL",
-        "1e-3"
+        "-1"
     );
+    setEnv("GBP_SE3_PARTIAL_BASIS_SMALL_GROUP_ACCEPT_RESIDUAL_TOL", "-1");
     setEnv(
         "GBP_SE3_PARTIAL_BASIS_ACCEPT_UNCONVERGED",
         partial_basis_accept_unconverged ? "1" : "0"
@@ -142,6 +141,32 @@ void configureFastSE3Path(
         "GBP_SE3_PARTIAL_BASIS_MAX_ITERS",
         std::to_string(partial_basis_max_iters)
     );
+
+    // Pin the released policy even when inherited experiment settings are present.
+    setEnv("HGBP_SE3_ADAPTIVE_PRECISION", "1");
+    setEnv("HGBP_SE3_BALANCED_INITIALIZATION", "1");
+    setEnv("HGBP_SE3_RESET_TRANSPORT", "1");
+    setEnv("HGBP_CYCLE_ENERGY", "1");
+    setEnv("HGBP_CYCLE_ENERGY_RESTART", "1");
+    setEnv("HGBP_SE3_PERSISTENT_SWEEPS", "1");
+    setEnv("HGBP_SE3_SMOOTHER", "gbp");
+    setEnv("HGBP_SE3_SKIP_COARSE", "0");
+    setEnv("HGBP_SE3_CYCLE_MESSAGE_REBUILD", "0");
+    setEnv("HGBP_SE3_AUTOMATIC_COARSE", "1");
+    setEnv("HGBP_SE3_PRECISION_INITIALIZATION", "warm-transport-balanced");
+    setEnv("HGBP_SE3_PRECISION_AUDIT", "");
+    setEnv("HGBP_SE3_EXACT_BASIS_CACHE", "0");
+    setEnv("HGBP_SE3_PREDICT_PARTIAL_BUDGET", "0");
+    setEnv("HGBP_SE3_AMORTIZED_COARSE", "1");
+    setEnv("HGBP_SE3_COARSE_CHOLMOD", "1");
+    setEnv("HGBP_SE3_ROBUST_LINE_SEARCH", "1");
+    setEnv("HGBP_SE3_BASIS_PREPASS", "none");
+    setEnv("HGBP_SE3_BOUNDARY_BASIS", "none");
+    setEnv("HGBP_SE3_BUFFERED_OBJECTIVE", "1");
+    setEnv("HGBP_SE3_ETA_LIFT", "precision");
+    setEnv("HGBP_SE3_CYCLE_AUDIT", "0");
+    setEnv("HGBP_SE3_PRECISION_DEFECT", "none");
+    setEnv("HGBP_SE3_RESIDUAL_STOP", "1");
 }
 
 template <typename Row>
@@ -157,17 +182,21 @@ void printUsage() {
     std::cout
         << "Usage: se3_benchmark --problem-file <path> [--out-json <path>]\n"
         << "  Defaults: outer=20, c=5, k=50, group=20, r=12, threads=16, huber=5,\n"
-        << "            direct enabled, final direct polish=1.\n"
+        << "            adaptive variance, diagonal messages, balanced transported precision,\n"
+        << "            automatic coarse correction, cycle line search, no fine direct solve.\n"
         << "  Optional: --num-outer N --inner-cycles C --pre-sweeps K --group-size G\n"
         << "            --r-reduced R --threads T --huber-delta D\n"
-        << "            --basis-rebuild-period N --coarse-numeric-rebuild-period N\n"
-        << "            --coarse-reuse-pcg-iters N --implicit-fine-operator-threads N\n"
-        << "            --fixed-lambda-after-sweeps K --partial-basis-max-iters N\n"
-        << "            --partial-basis-accept-unconverged 0|1\n"
-        << "            --final-direct-polish-steps N\n"
+        << "            --implicit-fine-operator-threads N (defaults to --threads)\n"
         << "            --process-affinity-mask MASK\n"
-        << "            --skip-direct\n"
-        << "            --write-poses\n";
+        << "            --write-poses\n"
+        << "  Formal-command compatibility (only these values are supported):\n"
+        << "            --basis-rebuild-period 1 --coarse-numeric-rebuild-period 1\n"
+        << "            --coarse-reuse-pcg-iters 1 --fixed-lambda-after-sweeps -1\n"
+        << "            --partial-basis-max-iters 6 --partial-basis-accept-unconverged 0\n"
+        << "            --final-direct-polish-steps 0 --skip-direct\n"
+        << "            --variance-policy adaptive --message-initialization diagonal\n"
+        << "            --precision-initialization warm-transport-balanced\n"
+        << "            --persistent-sweeps --automatic-coarse --cycle-line-search\n";
 }
 
 }  // namespace
@@ -182,17 +211,21 @@ int main(int argc, char** argv) {
         int group_size = 20;
         int r_reduced = 12;
         int sync_num_threads = 16;
-        int fixed_lambda_after_sweeps = 100;
-        int final_direct_polish_steps = 1;
+        int fixed_lambda_after_sweeps = -1;
+        int final_direct_polish_steps = 0;
         int basis_rebuild_period = 1;
         int coarse_numeric_rebuild_period = 1;
         int coarse_reuse_pcg_iters = 1;
         int implicit_fine_operator_threads = 16;
+        bool implicit_fine_operator_threads_set = false;
         int partial_basis_max_iters = 6;
         int partial_basis_accept_unconverged = 0;
         std::string process_affinity_mask;
-        bool direct_enabled = true;
+        const bool direct_enabled = false;
         bool write_poses = false;
+        std::string variance_policy = "adaptive";
+        std::string message_initialization = "diagonal";
+        std::string precision_initialization = "warm-transport-balanced";
         hgbp::se3::RobustLossConfig robust_loss_config;
         robust_loss_config.huber_delta = 5.0;
 
@@ -216,6 +249,15 @@ int main(int argc, char** argv) {
                 sync_num_threads = parseInt(arg, argv[++i]);
             } else if (arg == "--fixed-lambda-after-sweeps" && i + 1 < argc) {
                 fixed_lambda_after_sweeps = parseInt(arg, argv[++i]);
+            } else if (arg == "--variance-policy" && i + 1 < argc) {
+                variance_policy = argv[++i];
+            } else if (arg == "--message-initialization" && i+1<argc) {
+                message_initialization=argv[++i];
+            } else if (arg == "--cycle-line-search" || arg == "--persistent-sweeps" ||
+                       arg == "--automatic-coarse" || arg == "--skip-direct") {
+                // Accepted formal commands explicitly restate the released defaults.
+            } else if(arg=="--precision-initialization" && i+1<argc) {
+                precision_initialization=argv[++i];
             } else if (arg == "--basis-rebuild-period" && i + 1 < argc) {
                 basis_rebuild_period = parseInt(arg, argv[++i]);
             } else if (arg == "--coarse-numeric-rebuild-period" &&
@@ -226,6 +268,7 @@ int main(int argc, char** argv) {
             } else if (arg == "--implicit-fine-operator-threads" &&
                        i + 1 < argc) {
                 implicit_fine_operator_threads = parseInt(arg, argv[++i]);
+                implicit_fine_operator_threads_set = true;
             } else if (arg == "--partial-basis-max-iters" && i + 1 < argc) {
                 partial_basis_max_iters = parseInt(arg, argv[++i]);
             } else if (arg == "--partial-basis-accept-unconverged" &&
@@ -237,8 +280,6 @@ int main(int argc, char** argv) {
                 robust_loss_config.huber_delta = parseDouble(arg, argv[++i]);
             } else if (arg == "--process-affinity-mask" && i + 1 < argc) {
                 process_affinity_mask = argv[++i];
-            } else if (arg == "--skip-direct") {
-                direct_enabled = false;
             } else if (arg == "--write-poses") {
                 write_poses = true;
             } else if (arg == "--help" || arg == "-h") {
@@ -252,19 +293,27 @@ int main(int argc, char** argv) {
         if (problem_file.empty()) {
             throw std::runtime_error("--problem-file is required");
         }
+        if (!implicit_fine_operator_threads_set) {
+            implicit_fine_operator_threads = sync_num_threads;
+        }
         if (num_outer < 1 || inner_cycles < 1 || pre_sweeps < 0 ||
             group_size < 1 || r_reduced < 1 || sync_num_threads < 1 ||
-            fixed_lambda_after_sweeps < -1 || final_direct_polish_steps < 0 ||
-            basis_rebuild_period < 1 || coarse_numeric_rebuild_period < 1 ||
-            coarse_reuse_pcg_iters < 1 || implicit_fine_operator_threads < 1 ||
-            partial_basis_max_iters < 1 ||
-            (partial_basis_accept_unconverged != 0 &&
-             partial_basis_accept_unconverged != 1) ||
+            implicit_fine_operator_threads < 1 ||
             robust_loss_config.huber_delta < 0.0) {
             throw std::runtime_error("invalid benchmark configuration");
         }
+        if (fixed_lambda_after_sweeps != -1 || final_direct_polish_steps != 0 ||
+            basis_rebuild_period != 1 || coarse_numeric_rebuild_period != 1 ||
+            coarse_reuse_pcg_iters != 1 || partial_basis_max_iters != 6 ||
+            partial_basis_accept_unconverged != 0 || variance_policy != "adaptive" ||
+            message_initialization != "diagonal" ||
+            precision_initialization != "warm-transport-balanced") {
+            throw std::runtime_error(
+                "only the released adaptive SE3 policy is supported; see --help for compatibility values"
+            );
+        }
 
-        configureFastSE3Path(
+        configureUniformSE3Path(
             fixed_lambda_after_sweeps,
             final_direct_polish_steps,
             basis_rebuild_period,
@@ -318,11 +367,7 @@ int main(int argc, char** argv) {
             hgbp::se3::writeSyntheticSE3ExperimentPoseHistoryJson(results, pose_json);
         }
 
-        const double direct_total_sec = sumOuterSeconds(results.direct_history);
         const double mg_total_sec = sumOuterSeconds(results.mg_history);
-        const double direct_cost = results.direct_history.empty()
-            ? 0.0
-            : results.direct_history.back().nonlinear_objective;
         const double mg_cost = results.mg_history.empty()
             ? 0.0
             : results.mg_history.back().nonlinear_objective;
@@ -330,16 +375,8 @@ int main(int argc, char** argv) {
         std::cout << "wrote " << out_json << "\n";
         std::cout << "nodes=" << results.num_poses
                   << " factors=" << results.num_edges << "\n";
-        if (direct_enabled) {
-            std::cout << "direct_total_sec=" << direct_total_sec
-                      << " direct_cost=" << direct_cost << "\n";
-        }
         std::cout << "mg_total_sec=" << mg_total_sec
                   << " mg_cost=" << mg_cost << "\n";
-        if (direct_enabled && direct_total_sec > 0.0) {
-            std::cout << "mg_over_direct_ratio=" << (mg_total_sec / direct_total_sec)
-                      << " speedup=" << (direct_total_sec / mg_total_sec) << "x\n";
-        }
 #ifdef _WIN32
         if (!process_affinity_mask.empty()) {
             std::cout << "process_affinity_mask=" << process_affinity_mask << "\n";

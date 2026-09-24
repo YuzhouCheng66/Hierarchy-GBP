@@ -1,343 +1,37 @@
 {
-  "schema_version": 2,
-  "shared": {
+  "schema_version": 3,
+  "provenance": "cpp/experiments/ba_dataflow_20260924/uniform_candidate.json; paper_full_retest_20260923/run_ba.py:hgbp_arguments",
+  "policy": {
     "outer": 20,
-    "threads": 16,
     "mg_cycles": 5,
     "pre_sweeps": 3,
-    "gbp_full_sweeps": 1,
-    "message_damping": 0.03,
+    "gbp_full_sweeps": 32,
+    "graph_neighbors": 4,
+    "coarse_groups": 24,
+    "linear_rel_tol": 0.1,
+    "variance_rel_tol": 1E-06,
+    "pair_sample_cap": 16,
+    "message_damping": 1.0,
+    "initial_lambda": 0.0001,
+    "pair_factor_scale": 1.0,
     "coarse_scale": 1.0,
-    "normalize_bal": true,
-    "pair_factor_scale": 0.3,
-    "pair_backbone_min_coverage": 0.9,
+    "coarse_operator": "additive",
+    "linear_controller": "fcg",
+    "gbp_model": "normalized",
     "krylov_start_outer": 1,
-    "fine_smoother": "gbp",
-    "cost_relative_tolerance": 1e-3,
-    "mre_relative_tolerance": 1e-3,
-    "rmse_relative_tolerance": 1e-3,
-    "thread_ratio_relative_tolerance": 0.35,
-    "thread_time_regression_relative_tolerance": 0.25,
-    "thread_compare_cooldown_sec": 30,
-    "thread_cost_relative_tolerance": 1e-3,
-    "thread_mre_relative_tolerance": 1e-3,
-    "thread_rmse_relative_tolerance": 1e-3
+    "normalize_bal": true,
+    "pair_sample_rescale": true,
+    "unreduced_unary": false,
+    "no_pose_scaling": false,
+    "aggregation": "connected"
   },
-  "datasets": {
-    "Ladybug49": {
-      "build_threads": 12,
-      "group_size": 5,
-      "initial_lambda": 0.0001,
-      "min_pair_observations": 1,
-      "pair_sample_cap": 64,
-      "pair_sample_rescale": true,
-      "unreduced_unary": false,
-      "no_pose_scaling": false,
-      "reference": {
-        "hgbp": {
-          "1": {
-            "time_sec": 0.4166652,
-            "cost": 26705.64384909017,
-            "mre": 0.579997713316862,
-            "rmse": 0.9157871345012768
-          },
-          "16": {
-            "time_sec": 0.1491319,
-            "cost": 26705.643849074135,
-            "mre": 0.5799977133168546,
-            "rmse": 0.9157871345010017
-          }
-        }
-      }
-    },
-    "Venice89": {
-      "build_threads": 16,
-      "group_size": 10,
-      "initial_lambda": 0.0001,
-      "min_pair_observations": 1,
-      "pair_sample_cap": 16,
-      "pair_sample_rescale": true,
-      "unreduced_unary": true,
-      "no_pose_scaling": false,
-      "reference": {
-        "hgbp": {
-          "1": {
-            "time_sec": 3.3014166,
-            "cost": 577201.5962939397,
-            "mre": 0.5878313013779402,
-            "rmse": 1.0125554632437714
-          },
-          "16": {
-            "time_sec": 0.8791643,
-            "cost": 577201.5962951423,
-            "mre": 0.5878313013780275,
-            "rmse": 1.012555463244825
-          }
-        }
-      }
-    },
-    "Final93": {
-      "build_threads": 16,
-      "group_size": 10,
-      "initial_lambda": 0.0001,
-      "min_pair_observations": 1,
-      "pair_sample_cap": 16,
-      "pair_sample_rescale": true,
-      "unreduced_unary": false,
-      "no_pose_scaling": false,
-      "reference": {
-        "hgbp": {
-          "1": {
-            "time_sec": 2.2808484,
-            "cost": 291090.1351948353,
-            "mre": 0.6633243807826791,
-            "rmse": 1.0063101009405018
-          },
-          "16": {
-            "time_sec": 0.5775607,
-            "cost": 291090.1351948369,
-            "mre": 0.6633243807830054,
-            "rmse": 1.0063101009405049
-          }
-        }
-      }
-    },
-    "Ladybug138": {
-      "build_threads": 16,
-      "group_size": 10,
-      "initial_lambda": 0.0001,
-      "min_pair_observations": 1,
-      "pair_sample_cap": 16,
-      "pair_sample_rescale": true,
-      "unreduced_unary": true,
-      "no_pose_scaling": false,
-      "reference": {
-        "hgbp": {
-          "1": {
-            "time_sec": 1.2419409,
-            "cost": 120648.89880409717,
-            "mre": 0.7774430031352086,
-            "rmse": 1.1898673855436606
-          },
-          "16": {
-            "time_sec": 0.3867442,
-            "cost": 120648.89880403767,
-            "mre": 0.777443003135336,
-            "rmse": 1.1898673855433672
-          }
-        }
-      }
-    },
-    "Trafalgar257": {
-      "build_threads": 16,
-      "group_size": 10,
-      "initial_lambda": 0.0001,
-      "min_pair_observations": 8,
-      "pair_sample_cap": 16,
-      "pair_sample_rescale": true,
-      "unreduced_unary": false,
-      "no_pose_scaling": false,
-      "reference": {
-        "hgbp": {
-          "1": {
-            "time_sec": 2.0915597,
-            "cost": 198055.00885089167,
-            "mre": 0.6410527359809751,
-            "rmse": 0.936319840529856
-          },
-          "16": {
-            "time_sec": 0.6137329,
-            "cost": 198055.00970835873,
-            "mre": 0.6410527376895745,
-            "rmse": 0.9363198425567258
-          }
-        }
-      }
-    },
-    "Dubrovnik356": {
-      "build_threads": 16,
-      "group_size": 20,
-      "initial_lambda": 0.01,
-      "min_pair_observations": 256,
-      "pair_sample_cap": 16,
-      "pair_sample_rescale": true,
-      "unreduced_unary": false,
-      "no_pose_scaling": true,
-      "reference": {
-        "hgbp": {
-          "1": {
-            "time_sec": 7.9209817,
-            "cost": 1037911.9747258899,
-            "mre": 0.6344271671594526,
-            "rmse": 0.9093101366039914
-          },
-          "16": {
-            "time_sec": 1.8351155,
-            "cost": 1037912.5639960009,
-            "mre": 0.6344273764213353,
-            "rmse": 0.9093103947324372
-          }
-        }
-      }
-    },
-    "Final394": {
-      "build_threads": 16,
-      "group_size": 20,
-      "initial_lambda": 0.0001,
-      "min_pair_observations": 128,
-      "pair_sample_cap": 16,
-      "pair_sample_rescale": false,
-      "unreduced_unary": false,
-      "no_pose_scaling": false,
-      "reference": {
-        "hgbp": {
-          "1": {
-            "time_sec": 6.6370376,
-            "cost": 600202.3045140153,
-            "mre": 0.5660367360799773,
-            "rmse": 1.0597717875734753
-          },
-          "16": {
-            "time_sec": 1.4785221,
-            "cost": 600202.3042542106,
-            "mre": 0.5660367357965999,
-            "rmse": 1.0597717873441075
-          }
-        }
-      }
-    },
-    "Ladybug1723": {
-      "build_threads": 16,
-      "group_size": 40,
-      "initial_lambda": 0.003,
-      "min_pair_observations": 64,
-      "pair_sample_cap": 16,
-      "pair_sample_rescale": true,
-      "unreduced_unary": false,
-      "no_pose_scaling": true,
-      "reference": {
-        "hgbp": {
-          "1": {
-            "time_sec": 5.8554323,
-            "cost": 759701.8490772663,
-            "mre": 0.7578687914989946,
-            "rmse": 1.0579786608537527
-          },
-          "16": {
-            "time_sec": 1.6319375,
-            "cost": 759283.2014858105,
-            "mre": 0.7577851790561582,
-            "rmse": 1.0576871114417332
-          }
-        }
-      }
-    },
-    "Venice1778": {
-      "build_threads": 16,
-      "group_size": 80,
-      "initial_lambda": 0.1,
-      "min_pair_observations": 256,
-      "pair_sample_cap": 16,
-      "pair_sample_rescale": true,
-      "unreduced_unary": true,
-      "no_pose_scaling": false,
-      "reference": {
-        "hgbp": {
-          "1": {
-            "time_sec": 31.6708959,
-            "cost": 3372462.7383450107,
-            "mre": 0.5530934381038136,
-            "rmse": 0.8211151790702478
-          },
-          "16": {
-            "time_sec": 7.3844969,
-            "cost": 3372462.738345408,
-            "mre": 0.5530934381038716,
-            "rmse": 0.821115179070298
-          }
-        }
-      }
-    },
-    "Final1936": {
-      "build_threads": 16,
-      "group_size": 90,
-      "initial_lambda": 0.1,
-      "min_pair_observations": 2048,
-      "pair_sample_cap": 16,
-      "pair_sample_rescale": true,
-      "unreduced_unary": true,
-      "no_pose_scaling": false,
-      "reference": {
-        "hgbp": {
-          "1": {
-            "time_sec": 23.0241701,
-            "cost": 9303980.69809292,
-            "mre": 0.8439779369318926,
-            "rmse": 1.3358571120802616
-          },
-          "16": {
-            "time_sec": 6.1708002,
-            "cost": 9303980.698092896,
-            "mre": 0.8439779369318662,
-            "rmse": 1.3358571120802587
-          }
-        }
-      }
-    },
-    "Final3068": {
-      "build_threads": 16,
-      "group_size": 130,
-      "initial_lambda": 1.0,
-      "min_pair_observations": 768,
-      "pair_sample_cap": 16,
-      "pair_sample_rescale": true,
-      "unreduced_unary": false,
-      "no_pose_scaling": false,
-      "krylov_start_outer": 6,
-      "reference": {
-        "hgbp": {
-          "1": {
-            "time_sec": 8.0812534,
-            "cost": 3400612.594138987,
-            "mre": 0.830489128188352,
-            "rmse": 1.4339549584006046
-          },
-          "16": {
-            "time_sec": 2.2053273,
-            "cost": 3400612.5916161523,
-            "mre": 0.8304891277512169,
-            "rmse": 1.433954957868696
-          }
-        }
-      }
-    },
-    "Final4585": {
-      "build_threads": 16,
-      "group_size": 200,
-      "mg_cycles": 4,
-      "krylov_start_outer": 10,
-      "initial_lambda": 0.22,
-      "min_pair_observations": 2048,
-      "pair_sample_cap": 16,
-      "pair_sample_rescale": true,
-      "unreduced_unary": true,
-      "no_pose_scaling": false,
-      "reference": {
-        "hgbp": {
-          "1": {
-            "time_sec": 31.5040074,
-            "cost": 10404752.181468513,
-            "mre": 0.6791975226297818,
-            "rmse": 1.0678160866001691
-          },
-          "16": {
-            "time_sec": 7.8589381,
-            "cost": 10404752.181469128,
-            "mre": 0.6791975226298091,
-            "rmse": 1.067816086600201
-          }
-        }
-      }
-    }
+  "environment": {
+    "OMP_NUM_THREADS": "{threads}",
+    "OMP_THREAD_LIMIT": "{threads}",
+    "OMP_DYNAMIC": "FALSE",
+    "OPENBLAS_NUM_THREADS": "{threads}",
+    "MKL_NUM_THREADS": "{threads}",
+    "OMP_WAIT_POLICY": "PASSIVE",
+    "KMP_BLOCKTIME": "0"
   }
 }

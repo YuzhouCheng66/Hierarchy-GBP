@@ -4,8 +4,17 @@
 #include <vector>
 
 #include "internal/se2_solver_impl.h"
+#include "internal/se2_precision.h"
 
 namespace slam {
+
+struct SyntheticSE2PackedResidualWorkspace;
+void fineResidualSyntheticSE2PackedInto(
+    const SyntheticSE2PackedResidualWorkspace& workspace,
+    const Eigen::VectorXd& x, Eigen::VectorXd& residual, int threads);
+void shiftSE2PackedCorrectionReference(SyntheticSE2PackedResidualWorkspace& workspace,
+                                      const Eigen::VectorXd& delta_reference);
+void initializeSE2PackedMessagesFromFactors(SyntheticSE2PackedResidualWorkspace& workspace, int mode, int threads);
 
 // Synthetic-only packed residual workspace intended to become the non-sweeps
 // backbone for 1-core MG. This keeps residual factors, messages, beliefs, and
@@ -31,6 +40,11 @@ struct SyntheticSE2PackedResidualBinaryFactor {
 struct SyntheticSE2PackedResidualWorkspace {
     int num_vars = 0;
     double tiny_prior = 1e-12;
+    double eta_relaxation = 1.0;
+    bool lift_correction_to_messages = false;
+    int message_initialization = 0;
+    bool jacobi_ready = false;
+    std::vector<double> jacobi_diagonal, jacobi_inverse, jacobi_rhs, jacobi_x, jacobi_alt;
     bool kernel_profile_enabled = false;
     bool kernel_split_profile_enabled = false;
     std::uint64_t schur_adjugate_fallback_count = 0;
@@ -45,6 +59,22 @@ struct SyntheticSE2PackedResidualWorkspace {
     std::uint64_t fixedeta_eta_map_builds = 0;
     std::uint64_t fixedeta_serial_delta_sweeps = 0;
     int sweeps_since_relinearize = 0;
+    bool adaptive_precision = false;
+    bool precision_frozen = false;
+    int precision_stable_checks = 0;
+    int precision_checks = 0;
+    int precision_freezes = 0;
+    int precision_thaws = 0;
+    int first_precision_freeze_sweep = -1;
+    int last_precision_check_sweep = 0;
+    int precision_check_interval = SE2PrecisionPolicy::check_period;
+    int next_precision_check_sweep = SE2PrecisionPolicy::check_period;
+    int full_precision_sweeps = 0;
+    int eta_only_sweeps = 0;
+    double last_precision_residual = 0.0;
+    bool precision_scales_ready = false;
+    std::vector<double> precision_scales;
+    std::vector<double> precision_residuals;
 
     std::vector<double> prior_eta;
     std::vector<double> prior_lam6;
@@ -107,6 +137,8 @@ void synchronousIterationsSyntheticSE2PackedResidualWorkspace(
     double& variable_pass_sec_accum,
     int num_threads = 1
 );
+
+void blockJacobiSE2PackedIterations(SyntheticSE2PackedResidualWorkspace& workspace, int sweeps, int threads);
 
 Eigen::VectorXd stackedMeanVectorSyntheticSE2PackedResidualWorkspace(
     SyntheticSE2PackedResidualWorkspace& workspace,

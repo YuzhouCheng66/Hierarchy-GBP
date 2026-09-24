@@ -17,6 +17,7 @@ struct PartialSymmetricEigenOptions {
     double residual_tol = 1e-5;
     double ridge = 1e-10;
     int residual_check_period = 1;
+    bool predict_failed_budget = false;
 };
 
 struct PartialSymmetricEigenWorkspace {
@@ -37,6 +38,7 @@ struct PartialSymmetricEigenResult {
     bool converged = false;
     int iterations = 0;
     double max_relative_residual = std::numeric_limits<double>::infinity();
+    bool aborted_for_work = false;
 };
 
 inline double meanAbsDiagonal(const Eigen::Ref<const Eigen::MatrixXd>& a) {
@@ -138,6 +140,8 @@ inline PartialSymmetricEigenResult computeSmallestEigenpairsPartial(
     result.eigenvalues.resize(k);
 
     const int residual_check_period = std::max(1, options.residual_check_period);
+    double previous_checked_residual = std::numeric_limits<double>::infinity();
+    int previous_checked_iteration = 0;
     for (int iter = 0; iter < options.max_iters; ++iter) {
         ws.Z = ws.ldlt.solve(ws.Q);
         if (ws.ldlt.info() != Eigen::Success) {
@@ -180,6 +184,23 @@ inline PartialSymmetricEigenResult computeSmallestEigenpairsPartial(
             result.converged = true;
             break;
         }
+        // A work heuristic may choose the full eigensolver sooner, but never
+        // accepts a less accurate partial result. Keep the existing tolerance.
+        if (options.predict_failed_budget && iter + 1 < options.max_iters &&
+            previous_checked_iteration > 0 && std::isfinite(previous_checked_residual) &&
+            previous_checked_residual > 0.0 && std::isfinite(max_rel_resid) &&
+            max_rel_resid > 0.0 && options.residual_tol > 0.0) {
+            const double log_residual = std::log(max_rel_resid);
+            const double log_rate = (log_residual - std::log(previous_checked_residual)) /
+                (iter + 1 - previous_checked_iteration);
+            const double predicted = log_residual + (options.max_iters - iter - 1) * log_rate;
+            if (predicted > std::log(options.residual_tol)) {
+                result.aborted_for_work = true;
+                break;
+            }
+        }
+        previous_checked_residual = max_rel_resid;
+        previous_checked_iteration = iter + 1;
     }
 
     return result;

@@ -1,0 +1,413 @@
+{
+  "schema_version": 1,
+  "quality_relative_tolerance": {
+    "pgo": 1E-06,
+    "ba": 1E-05
+  },
+  "timing": "Informational ratios only; no cross-machine speed acceptance criterion.",
+  "sources": {
+    "table": "E:/HGBP_profiles/paper_tables_20260924/summary.json",
+    "se3_single_thread": "E:/HGBP_profiles/pgo_serial_kernels_20260924/comparison.json:single_thread new_sec/new_cost"
+  },
+  "datasets": {
+    "FR079": {
+      "suite": "pgo",
+      "input_sha256": "e9e0a83d45cdf9ebb55f1fdbd137999dc8f176b7ada98194cf71f62b35d4a62f",
+      "threads": {
+        "1": {
+          "time_sec": 0.2877933,
+          "cost": 18.785887502903712,
+          "source": "E:\\HGBP_profiles\\pgo_serial_audit_20260924\\se2_split\\medians.json",
+          "repeats": 5
+        },
+        "16": {
+          "time_sec": 0.108528,
+          "cost": 18.785887502887988,
+          "source": "E:\\HGBP_profiles\\pgo_serial_audit_20260924\\se2_split\\medians.json",
+          "repeats": 5
+        }
+      }
+    },
+    "FRH": {
+      "suite": "pgo",
+      "input_sha256": "7643e97c77bb5f7be9bb00f518fb46f09c57234e0c150aca2e4a8e522396343c",
+      "threads": {
+        "1": {
+          "time_sec": 0.3467447,
+          "cost": 9.656841046772365E-05,
+          "source": "E:\\HGBP_profiles\\pgo_serial_audit_20260924\\se2_split\\medians.json",
+          "repeats": 5
+        },
+        "16": {
+          "time_sec": 0.119172,
+          "cost": 9.656841046587548E-05,
+          "source": "E:\\HGBP_profiles\\pgo_serial_audit_20260924\\se2_split\\medians.json",
+          "repeats": 5
+        }
+      }
+    },
+    "M3500": {
+      "suite": "pgo",
+      "input_sha256": "1883593980e602b11bd0ba95799c969e59ee8a6892bdb2a3a48f495459efe9d8",
+      "threads": {
+        "1": {
+          "time_sec": 0.8945441,
+          "cost": 68.95754667615249,
+          "source": "E:\\HGBP_profiles\\pgo_serial_audit_20260924\\se2_split\\medians.json",
+          "repeats": 5
+        },
+        "16": {
+          "time_sec": 0.2728623,
+          "cost": 68.95754667615267,
+          "source": "E:\\HGBP_profiles\\pgo_serial_audit_20260924\\se2_split\\medians.json",
+          "repeats": 5
+        }
+      }
+    },
+    "ParkingGarage": {
+      "suite": "pgo",
+      "input_sha256": "3ac0a31bfb601d7455d451e2546655cb5dececf51a7823f57c8a7e0fe1ca6527",
+      "threads": {
+        "1": {
+          "time_sec": 7.6640726,
+          "cost": 0.6341924119375459,
+          "source": "E:/HGBP_profiles/pgo_serial_kernels_20260924/comparison.json:single_thread new_sec/new_cost"
+        },
+        "16": {
+          "time_sec": 1.7676895,
+          "cost": 0.634192403821812,
+          "source": "E:\\HGBP_profiles\\pgo_serial_audit_20260924\\se3_simd_small\\medians.json",
+          "repeats": 3
+        }
+      }
+    },
+    "Sphere": {
+      "suite": "pgo",
+      "input_sha256": "104ab57593394f24351d9f692f3b923f8b98fff1eb638c64356cf5049e06cf3c",
+      "threads": {
+        "1": {
+          "time_sec": 4.7577335,
+          "cost": 675.7009629259359,
+          "source": "E:/HGBP_profiles/pgo_serial_kernels_20260924/comparison.json:single_thread new_sec/new_cost"
+        },
+        "16": {
+          "time_sec": 1.1780569,
+          "cost": 675.7009629259379,
+          "source": "E:\\HGBP_profiles\\pgo_serial_audit_20260924\\se3_simd_small\\medians.json",
+          "repeats": 3
+        }
+      }
+    },
+    "Cubicle": {
+      "suite": "pgo",
+      "input_sha256": "f3965db26b97ff860e0dbcecd790495629324abc971f5e2dc89dff33b8bf6539",
+      "threads": {
+        "1": {
+          "time_sec": 22.6316495,
+          "cost": 1378.5343286561877,
+          "source": "E:/HGBP_profiles/pgo_serial_kernels_20260924/comparison.json:single_thread new_sec/new_cost"
+        },
+        "16": {
+          "time_sec": 4.8619508,
+          "cost": 1378.534328656468,
+          "source": "E:\\HGBP_profiles\\pgo_serial_audit_20260924\\se3_simd_small\\medians.json",
+          "repeats": 3
+        }
+      }
+    },
+    "Grid": {
+      "suite": "pgo",
+      "input_sha256": "f5dd7a17bf8b9c39890b14f9bb0c1e8366a7490f01714e43e3bc03f52cf414e7",
+      "threads": {
+        "1": {
+          "time_sec": 16.1574715,
+          "cost": 42179.97894506796,
+          "source": "E:/HGBP_profiles/pgo_serial_kernels_20260924/comparison.json:single_thread new_sec/new_cost"
+        },
+        "16": {
+          "time_sec": 3.9019179,
+          "cost": 42179.97894506796,
+          "source": "E:\\HGBP_profiles\\pgo_serial_audit_20260924\\se3_simd_large\\medians.json",
+          "repeats": 1
+        }
+      }
+    },
+    "Globe10k": {
+      "suite": "pgo",
+      "input_sha256": "3f0b6f2747a1cfbee82500f707c7000b8d404e2cd76e057f5184c94236749c52",
+      "threads": {
+        "1": {
+          "time_sec": 20.4403329,
+          "cost": 3039.927579192697,
+          "source": "E:/HGBP_profiles/pgo_serial_kernels_20260924/comparison.json:single_thread new_sec/new_cost"
+        },
+        "16": {
+          "time_sec": 5.3419717,
+          "cost": 3039.9275791926866,
+          "source": "E:\\HGBP_profiles\\pgo_serial_audit_20260924\\se3_simd_large\\medians.json",
+          "repeats": 1
+        }
+      }
+    },
+    "Globe100k": {
+      "suite": "pgo",
+      "input_sha256": "86045ecc9355c0bf91b87b1dd82fe6391a216bf6baf6d2123f6cf3dad1a56b8d",
+      "threads": {
+        "1": {
+          "time_sec": 177.8758535,
+          "cost": 20090.740925345614,
+          "source": "E:/HGBP_profiles/pgo_serial_kernels_20260924/comparison.json:single_thread new_sec/new_cost"
+        },
+        "16": {
+          "time_sec": 42.7112946,
+          "cost": 20090.740925345766,
+          "source": "E:\\HGBP_profiles\\pgo_serial_audit_20260924\\se3_simd_large\\medians.json",
+          "repeats": 1
+        }
+      }
+    },
+    "Ladybug49": {
+      "suite": "ba",
+      "input_sha256": "96ca2845519d89d0727953d983427ab38a42c54991cd4d73e46a4221da3c61b4",
+      "threads": {
+        "1": {
+          "time_sec": 0.1783874,
+          "cost": 26705.214410713448,
+          "source": "E:\\HGBP_profiles\\ba_dataflow_20260924\\check1\\summary.json",
+          "repeats": 2,
+          "mre": 0.5800764587477595,
+          "rmse": 0.9157797713438164
+        },
+        "16": {
+          "time_sec": 0.0711205,
+          "cost": 26705.214410714012,
+          "source": "E:\\HGBP_profiles\\ba_dataflow_20260924\\full16\\summary.json",
+          "repeats": 3,
+          "mre": 0.5800764587479228,
+          "rmse": 0.9157797713438263
+        }
+      }
+    },
+    "Venice89": {
+      "suite": "ba",
+      "input_sha256": "a66fbb4e4c3c8fcd59a4842331734895517928b67f8bff41dd494e50abc46f33",
+      "threads": {
+        "1": {
+          "time_sec": 2.6750203499999996,
+          "cost": 576781.2701308135,
+          "source": "E:\\HGBP_profiles\\ba_dataflow_20260924\\table_complete1\\summary.json",
+          "repeats": 2,
+          "mre": 0.5875928177653025,
+          "rmse": 1.0121867176734456
+        },
+        "16": {
+          "time_sec": 0.5852731,
+          "cost": 576781.270131017,
+          "source": "E:\\HGBP_profiles\\ba_dataflow_20260924\\full16\\summary.json",
+          "repeats": 3,
+          "mre": 0.5875928177651938,
+          "rmse": 1.0121867176736243
+        }
+      }
+    },
+    "Final93": {
+      "suite": "ba",
+      "input_sha256": "90dda36d202d43221e4f8e3c969d1820e421b315cfe29f99159e5bcddf67436a",
+      "threads": {
+        "1": {
+          "time_sec": 1.58773675,
+          "cost": 291092.14843252307,
+          "source": "E:\\HGBP_profiles\\ba_dataflow_20260924\\table_complete1\\summary.json",
+          "repeats": 2,
+          "mre": 0.663312091120948,
+          "rmse": 1.0063135808556085
+        },
+        "16": {
+          "time_sec": 0.3758095,
+          "cost": 291092.1484325255,
+          "source": "E:\\HGBP_profiles\\ba_dataflow_20260924\\full16\\summary.json",
+          "repeats": 3,
+          "mre": 0.6633120911209365,
+          "rmse": 1.0063135808556132
+        }
+      }
+    },
+    "Trafalgar257": {
+      "suite": "ba",
+      "input_sha256": "dbc87437328a3a94936584a49656f3f6f095d2df71eadd831a1885e482dbb90a",
+      "threads": {
+        "1": {
+          "time_sec": 1.3108908000000001,
+          "cost": 197378.48228648986,
+          "source": "E:\\HGBP_profiles\\ba_dataflow_20260924\\check1\\summary.json",
+          "repeats": 2,
+          "mre": 0.6398210109941667,
+          "rmse": 0.9347193076445517
+        },
+        "16": {
+          "time_sec": 0.4502791,
+          "cost": 197378.48228650555,
+          "source": "E:\\HGBP_profiles\\ba_dataflow_20260924\\full16\\summary.json",
+          "repeats": 3,
+          "mre": 0.6398210109941923,
+          "rmse": 0.9347193076445887
+        }
+      }
+    },
+    "Dubrovnik356": {
+      "suite": "ba",
+      "input_sha256": "c2d5dce6ebd8e11c3c7e42cab612b746a3a4aa91f3c5bc53e7aaef739ede9abd",
+      "threads": {
+        "1": {
+          "time_sec": 6.8285243,
+          "cost": 1021101.7907564436,
+          "source": "E:\\HGBP_profiles\\ba_dataflow_20260924\\table_complete1\\summary.json",
+          "repeats": 2,
+          "mre": 0.6297830143072901,
+          "rmse": 0.9019164126316149
+        },
+        "16": {
+          "time_sec": 1.6326682,
+          "cost": 1021101.7909862889,
+          "source": "E:\\HGBP_profiles\\ba_dataflow_20260924\\full16\\summary.json",
+          "repeats": 3,
+          "mre": 0.6297830143638964,
+          "rmse": 0.9019164127331234
+        }
+      }
+    },
+    "Final394": {
+      "suite": "ba",
+      "input_sha256": "bb0623bcc14fed2eecd7b4f3487d6b7b621981a36e88d9c2a5be3c520e46ea47",
+      "threads": {
+        "1": {
+          "time_sec": 2.86911655,
+          "cost": 598296.0938795459,
+          "source": "E:\\HGBP_profiles\\ba_dataflow_20260924\\check1\\summary.json",
+          "repeats": 2,
+          "mre": 0.5639237294547613,
+          "rmse": 1.058087559806112
+        },
+        "16": {
+          "time_sec": 0.8249592,
+          "cost": 598296.0938795333,
+          "source": "E:\\HGBP_profiles\\ba_dataflow_20260924\\full16\\summary.json",
+          "repeats": 3,
+          "mre": 0.5639237294547581,
+          "rmse": 1.058087559806101
+        }
+      }
+    },
+    "Ladybug1723": {
+      "suite": "ba",
+      "input_sha256": "a85156db95e9b55fa30831e2a10155243cfd34e830a0828760270be129e0b902",
+      "threads": {
+        "1": {
+          "time_sec": 4.787164649999999,
+          "cost": 759599.6847505283,
+          "source": "E:\\HGBP_profiles\\ba_dataflow_20260924\\table_complete1\\summary.json",
+          "repeats": 2,
+          "mre": 0.7575451167489348,
+          "rmse": 1.0579075202399322
+        },
+        "16": {
+          "time_sec": 1.2170868,
+          "cost": 759599.4525710844,
+          "source": "E:\\HGBP_profiles\\ba_dataflow_20260924\\full16\\summary.json",
+          "repeats": 3,
+          "mre": 0.7575450918166574,
+          "rmse": 1.0579073585597714
+        }
+      }
+    },
+    "Venice1778": {
+      "suite": "ba",
+      "input_sha256": "4f3f4d12f5872a8c593d35b60e00f447e1e1e5aee797445dfbb3f3e8e1b9b2a0",
+      "threads": {
+        "1": {
+          "time_sec": 25.6334065,
+          "cost": 3363149.1650143634,
+          "source": "E:\\HGBP_profiles\\ba_dataflow_20260924\\check1\\summary.json",
+          "repeats": 2,
+          "mre": 0.5521367957604385,
+          "rmse": 0.8199805774040845
+        },
+        "16": {
+          "time_sec": 5.8906539,
+          "cost": 3363149.172228822,
+          "source": "E:\\HGBP_profiles\\ba_dataflow_20260924\\full16\\summary.json",
+          "repeats": 3,
+          "mre": 0.5521367966471561,
+          "rmse": 0.8199805782835758
+        }
+      }
+    },
+    "Final3068": {
+      "suite": "ba",
+      "input_sha256": "f6bd559b2e0316e177742ebf73bd5311766e8a40ccca2628bfe29cd5989de481",
+      "threads": {
+        "1": {
+          "time_sec": 12.3982599,
+          "cost": 3240217.0790154375,
+          "source": "E:\\HGBP_profiles\\ba_dataflow_20260924\\table_complete1\\summary.json",
+          "repeats": 2,
+          "mre": 0.803264430679131,
+          "rmse": 1.3997290756199279
+        },
+        "16": {
+          "time_sec": 3.0314901,
+          "cost": 3240217.2401169008,
+          "source": "E:\\HGBP_profiles\\ba_dataflow_20260924\\full16\\summary.json",
+          "repeats": 3,
+          "mre": 0.8032644518732963,
+          "rmse": 1.3997291104167315
+        }
+      }
+    },
+    "Final4585": {
+      "suite": "ba",
+      "input_sha256": "d5e0ea06a364d7a7b5b087ab3c9d53c97dbbcd6c7d3984b62428185e66b9dd54",
+      "threads": {
+        "1": {
+          "time_sec": 48.54804385,
+          "cost": 10331431.91401479,
+          "source": "E:\\HGBP_profiles\\ba_dataflow_20260924\\check1\\summary.json",
+          "repeats": 2,
+          "mre": 0.6760325638512376,
+          "rmse": 1.0640470887452667
+        },
+        "16": {
+          "time_sec": 11.201007,
+          "cost": 10331431.914013779,
+          "source": "E:\\HGBP_profiles\\ba_dataflow_20260924\\full16\\summary.json",
+          "repeats": 3,
+          "mre": 0.676032563851124,
+          "rmse": 1.0640470887452176
+        }
+      }
+    },
+    "OneDSfMAlamo": {
+      "suite": "ba",
+      "input_sha256": "24ad4f705b7f13a48ce25fc4647e139a1b9781c253573548127b212382a84a5c",
+      "threads": {
+        "1": {
+          "time_sec": 4.8353609,
+          "cost": 1740878.7294258797,
+          "source": "E:/HGBP_profiles/paper_full_retest_20260923/ba_1/runs.json",
+          "qualification": "September 23 implementation; same numerical policy, before the September 24 dataflow engineering update. Timing is informational only.",
+          "repeats": 1,
+          "mre": 0.6944480044272567,
+          "rmse": 1.4598297295270293
+        },
+        "16": {
+          "time_sec": 1.2286501,
+          "cost": 1740878.7294245106,
+          "source": "E:\\HGBP_profiles\\ba_dataflow_20260924\\full16\\summary.json",
+          "repeats": 3,
+          "mre": 0.6944480044264216,
+          "rmse": 1.4598297295264557
+        }
+      }
+    }
+  }
+}
