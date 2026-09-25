@@ -1,14 +1,16 @@
 # Hierarchy-GBP
 
-CPU implementations of hierarchical Gaussian belief propagation for SE2/SE3
-pose-graph optimization and bundle adjustment.
+High-performance CPU solvers for SE2/SE3 pose-graph optimization and bundle
+adjustment, built around **hierarchical Gaussian belief propagation (H-GBP)**.
 
-PGO combines loopy GBP smoothing with a reduced-basis coarse correction.
-BA uses landmark elimination, GBP camera messages and a connected coarse
-correction inside a flexible conjugate-gradient linear controller.
-PGO checks precision convergence adaptively. BA switches to cached eta-only
-updates at its precision tolerance or 32-sweep cap. Neither uses fine-level
-direct polish. See [policy details](docs/policies.md).
+H-GBP combines **loopy Gaussian message passing** with **coarse-scale correction**
+to couple local refinement and coordinated global updates. PGO uses a
+reduced-basis hierarchy; BA applies GBP and connected coarse corrections to
+the landmark-reduced camera system within a flexible conjugate-gradient solve.
+
+Optimized fixed-size kernels, packed message storage and cached updates support
+efficient single-threaded and parallel execution. See
+[algorithm and policy details](docs/policies.md).
 
 ## Layout
 
