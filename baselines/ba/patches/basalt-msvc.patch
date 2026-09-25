@@ -1,0 +1,30 @@
+diff --git a/include/basalt/utils/assert.h b/include/basalt/utils/assert.h
+index 6adbf27..2da267a 100644
+--- a/include/basalt/utils/assert.h
++++ b/include/basalt/utils/assert.h
+@@ -45,7 +45,14 @@ namespace basalt {
+ 
+ #define UNUSED(x) (void)(x)
+ 
++#if defined(_MSC_VER)
++#define BASALT_ATTRIBUTE_NORETURN __declspec(noreturn)
++#ifndef __PRETTY_FUNCTION__
++#define __PRETTY_FUNCTION__ __FUNCSIG__
++#endif
++#else
+ #define BASALT_ATTRIBUTE_NORETURN __attribute__((noreturn))
++#endif
+ 
+ inline BASALT_ATTRIBUTE_NORETURN void assertionFailed(char const* expr,
+                                                       char const* function,
+@@ -85,7 +92,11 @@ inline BASALT_ATTRIBUTE_NORETURN void logFatalMsg(char const* msg,
+ 
+ }  // namespace basalt
+ 
++#if defined(_MSC_VER)
++#define BASALT_LIKELY(x) (x)
++#else
+ #define BASALT_LIKELY(x) __builtin_expect(x, 1)
++#endif
+ 
+ #if defined(BASALT_DISABLE_ASSERTS)

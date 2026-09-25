@@ -1,0 +1,641 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index a2d7bc8..8530b88 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -4,7 +4,7 @@ message(STATUS "CMake version: ${CMAKE_VERSION}")
+ 
+ include(cmake/PreventInSourceBuild.cmake)
+ 
+-project(rootba VERSION 0.1.0 LANGUAGES CXX)
++project(rootba VERSION 0.1.0 LANGUAGES C CXX)
+ 
+ # helper
+ include(cmake/Utils.cmake)
+@@ -22,6 +22,7 @@ option(ROOTBA_ENABLE_TESTING "Enable tests to be built" ON)
+ option(ROOTBA_INSTANTIATIONS_DOUBLE "Instatiate templates for Scalar=double." ON)
+ option(ROOTBA_INSTANTIATIONS_FLOAT "Instatiate templates for Scalar=float." ON)
+ option(ROOTBA_INSTANTIATIONS_STATIC_LMB "Instatiate templates for statically-size landmark blocks." ON)
++option(ROOTBA_BUILD_QR "Build square-root QR solver components." ON)
+ 
+ if(ROOTBA_INSTANTIATIONS_DOUBLE)
+   list(APPEND ROOTBA_COMPILE_DEFINITIONS ROOTBA_INSTANTIATIONS_DOUBLE)
+@@ -32,6 +33,9 @@ endif()
+ if(ROOTBA_INSTANTIATIONS_STATIC_LMB)
+   list(APPEND ROOTBA_COMPILE_DEFINITIONS ROOTBA_INSTANTIATIONS_STATIC_LMB)
+ endif()
++if(ROOTBA_BUILD_QR)
++  list(APPEND ROOTBA_COMPILE_DEFINITIONS ROOTBA_BUILD_QR)
++endif()
+ 
+ # set build type if not specified
+ set_default_build_type(Release)
+@@ -72,15 +76,24 @@ set(ROOTBA_RELEASE_FLAGS "-DROOTBA_DISABLE_ASSERTS")
+ # - Debug: no optimization, debug symbols, assertions
+ # - RelWithDebInfo: full optimization, debug symbols, assertions
+ # - Release: full optimization, no debug symbols, no assertions
+-set(CMAKE_CXX_FLAGS_DEBUG "-g ${ROOTBA_DEBUG_FLAGS} ${CMAKE_CXX_FLAGS}")                # cmake default: "-g"
+-set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -g ${ROOTBA_DEBUG_FLAGS} ${CMAKE_CXX_FLAGS}")   # cmake default: "-O2 -g -DNDEBUG"
+-set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG ${ROOTBA_RELEASE_FLAGS} ${CMAKE_CXX_FLAGS}")  # cmake default: "-O3 -DNDEBUG"
++if(MSVC)
++  set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL" CACHE STRING "" FORCE)
++  set(CMAKE_CXX_FLAGS_DEBUG "/MDd /Zi /Od ${ROOTBA_DEBUG_FLAGS} ${CMAKE_CXX_FLAGS}")
++  set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "/MD /O2 /Zi ${ROOTBA_DEBUG_FLAGS} ${CMAKE_CXX_FLAGS}")
++  set(CMAKE_CXX_FLAGS_RELEASE "/MD /O2 /DNDEBUG ${ROOTBA_RELEASE_FLAGS} ${CMAKE_CXX_FLAGS}")
++else()
++  set(CMAKE_CXX_FLAGS_DEBUG "-g ${ROOTBA_DEBUG_FLAGS} ${CMAKE_CXX_FLAGS}")                # cmake default: "-g"
++  set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -g ${ROOTBA_DEBUG_FLAGS} ${CMAKE_CXX_FLAGS}")   # cmake default: "-O2 -g -DNDEBUG"
++  set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG ${ROOTBA_RELEASE_FLAGS} ${CMAKE_CXX_FLAGS}")  # cmake default: "-O3 -DNDEBUG"
++endif()
+ 
+ # CI version with no debug symbols and sanitizer flags
+-set(CMAKE_CXX_FLAGS_CIDEBUG "-g0 ${ROOTBA_DEBUG_FLAGS} ${CMAKE_CXX_FLAGS}")
+-set(CMAKE_CXX_FLAGS_CIRELWITHDEBINFO "-O3 -g0  ${ROOTBA_DEBUG_FLAGS} ${CMAKE_CXX_FLAGS}")
+-set(CMAKE_CXX_FLAGS_SANITIZERDEBUG "-g ${ROOTBA_DEBUG_FLAGS} ${ROOTBA_SANITIZER_FLAGS} ${CMAKE_CXX_FLAGS}")
+-set(CMAKE_CXX_FLAGS_SANITIZERRELWITHDEBINFO "-O3 -g ${ROOTBA_DEBUG_FLAGS} ${ROOTBA_SANITIZER_FLAGS} ${CMAKE_CXX_FLAGS}")
++if(NOT MSVC)
++  set(CMAKE_CXX_FLAGS_CIDEBUG "-g0 ${ROOTBA_DEBUG_FLAGS} ${CMAKE_CXX_FLAGS}")
++  set(CMAKE_CXX_FLAGS_CIRELWITHDEBINFO "-O3 -g0  ${ROOTBA_DEBUG_FLAGS} ${CMAKE_CXX_FLAGS}")
++  set(CMAKE_CXX_FLAGS_SANITIZERDEBUG "-g ${ROOTBA_DEBUG_FLAGS} ${ROOTBA_SANITIZER_FLAGS} ${CMAKE_CXX_FLAGS}")
++  set(CMAKE_CXX_FLAGS_SANITIZERRELWITHDEBINFO "-O3 -g ${ROOTBA_DEBUG_FLAGS} ${ROOTBA_SANITIZER_FLAGS} ${CMAKE_CXX_FLAGS}")
++endif()
+ 
+ # Save build commands in json to use with clang-tidy
+ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+diff --git a/cmake/SetupDependencies.cmake b/cmake/SetupDependencies.cmake
+index 0a04cb8..cccbc7c 100644
+--- a/cmake/SetupDependencies.cmake
++++ b/cmake/SetupDependencies.cmake
+@@ -65,8 +65,11 @@ find_package(absl REQUIRED)
+ # link to targets 'absl::...'
+ message(STATUS "Found Abseil")
+ 
+-find_package(Ceres REQUIRED)
+-# link to target 'Ceres::ceres'
++option(ROOTBA_BUILD_CERES "Build Ceres-backed RootBA targets." ON)
++if(ROOTBA_BUILD_CERES)
++  find_package(Ceres REQUIRED)
++  # link to target 'Ceres::ceres'
++endif()
+ 
+ 
+ 
+diff --git a/external/basalt-headers b/external/basalt-headers
+--- a/external/basalt-headers
++++ b/external/basalt-headers
+@@ -1 +1 @@
+-Subproject commit 91293fa478c008e9b103137a3f7d578aafab5858
++Subproject commit 91293fa478c008e9b103137a3f7d578aafab5858-dirty
+diff --git a/external/clipp/include/clipp b/external/clipp/include/clipp
+deleted file mode 120000
+index b3ea042..0000000
+--- a/external/clipp/include/clipp
++++ /dev/null
+@@ -1 +0,0 @@
+-../clipp/include/
+\ No newline at end of file
+diff --git a/external/nameof/include/nameof b/external/nameof/include/nameof
+deleted file mode 120000
+index 63769e2..0000000
+--- a/external/nameof/include/nameof
++++ /dev/null
+@@ -1 +0,0 @@
+-../../nameof/nameof/include/
+\ No newline at end of file
+diff --git a/external/visit_struct b/external/visit_struct
+--- a/external/visit_struct
++++ b/external/visit_struct
+@@ -1 +1 @@
+-Subproject commit 7b70ef10c90d18034f62ecfe926a7fd8c335c1d1
++Subproject commit 7b70ef10c90d18034f62ecfe926a7fd8c335c1d1-dirty
+diff --git a/src/app/CMakeLists.txt b/src/app/CMakeLists.txt
+index 49445b1..f1442c3 100644
+--- a/src/app/CMakeLists.txt
++++ b/src/app/CMakeLists.txt
+@@ -9,17 +9,32 @@
+ #  message(STATUS "${IPO_OUTPUT}")
+ #endif()
+ 
+-add_executable(bal bal.cpp)
+-target_link_libraries(bal rootba_solver rootba_ceres rootba_cli)
++if(ROOTBA_BUILD_CERES)
++  add_executable(bal bal.cpp)
++  target_link_libraries(bal rootba_solver rootba_ceres rootba_cli)
+ 
+-add_executable(bal_gui bal_gui.cpp)
+-target_link_libraries(bal_gui rootba_pangolin rootba_solver rootba_ceres rootba_cli)
++  add_executable(bal_gui bal_gui.cpp)
++  target_link_libraries(bal_gui rootba_pangolin rootba_solver rootba_ceres rootba_cli)
+ 
+-add_executable(bal_ceres bal_ceres.cpp)
+-target_link_libraries(bal_ceres rootba_ceres rootba_cli)
++  add_executable(bal_ceres bal_ceres.cpp)
++  target_link_libraries(bal_ceres rootba_ceres rootba_cli)
+ 
+-add_executable(bal_qr bal_qr.cpp)
+-target_link_libraries(bal_qr rootba_solver rootba_cli)
++  add_executable(bal_ceres_sparse_schur bal_ceres.cpp)
++  target_compile_definitions(bal_ceres_sparse_schur PRIVATE ROOTBA_FORCE_CERES_SPARSE_SCHUR)
++  target_link_libraries(bal_ceres_sparse_schur rootba_ceres rootba_cli)
++
++  add_executable(bal_ceres_iterative_schur bal_ceres.cpp)
++  target_compile_definitions(bal_ceres_iterative_schur PRIVATE ROOTBA_FORCE_CERES_ITERATIVE_SCHUR)
++  target_link_libraries(bal_ceres_iterative_schur rootba_ceres rootba_cli)
++endif()
++
++if(ROOTBA_BUILD_QR)
++  add_executable(bal_qr bal_qr.cpp)
++  target_link_libraries(bal_qr rootba_solver rootba_cli)
++endif()
+ 
+ add_executable(bal_sc bal_sc.cpp)
+ target_link_libraries(bal_sc rootba_solver rootba_cli)
++
++add_executable(bal_power_sc bal_power_sc.cpp)
++target_link_libraries(bal_power_sc rootba_solver rootba_cli)
+diff --git a/src/app/bal_ceres.cpp b/src/app/bal_ceres.cpp
+index 1efa08e..a31edac 100644
+--- a/src/app/bal_ceres.cpp
++++ b/src/app/bal_ceres.cpp
+@@ -63,6 +63,16 @@ int main(int argc, char** argv) {
+     options.solver.solver_type = SolverOptions::SolverType::CERES;
+   }
+ 
++#if defined(ROOTBA_FORCE_CERES_SPARSE_SCHUR)
++  options.solver.linear_solver_type =
++      SolverOptions::LinearSolverType::SPARSE_SCHUR;
++#elif defined(ROOTBA_FORCE_CERES_ITERATIVE_SCHUR)
++  options.solver.linear_solver_type =
++      SolverOptions::LinearSolverType::ITERATIVE_SCHUR;
++  options.solver.preconditioner_type =
++      SolverOptions::PreconditionerType::SCHUR_JACOBI;
++#endif
++
+   // print options
+   if (options.solver.verbosity_level >= 2) {
+     LOG(INFO) << "Options:\n" << options;
+diff --git a/src/rootba/CMakeLists.txt b/src/rootba/CMakeLists.txt
+index 2be906c..4b1800e 100644
+--- a/src/rootba/CMakeLists.txt
++++ b/src/rootba/CMakeLists.txt
+@@ -6,11 +6,15 @@ add_library(rootba)
+ target_include_directories(rootba PUBLIC "${CMAKE_SOURCE_DIR}/src")
+ target_compile_features(rootba PUBLIC cxx_std_${ROOTBA_CXX_STANDARD})
+ set_target_properties(rootba PROPERTIES CXX_EXTENSIONS OFF)
+-if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+-  # don't use pedantic for GCC, since it warns on extra ';' --> fix wise enum
+-  target_compile_options(rootba PUBLIC -Wpedantic)
++if(MSVC)
++  target_compile_options(rootba PUBLIC /W3 /Zc:__cplusplus /bigobj)
++else()
++  if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
++    # don't use pedantic for GCC, since it warns on extra ';' --> fix wise enum
++    target_compile_options(rootba PUBLIC -Wpedantic)
++  endif()
++  target_compile_options(rootba PUBLIC -ftemplate-backtrace-limit=0 -Wall -Wextra -Wnon-virtual-dtor -Wsign-compare -Wno-unused-parameter ${ROOTBA_MARCH_FLAG})
+ endif()
+-target_compile_options(rootba PUBLIC -ftemplate-backtrace-limit=0 -Wall -Wextra -Wnon-virtual-dtor -Wsign-compare -Wno-unused-parameter ${ROOTBA_MARCH_FLAG})
+ target_compile_definitions(rootba PUBLIC ${ROOTBA_COMPILE_DEFINITIONS})
+ 
+ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+@@ -38,14 +42,23 @@ target_link_libraries(rootba
+     TBB::tbb
+ )
+ 
++if(MSVC AND TBB_LIBRARY_RELEASE)
++  get_filename_component(ROOTBA_TBB_LIBRARY_DIR "${TBB_LIBRARY_RELEASE}" DIRECTORY)
++  target_link_directories(rootba PUBLIC "${ROOTBA_TBB_LIBRARY_DIR}")
++endif()
++
+ add_subdirectory(testing)
+ add_subdirectory(util)
+ add_subdirectory(options)
+ add_subdirectory(bal)
+-add_subdirectory(qr)
++if(ROOTBA_BUILD_QR)
++  add_subdirectory(qr)
++endif()
+ add_subdirectory(sc)
+ add_subdirectory(solver)
+ add_subdirectory(cg)
+-add_subdirectory(ceres)
+-add_subdirectory(pangolin)
++if(ROOTBA_BUILD_CERES)
++  add_subdirectory(ceres)
++  add_subdirectory(pangolin)
++endif()
+ add_subdirectory(cli)
+diff --git a/src/rootba/bal/bal_problem.cpp b/src/rootba/bal/bal_problem.cpp
+index 70a1eb3..05264f8 100644
+--- a/src/rootba/bal/bal_problem.cpp
++++ b/src/rootba/bal/bal_problem.cpp
+@@ -122,7 +122,7 @@ T median_destructive(std::vector<T>& data) {
+ }
+ 
+ BalDatasetOptions::DatasetType autodetect_input_type(const std::string& path) {
+-  const std::string filename = std::filesystem::path(path).filename();
++  const std::string filename = std::filesystem::path(path).filename().string();
+ 
+   if (ends_with(filename, ".cereal")) {
+     return BalDatasetOptions::DatasetType::ROOTBA;
+diff --git a/src/rootba/cg/CMakeLists.txt b/src/rootba/cg/CMakeLists.txt
+index e104bf5..7514c6d 100644
+--- a/src/rootba/cg/CMakeLists.txt
++++ b/src/rootba/cg/CMakeLists.txt
+@@ -6,6 +6,8 @@ target_sources(rootba_cg
+     conjugate_gradient.hpp
+     preconditioner.hpp
+     utils.hpp
++  PRIVATE
++    anchor.cpp
+ )
+ 
+ target_link_libraries(rootba_cg
+diff --git a/src/rootba/cg/preconditioner.hpp b/src/rootba/cg/preconditioner.hpp
+index c8b70e2..6c27fc1 100644
+--- a/src/rootba/cg/preconditioner.hpp
++++ b/src/rootba/cg/preconditioner.hpp
+@@ -103,13 +103,13 @@ class BlockDiagonalPreconditioner : public Preconditioner<Scalar> {
+         if (diagonal) {
+           MatX tmp = input_block;
+           tmp +=
+-              diagonal->template segment(i * pose_size, pose_size).asDiagonal();
++              diagonal->segment(i * pose_size, pose_size).asDiagonal();
+           output_block.noalias() =
+-              tmp.template selfadjointView<Eigen::Upper>().llt().solve(
++              tmp.selfadjointView<Eigen::Upper>().llt().solve(
+                   MatX::Identity(pose_size, pose_size));
+         } else {
+           output_block.noalias() =
+-              input_block.template selfadjointView<Eigen::Upper>().llt().solve(
++              input_block.selfadjointView<Eigen::Upper>().llt().solve(
+                   MatX::Identity(pose_size, pose_size));
+         }
+       }
+@@ -169,7 +169,7 @@ class PowerSCPreconditioner : public Preconditioner<Scalar> {
+         auto inv_block =
+             Hpp_inv_.template block<POSE_SIZE, POSE_SIZE>(POSE_SIZE * r, 0);
+         inv_block.noalias() =
+-            input_block.template selfadjointView<Eigen::Upper>().llt().solve(
++            input_block.selfadjointView<Eigen::Upper>().llt().solve(
+                 MatX::Identity(POSE_SIZE, POSE_SIZE));
+       }
+     };
+diff --git a/src/rootba/cli/bal_cli_utils.cpp b/src/rootba/cli/bal_cli_utils.cpp
+index 7c438a7..de6f569 100644
+--- a/src/rootba/cli/bal_cli_utils.cpp
++++ b/src/rootba/cli/bal_cli_utils.cpp
+@@ -80,7 +80,7 @@ bool parse_bal_app_arguments(const std::string& application_summary, int argc,
+ 
+   // parse arguments
+   if (!parse(argc, argv, cli)) {
+-    auto executable_name = std::filesystem::path(argv[0]).filename();
++    auto executable_name = std::filesystem::path(argv[0]).filename().string();
+     auto fmt = doc_formatting{}.doc_column(22);
+     auto filter = param_filter{}.has_doc(tri::either);
+     if (!application_summary.empty()) {
+diff --git a/src/rootba/qr/impl/landmark_block_dynamic.cpp b/src/rootba/qr/impl/landmark_block_dynamic.cpp
+index c29e777..677ce8b 100644
+--- a/src/rootba/qr/impl/landmark_block_dynamic.cpp
++++ b/src/rootba/qr/impl/landmark_block_dynamic.cpp
+@@ -41,10 +41,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ namespace rootba {
+ 
+ #ifdef ROOTBA_INSTANTIATIONS_FLOAT
++template class LandmarkBlockBase<LandmarkBlockDynamic<float, 9>, float, 9>;
+ template class LandmarkBlockDynamic<float, 9>;
+ #endif
+ 
+ #ifdef ROOTBA_INSTANTIATIONS_DOUBLE
++template class LandmarkBlockBase<LandmarkBlockDynamic<double, 9>, double, 9>;
+ template class LandmarkBlockDynamic<double, 9>;
+ #endif
+ 
+diff --git a/src/rootba/qr/impl/landmark_block_static_2.cpp b/src/rootba/qr/impl/landmark_block_static_2.cpp
+index 8a4e355..dc33b39 100644
+--- a/src/rootba/qr/impl/landmark_block_static_2.cpp
++++ b/src/rootba/qr/impl/landmark_block_static_2.cpp
+@@ -41,10 +41,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ namespace rootba {
+ 
+ #ifdef ROOTBA_INSTANTIATIONS_FLOAT
++template class LandmarkBlockBase<LandmarkBlockStatic<float, 9, 2>, float, 9>;
+ template class LandmarkBlockStatic<float, 9, 2>;
+ #endif
+ 
+ #ifdef ROOTBA_INSTANTIATIONS_DOUBLE
++template class LandmarkBlockBase<LandmarkBlockStatic<double, 9, 2>, double, 9>;
+ template class LandmarkBlockStatic<double, 9, 2>;
+ #endif
+ 
+diff --git a/src/rootba/qr/impl/landmark_block_static_3.cpp b/src/rootba/qr/impl/landmark_block_static_3.cpp
+index 1dc62f9..0ece2a8 100644
+--- a/src/rootba/qr/impl/landmark_block_static_3.cpp
++++ b/src/rootba/qr/impl/landmark_block_static_3.cpp
+@@ -41,10 +41,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ namespace rootba {
+ 
+ #ifdef ROOTBA_INSTANTIATIONS_FLOAT
++template class LandmarkBlockBase<LandmarkBlockStatic<float, 9, 3>, float, 9>;
+ template class LandmarkBlockStatic<float, 9, 3>;
+ #endif
+ 
+ #ifdef ROOTBA_INSTANTIATIONS_DOUBLE
++template class LandmarkBlockBase<LandmarkBlockStatic<double, 9, 3>, double, 9>;
+ template class LandmarkBlockStatic<double, 9, 3>;
+ #endif
+ 
+diff --git a/src/rootba/qr/impl/landmark_block_static_4.cpp b/src/rootba/qr/impl/landmark_block_static_4.cpp
+index b5f996b..b2413af 100644
+--- a/src/rootba/qr/impl/landmark_block_static_4.cpp
++++ b/src/rootba/qr/impl/landmark_block_static_4.cpp
+@@ -41,10 +41,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ namespace rootba {
+ 
+ #ifdef ROOTBA_INSTANTIATIONS_FLOAT
++template class LandmarkBlockBase<LandmarkBlockStatic<float, 9, 4>, float, 9>;
+ template class LandmarkBlockStatic<float, 9, 4>;
+ #endif
+ 
+ #ifdef ROOTBA_INSTANTIATIONS_DOUBLE
++template class LandmarkBlockBase<LandmarkBlockStatic<double, 9, 4>, double, 9>;
+ template class LandmarkBlockStatic<double, 9, 4>;
+ #endif
+ 
+diff --git a/src/rootba/qr/impl/landmark_block_static_5.cpp b/src/rootba/qr/impl/landmark_block_static_5.cpp
+index a277037..09f8ca0 100644
+--- a/src/rootba/qr/impl/landmark_block_static_5.cpp
++++ b/src/rootba/qr/impl/landmark_block_static_5.cpp
+@@ -41,10 +41,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ namespace rootba {
+ 
+ #ifdef ROOTBA_INSTANTIATIONS_FLOAT
++template class LandmarkBlockBase<LandmarkBlockStatic<float, 9, 5>, float, 9>;
+ template class LandmarkBlockStatic<float, 9, 5>;
+ #endif
+ 
+ #ifdef ROOTBA_INSTANTIATIONS_DOUBLE
++template class LandmarkBlockBase<LandmarkBlockStatic<double, 9, 5>, double, 9>;
+ template class LandmarkBlockStatic<double, 9, 5>;
+ #endif
+ 
+diff --git a/src/rootba/qr/impl/landmark_block_static_6.cpp b/src/rootba/qr/impl/landmark_block_static_6.cpp
+index 14e1a15..5a51de3 100644
+--- a/src/rootba/qr/impl/landmark_block_static_6.cpp
++++ b/src/rootba/qr/impl/landmark_block_static_6.cpp
+@@ -41,10 +41,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ namespace rootba {
+ 
+ #ifdef ROOTBA_INSTANTIATIONS_FLOAT
++template class LandmarkBlockBase<LandmarkBlockStatic<float, 9, 6>, float, 9>;
+ template class LandmarkBlockStatic<float, 9, 6>;
+ #endif
+ 
+ #ifdef ROOTBA_INSTANTIATIONS_DOUBLE
++template class LandmarkBlockBase<LandmarkBlockStatic<double, 9, 6>, double, 9>;
+ template class LandmarkBlockStatic<double, 9, 6>;
+ #endif
+ 
+diff --git a/src/rootba/qr/impl/landmark_block_static_7.cpp b/src/rootba/qr/impl/landmark_block_static_7.cpp
+index 1a2c26a..efc423f 100644
+--- a/src/rootba/qr/impl/landmark_block_static_7.cpp
++++ b/src/rootba/qr/impl/landmark_block_static_7.cpp
+@@ -41,10 +41,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ namespace rootba {
+ 
+ #ifdef ROOTBA_INSTANTIATIONS_FLOAT
++template class LandmarkBlockBase<LandmarkBlockStatic<float, 9, 7>, float, 9>;
+ template class LandmarkBlockStatic<float, 9, 7>;
+ #endif
+ 
+ #ifdef ROOTBA_INSTANTIATIONS_DOUBLE
++template class LandmarkBlockBase<LandmarkBlockStatic<double, 9, 7>, double, 9>;
+ template class LandmarkBlockStatic<double, 9, 7>;
+ #endif
+ 
+diff --git a/src/rootba/qr/impl/landmark_block_static_8.cpp b/src/rootba/qr/impl/landmark_block_static_8.cpp
+index 61a4cf9..4c065c7 100644
+--- a/src/rootba/qr/impl/landmark_block_static_8.cpp
++++ b/src/rootba/qr/impl/landmark_block_static_8.cpp
+@@ -41,10 +41,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ namespace rootba {
+ 
+ #ifdef ROOTBA_INSTANTIATIONS_FLOAT
++template class LandmarkBlockBase<LandmarkBlockStatic<float, 9, 8>, float, 9>;
+ template class LandmarkBlockStatic<float, 9, 8>;
+ #endif
+ 
+ #ifdef ROOTBA_INSTANTIATIONS_DOUBLE
++template class LandmarkBlockBase<LandmarkBlockStatic<double, 9, 8>, double, 9>;
+ template class LandmarkBlockStatic<double, 9, 8>;
+ #endif
+ 
+diff --git a/src/rootba/sc/CMakeLists.txt b/src/rootba/sc/CMakeLists.txt
+index 976b999..ecc4739 100644
+--- a/src/rootba/sc/CMakeLists.txt
++++ b/src/rootba/sc/CMakeLists.txt
+@@ -6,6 +6,7 @@ target_sources(rootba_sc
+     landmark_block.hpp
+     linearization_power_sc.hpp
+   PRIVATE
++    anchor.cpp
+ )
+ 
+ target_link_libraries(rootba_sc
+diff --git a/src/rootba/sc/landmark_block.hpp b/src/rootba/sc/landmark_block.hpp
+index 1bf6ad4..4421b5e 100644
+--- a/src/rootba/sc/landmark_block.hpp
++++ b/src/rootba/sc/landmark_block.hpp
+@@ -124,7 +124,8 @@ class LandmarkBlockSC {
+   // unusable. Numeric check is only performed for residuals that were
+   // considered to be used (valid), which depends on use_valid_projections_only
+   // setting.
+-  inline void linearize_landmark(const Cameras& cameras) {
++  inline void linearize_landmark(const Cameras& cameras,
++                                 bool scale_landmark_cols = false) {
+     ROOTBA_ASSERT(state_ == ALLOCATED || state_ == NUMERICAL_FAILURE ||
+                   state_ == LINEARIZED);
+ 
+@@ -170,6 +171,9 @@ class LandmarkBlockSC {
+ 
+     if (numerically_valid) {
+       state_ = LINEARIZED;
++      if (scale_landmark_cols) {
++        scale_Jl_cols();
++      }
+     } else {
+       state_ = NUMERICAL_FAILURE;
+     }
+@@ -232,8 +236,42 @@ class LandmarkBlockSC {
+     return storage_.template block<2, POSE_SIZE>(2 * obs_idx, 0);
+   }
+ 
++  inline auto get_ri(const size_t obs_idx) const {
++    return storage_.template block<2, 1>(2 * obs_idx, res_idx_);
++  }
++
++  inline std::pair<Mat3, Vec3> prepare_Hll_inv_bl() const {
++    Mat3 Hll = Mat3::Zero();
++    Vec3 bl = Vec3::Zero();
++    for (size_t i = 0; i < pose_idx_.size(); ++i) {
++      const auto Jl = get_Jli(i);
++      const auto r = get_ri(i);
++      for (int col = 0; col < 3; ++col) {
++        bl[col] += Jl(0, col) * r[0] + Jl(1, col) * r[1];
++        for (int row = 0; row <= col; ++row) {
++          Hll(row, col) +=
++              Jl(0, row) * Jl(0, col) + Jl(1, row) * Jl(1, col);
++        }
++      }
++    }
++    for (int col = 0; col < 3; ++col) {
++      for (int row = col + 1; row < 3; ++row) {
++        Hll(row, col) = Hll(col, row);
++      }
++    }
++    Hll_inv_ = Hll;
++    Hll_inv_.diagonal().array() += lambda_;
++    Hll_inv_ = Hll_inv_.inverse().eval();
++    const Vec3 Hll_inv_bl = Hll_inv_ * bl;
++    return {Hll_inv_, Hll_inv_bl};
++  }
++
+   inline auto get_Hll_inv() const { return Hll_inv_; }
+ 
++  inline void set_Jl_col_scale_identity() {
++    Jl_col_scale.setOnes();
++  }
++
+   // Fill the explicit reduced H, b linear system by parallel_reduce
+   inline void add_Hb(BlockSparseMatrix<Scalar>& accu, VecX& b) const {
+     ROOTBA_ASSERT(state_ == LINEARIZED);
+@@ -445,6 +483,35 @@ class LandmarkBlockSC {
+     lm_ptr_->p_w += inc;
+   }
+ 
++  void back_substitute_prepared(const VecX& pose_inc, Scalar& l_diff) {
++    ROOTBA_ASSERT(state_ == LINEARIZED);
++
++    Vec3 tmp = Vec3::Zero();
++    Scalar pose_model = 0;
++    for (size_t i = 0; i < pose_idx_.size(); ++i) {
++      const size_t cam_idx = pose_idx_[i];
++      const auto Jp = get_Jpi(i);
++      const auto Jl = get_Jli(i);
++      const auto r = get_ri(i);
++      const auto p_inc =
++          pose_inc.template segment<POSE_SIZE>(cam_idx * POSE_SIZE);
++      const Vec2 projected_inc = Jp * p_inc;
++
++      tmp.noalias() += Jl.transpose() * (r + projected_inc);
++      pose_model +=
++          projected_inc.dot(Scalar(0.5) * projected_inc + r);
++    }
++
++    Vec3 inc = -Hll_inv_ * tmp;
++    const Scalar landmark_model =
++        Scalar(0.5) * inc.dot(tmp) -
++        Scalar(0.5) * lambda_ * inc.squaredNorm();
++    l_diff -= pose_model + landmark_model;
++
++    inc.array() *= Jl_col_scale.array();
++    lm_ptr_->p_w += inc;
++  }
++
+   void print_storage(const std::string& filename) const {
+     std::ofstream f(filename);
+ 
+diff --git a/src/rootba/sc/linearization_sc.hpp b/src/rootba/sc/linearization_sc.hpp
+index 8ccb5f2..12a9e93 100644
+--- a/src/rootba/sc/linearization_sc.hpp
++++ b/src/rootba/sc/linearization_sc.hpp
+@@ -98,7 +98,7 @@ class LinearizationSC {
+   // state is unusable. Numeric check is only performed for residuals that were
+   // considered to be used (valid), which depends on use_valid_projections_only
+   // setting.
+-  bool linearize_problem() {
++  bool linearize_problem(bool scale_landmark_cols = false) {
+     ROOTBA_ASSERT(bal_problem_.landmarks().size() == landmark_blocks_.size());
+ 
+     size_t num_landmarks = landmark_blocks_.size();
+@@ -106,7 +106,8 @@ class LinearizationSC {
+     auto body = [&](const tbb::blocked_range<size_t>& range,
+                     bool numerically_valid) {
+       for (size_t r = range.begin(); r != range.end(); ++r) {
+-        landmark_blocks_[r].linearize_landmark(bal_problem_.cameras());
++        landmark_blocks_[r].linearize_landmark(
++            bal_problem_.cameras(), scale_landmark_cols);
+         numerically_valid &= !landmark_blocks_[r].is_numerical_failure();
+       }
+       return numerically_valid;
+diff --git a/src/rootba/solver/CMakeLists.txt b/src/rootba/solver/CMakeLists.txt
+index d9281b7..74d2771 100644
+--- a/src/rootba/solver/CMakeLists.txt
++++ b/src/rootba/solver/CMakeLists.txt
+@@ -6,7 +6,6 @@ target_sources(rootba_solver
+     linearizor.hpp
+     linearizor_base.hpp
+     linearizor_power_sc.hpp
+-    linearizor_qr.hpp
+     linearizor_sc.hpp
+     solver_summary.hpp
+   PRIVATE
+@@ -14,18 +13,29 @@ target_sources(rootba_solver
+     linearizor.cpp
+     linearizor_base.cpp
+     linearizor_power_sc.cpp
+-    linearizor_qr.cpp
+     linearizor_sc.cpp
+ )
+ 
++if(ROOTBA_BUILD_QR)
++  target_sources(rootba_solver
++    PUBLIC
++      linearizor_qr.hpp
++    PRIVATE
++      linearizor_qr.cpp
++  )
++endif()
++
+ target_link_libraries(rootba_solver
+   PUBLIC
+     rootba
+     rootba_cg
+-    rootba_qr
+     rootba_sc
+ )
+ 
++if(ROOTBA_BUILD_QR)
++  target_link_libraries(rootba_solver PUBLIC rootba_qr)
++endif()
++
+ if(ROOTBA_ENABLE_TESTING)
+ 
+   rootba_add_test(test_librootba_solver
+diff --git a/src/rootba/solver/linearizor.cpp b/src/rootba/solver/linearizor.cpp
+index d650eb4..8ad4381 100644
+--- a/src/rootba/solver/linearizor.cpp
++++ b/src/rootba/solver/linearizor.cpp
+@@ -38,7 +38,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ #include <magic_enum/magic_enum.hpp>
+ 
+ #include "rootba/solver/linearizor_power_sc.hpp"
++#ifdef ROOTBA_BUILD_QR
+ #include "rootba/solver/linearizor_qr.hpp"
++#endif
+ #include "rootba/solver/linearizor_sc.hpp"
+ #include "rootba/util/format.hpp"
+ 
+@@ -50,8 +52,13 @@ std::unique_ptr<Linearizor<Scalar_>> Linearizor<Scalar_>::create(
+     SolverSummary* summary) {
+   switch (options.solver_type) {
+     case SolverOptions::SolverType::SQUARE_ROOT:
++#ifdef ROOTBA_BUILD_QR
+       return std::make_unique<LinearizorQR<Scalar>>(bal_problem, options,
+                                                     summary);
++#else
++      LOG(FATAL) << "SQUARE_ROOT solver was not built.";
++      return nullptr;
++#endif
+     case SolverOptions::SolverType::SCHUR_COMPLEMENT:
+       return std::make_unique<LinearizorSC<Scalar>>(bal_problem, options,
+                                                     summary);

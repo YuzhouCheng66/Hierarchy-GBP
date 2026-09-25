@@ -1,0 +1,223 @@
+{
+  "schema_version": 1,
+  "provenance": "paper_full_retest_20260923: run_all.py and per-method protocol/run records",
+  "methods": {
+    "cholmod1": {
+      "label": "g2o CHOLMOD kernel / matched Lie-log frontend (1 thread)",
+      "platform": "native",
+      "executables": {
+        "SE2": "cholmod_se2",
+        "SE3": "cholmod_se3"
+      },
+      "threads": 1,
+      "arguments": [
+        "--input",
+        "{input}",
+        "--output-json",
+        "{result}",
+        "--num-outer",
+        "20",
+        "--huber-delta",
+        "5"
+      ],
+      "environment": {
+        "OMP_NUM_THREADS": "1",
+        "OMP_DYNAMIC": "FALSE",
+        "MKL_NUM_THREADS": "1",
+        "OPENBLAS_NUM_THREADS": "1"
+      },
+      "objective": "0.5 * full-information chi2; Huber delta 5; hard first-pose gauge; diagonal jitter 1e-10; no outer line search; block ordering and symbolic reuse",
+      "timing": "setup_excluding_parse_sec + solve_sec",
+      "caveat": "Not stock g2o CLI. Measured archived CHOLMOD had supernodal compiled out. A modern dependency rebuild is not the archived backend and must not be labeled as such. No switch here deliberately disables features of a new backend."
+    },
+    "pcg16": {
+      "label": "g2o OpenMP frontend / serial fixed-block PCG (16-worker frontend)",
+      "platform": "native",
+      "executables": {
+        "SE2": "g2o_pcg_openmp",
+        "SE3": "g2o_pcg_openmp"
+      },
+      "threads": 16,
+      "arguments": [
+        "--input",
+        "{input}",
+        "--output-json",
+        "{result}",
+        "--dimension",
+        "{dimension}",
+        "--threads",
+        "16",
+        "--num-outer",
+        "20",
+        "--stopping",
+        "historical-relative"
+      ],
+      "environment": {
+        "OMP_NUM_THREADS": "16",
+        "OMP_DYNAMIC": "FALSE",
+        "MKL_NUM_THREADS": "1",
+        "OPENBLAS_NUM_THREADS": "1"
+      },
+      "objective": "Matched full-information Lie-log / Huber delta 5; hard gauge; no CHOLMOD-wrapper jitter",
+      "timing": "solver_wall_sec, including setup and excluding parsing/output",
+      "caveat": "Inner PCG is serial, tolerance 1e-6, absoluteTolerance=false, maxIter=-1 (system dimension). Retain all 20 GN outers; no claim of 16-way PCG."
+    },
+    "amm16": {
+      "label": "AMM-PGO / DPGO upstream optimizer with measured parallel-node driver",
+      "platform": "linux",
+      "executables": {
+        "SE2": "dist_pgo",
+        "SE3": "dist_pgo"
+      },
+      "threads": 16,
+      "arguments": [
+        "--dataset",
+        "{input}",
+        "--num_nodes",
+        "16",
+        "--iters",
+        "{iterations}",
+        "--dist_init",
+        "false",
+        "--loss",
+        "huber",
+        "--loss_reg",
+        "25",
+        "--accelerated",
+        "true",
+        "--parallel_nodes",
+        "true",
+        "--local_max_iterations",
+        "10",
+        "--local_max_accepted",
+        "1",
+        "--local_grad_tol",
+        "0.001",
+        "--local_precon_grad_tol",
+        "0.0001",
+        "--save",
+        "true"
+      ],
+      "iterations": {
+        "FR079": 100,
+        "FRH": 300,
+        "M3500": 300,
+        "ParkingGarage": 300,
+        "Sphere": 300,
+        "Cubicle": 300,
+        "Grid": 20,
+        "Globe10k": 300,
+        "Globe100k": 100
+      },
+      "environment": {
+        "OMP_NUM_THREADS": "16",
+        "OMP_DYNAMIC": "FALSE",
+        "OMP_MAX_ACTIVE_LEVELS": "1",
+        "OMP_PROC_BIND": "close",
+        "OMP_PLACES": "cores",
+        "OPENBLAS_NUM_THREADS": "1",
+        "MKL_NUM_THREADS": "1",
+        "OMP_DISPLAY_ENV": "TRUE"
+      },
+      "objective": "Upstream scalar-information chordal Huber loss_reg=25; ignores supplied vertex initialization",
+      "timing": "measured algorithm wall = setup + optimization (not reported ideal time / num_nodes)",
+      "caveat": "Original per-scene iteration budgets intentionally retained, not newly tuned. Native objective is not the shared full-information Lie-log objective; independent rescore required."
+    },
+    "cycle16": {
+      "label": "Cycle-PGO / upstream EC_PGO (16-worker budget)",
+      "platform": "linux",
+      "executables": {
+        "SE2": "EC_PGO",
+        "SE3": "EC_PGO"
+      },
+      "threads": 16,
+      "arguments": [
+        "-i",
+        "{input}",
+        "-e",
+        "edges.txt",
+        "-v",
+        "poses.txt",
+        "-s",
+        "summary.txt",
+        "-n",
+        "20",
+        "-t",
+        "0"
+      ],
+      "environment": {
+        "OMP_NUM_THREADS": "16",
+        "OMP_DYNAMIC": "FALSE",
+        "OMP_MAX_ACTIVE_LEVELS": "1",
+        "OMP_PROC_BIND": "close",
+        "OMP_PLACES": "cores",
+        "OPENBLAS_NUM_THREADS": "1",
+        "MKL_NUM_THREADS": "1",
+        "OMP_DISPLAY_ENV": "TRUE"
+      },
+      "objective": "Upstream nonrobust cycle-space objective; no Huber",
+      "timing": "cycle_basis + ordering + solve; optimization + vertex reconstruction also retained separately",
+      "historically_unmeasured": {
+        "Globe100k": "Not freshly rerun in September 23 table. Historical OOM label; retained attempt SIGSEGV under 24-GiB address-space cap, not proof of unrestricted physical OOM."
+      },
+      "caveat": "Shared scoring used BFS reconstruction from optimized edges for every scene. Official poses assume consecutive odometry and are insufficient for Cubicle. Offline conversion is not included in native algorithm time."
+    },
+    "schwarz16": {
+      "label": "Independent GDSW two-level additive Schwarz-PCG adaptation (16 workers)",
+      "platform": "native",
+      "executables": {
+        "SE2": "g2o_block_pcg_se2",
+        "SE3": "g2o_block_pcg_se3"
+      },
+      "threads": 16,
+      "arguments": [
+        "--input",
+        "{input}",
+        "--output-json",
+        "{result}",
+        "--output-poses",
+        "{poses}",
+        "--num-outer",
+        "20",
+        "--huber-delta",
+        "5",
+        "--pcg-max-iterations",
+        "-1",
+        "--pcg-tolerance",
+        "1e-08",
+        "--pcg-preconditioner",
+        "two_level_schwarz",
+        "--schwarz-subdomains",
+        "16",
+        "--schwarz-overlap-layers",
+        "1",
+        "--schwarz-threads",
+        "16",
+        "--schwarz-local-shift",
+        "1e-10",
+        "--diagonal-jitter",
+        "1e-10",
+        "--line-search",
+        "--quiet",
+        "--paper-gradient-stopping",
+        "--gradient-absolute-tolerance",
+        "1e-8",
+        "--gradient-relative-tolerance",
+        "1e-6"
+      ],
+      "environment": {
+        "OMP_NUM_THREADS": "16",
+        "OMP_DYNAMIC": "FALSE",
+        "OMP_MAX_ACTIVE_LEVELS": "1",
+        "OPENBLAS_NUM_THREADS": "1",
+        "MKL_NUM_THREADS": "1"
+      },
+      "objective": "Matched full-information Lie-log / Huber delta 5; jitter 1e-10; original line search and early gradient stopping retained",
+      "timing": "total_sec includes parse/topology/initial objective/solve, matching the reported table; solve_sec is separately recorded and excludes ALL setup",
+      "historically_unmeasured": {
+        "Globe100k": "September 23 rerun waived. Located historical timeout was 1800 s; do not relabel as a fresh >2000 s result."
+      },
+      "caveat": "Independent adaptation of arXiv:2603.08975v2; not official authors' code, and not identical residual/preconditioner settings to the paper."
+    }
+  }
+}

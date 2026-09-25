@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "common_arguments": ["--max-num-iterations", "20", "--function-tolerance", "0", "--gradient-tolerance", "0", "--parameter-tolerance", "0", "--no-save-output", "--verbosity-level", "0"],
+  "profiles": {
+    "Ceres-Sparse-1": {"binary": "bal_ceres_sparse_schur", "method": "Ceres-Sparse", "threads": 1, "solver_type": "bal_ceres"},
+    "Ceres-Sparse-16": {"binary": "bal_ceres_sparse_schur", "method": "Ceres-Sparse", "threads": 16, "solver_type": "bal_ceres"},
+    "Ceres-Iterative-16": {"binary": "bal_ceres_iterative_schur", "method": "Ceres-Iterative", "threads": 16, "solver_type": "bal_ceres"},
+    "RootBA-QR-16": {"binary": "bal_qr", "method": "RootBA-QR", "threads": 16, "solver_type": "bal_qr"},
+    "PowerBA-16": {"binary": "bal_power_sc", "method": "PowerBA", "threads": 16, "solver_type": "bal_power_sc"}
+  },
+  "inherited_defaults": {
+    "source": "RootBA d3900037fc4bc98328e5d8d26f1c4eed922f88cc src/rootba/bal/*_options.hpp, plus archived wrapper selection",
+    "config_file": "absent; fresh empty run directory required",
+    "normalize": true,
+    "normalization_scale": 100,
+    "rotation_sigma": 0,
+    "translation_sigma": 0,
+    "point_sigma": 0,
+    "init_depth_threshold": 0,
+    "robust_norm": "NONE",
+    "optimized_cost": "ERROR",
+    "use_double": true,
+    "min_relative_decrease": 0,
+    "initial_trust_region_radius": 10000,
+    "min_trust_region_radius": 1e-32,
+    "max_trust_region_radius": 1e16,
+    "min_lm_diagonal": 1e-6,
+    "max_lm_diagonal": 1e32,
+    "min_linear_solver_iterations": 0,
+    "max_linear_solver_iterations": 500,
+    "eta": 0.1,
+    "jacobi_scaling": true,
+    "jacobi_scaling_epsilon": 0,
+    "preconditioner_type": "SCHUR_JACOBI",
+    "use_explicit_schur_complement": false,
+    "use_householder_marginalization": true,
+    "staged_execution": true,
+    "reduction_alg": 1,
+    "power_order": 10,
+    "initial_vee": 2,
+    "vee_factor": 2
+  }
+}

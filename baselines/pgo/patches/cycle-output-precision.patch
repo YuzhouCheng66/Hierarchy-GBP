@@ -1,0 +1,28 @@
+diff --git a/EC-PGO/ECPGO_EdgeCycleVertexSystem.h b/EC-PGO/ECPGO_EdgeCycleVertexSystem.h
+index c35ad57..dfb5889 100644
+--- a/EC-PGO/ECPGO_EdgeCycleVertexSystem.h
++++ b/EC-PGO/ECPGO_EdgeCycleVertexSystem.h
+@@ -671,10 +671,7 @@ public:
+             Eigen::VectorXd v_state = e.v_State();
+             for(size_t j = 0, m = v_state.rows(); j < m; ++ j) {
+                 double f = v_state(j);
+-                if(fabs(f) > 1)
+-                    fprintf(p_fw, (j)? ((j + 1 == m)? " %f\n" : " %f") : ((j + 1 == m)? "%f\n" : "%f"), f);
+-                else
+-                    fprintf(p_fw, (j)? ((j + 1 == m)? " %g\n" : " %g") : ((j + 1 == m)? "%g\n" : "%g"), f);
++                fprintf(p_fw, (j)? ((j + 1 == m)? " %.17g\n" : " %.17g") : ((j + 1 == m)? "%.17g\n" : "%.17g"), f);
+             }
+         }
+         fclose(p_fw);
+@@ -695,10 +692,7 @@ public:
+             Eigen::VectorXd v_state = v.v_State();
+             for(size_t j = 0, m = v_state.rows(); j < m; ++ j) {
+                 double f = v_state(j);
+-                if(fabs(f) > 1)
+-                    fprintf(p_fw, (j)? ((j + 1 == m)? " %f\n" : " %f") : ((j + 1 == m)? "%f\n" : "%f"), f);
+-                else
+-                    fprintf(p_fw, (j)? ((j + 1 == m)? " %g\n" : " %g") : ((j + 1 == m)? "%g\n" : "%g"), f);
++                fprintf(p_fw, (j)? ((j + 1 == m)? " %.17g\n" : " %.17g") : ((j + 1 == m)? "%.17g\n" : "%.17g"), f);
+             }
+         }
+         fclose(p_fw);

@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "archived_runtime_sha256": {
+    "cholmod1": {
+      "amd.dll": "134204d732eb272dc08fd993feb29b8228eb7aa4318dc6cbb9fe0073982013a7",
+      "camd.dll": "5b135c0fc43718965ffb982f5c1f9d28a16ed36b5240f32b51f9b67ef6111e43",
+      "ccolamd.dll": "3b00851400ec38d2291b47330c8c519c3fbe384874951621a8b5c3d01748a2da",
+      "cholmod.dll": "6a554b2796798f9f1b187b9a34e4e2dec16712a7a615ebae146340ee936d8327",
+      "cholmod_se2.exe": "65fa35c0a3c3d8c1f8708fa4b97e81f6146a75b4b07bb4c5ff554b129b1e7037",
+      "cholmod_se3.exe": "a207f37dcecabf9e08263c164bfd941b05e9eba6e73deb23d28ab9cb80256d22",
+      "colamd.dll": "2aacce7a3f14288761116b901a736c5fb1fed0d1cd8d33d2355af2d965d187fb",
+      "g2o_core.dll": "cef289023dd30e11f6efddb780f75800f822095432c38860a8ec9ab2f8e7dcae",
+      "g2o_solver_cholmod.dll": "5aeb6f5eaae3d84cd6732b5482997a97b406900dfb98d589a2847c425ef645f3",
+      "g2o_stuff.dll": "57ad22f55abfb2962c2cd5e8cbaa512ef899b6bdad1146eef4aaab7d79c6c52a",
+      "suitesparseconfig.dll": "ab749cbd24fc2c4850c5b63055c7f3388562750355d24a7cb179192561269670"
+    },
+    "pcg16": {
+      "g2o_core.dll": "32b874a41b82efd9be33e552a0121b6474f3bf0180dd0b169c42e5d719f249c7",
+      "g2o_pcg_openmp.exe": "7f724585e32a07110026e2fa1ed90dbd71bcef1fec0b4147a65861dc1642bd6a",
+      "g2o_solver_pcg.dll": "97ef8c73d434968562725a10590b8d08550f37de4f2be2f9ee54ccc25a62e40c",
+      "g2o_stuff.dll": "6d4a38b4575bcd0432ff11f30316ee01af3ce479fa73d1cac417f2a2d49aa906"
+    },
+    "amm16": {
+      "dist_pgo": "20b30485eea59de0b50fa1bfc3400f52d2047932f19eb356e0830578c53597c0",
+      "libDChordal.so": "bb64a57f708b6c5944202b7501f8ddc7d06e28e9350a2fbddef2876e2038a50b",
+      "libDPGO.so": "3f04cc26357917dde9ce2ead4cb5b0a3cc447756b92c368958259cdf51607eb5",
+      "libILDL.so": "5841b26afebf3345c357415ee6980ead4d2616ea421ba679bbc4d00b2aa579ac",
+      "libPCM.so": "b5e8729aa1ca4d26b5acb36c02add28b916d3a06317d72eb7f9b1d9b1e03aeab",
+      "libSESync.so": "aab1cb803ecd10c4f3eda2bf6425df35feb4235c0a180f1d187669a0638af140"
+    },
+    "cycle16": {
+      "EC_PGO": "35d6339f1ac27f778f9eb6108963b082128b6e756da1f96fb032aeec184a941d",
+      "libEC_PGO.so": "73e07440e64d923aa9d5642ddd8eb0457be5d54b8a03b466aecd6d5403d7f5e0",
+      "libEC_PGO.so.1": "73e07440e64d923aa9d5642ddd8eb0457be5d54b8a03b466aecd6d5403d7f5e0",
+      "libEC_PGO.so.1.1.1": "73e07440e64d923aa9d5642ddd8eb0457be5d54b8a03b466aecd6d5403d7f5e0",
+      "libFCB.so": "a6896e9c988f2ec6ac4f475ed2f16b6797738947f2e20a2bf86173e19b6a4ac3",
+      "libFCB.so.1": "a6896e9c988f2ec6ac4f475ed2f16b6797738947f2e20a2bf86173e19b6a4ac3",
+      "libFCB.so.1.0.1": "a6896e9c988f2ec6ac4f475ed2f16b6797738947f2e20a2bf86173e19b6a4ac3",
+      "libMCB.so": "955778b4275aace6b9c3e5c4a4ce696ab36515f04d03331247f38b43b3147667",
+      "libMCB.so.1": "955778b4275aace6b9c3e5c4a4ce696ab36515f04d03331247f38b43b3147667",
+      "libMCB.so.1.0.1": "955778b4275aace6b9c3e5c4a4ce696ab36515f04d03331247f38b43b3147667",
+      "libNE_PGO.so": "2623142cd5c62954aa566b81ef1ecf9425579c6ab7c1212484856896f10341a6",
+      "libNE_PGO.so.1": "2623142cd5c62954aa566b81ef1ecf9425579c6ab7c1212484856896f10341a6",
+      "libNE_PGO.so.1.1.1": "2623142cd5c62954aa566b81ef1ecf9425579c6ab7c1212484856896f10341a6"
+    },
+    "schwarz16": {
+      "g2o_block_pcg_se2.exe": "19b66216c1c502fd715ce8402aea8dbaa365696332046ceaad53519279133f16",
+      "g2o_block_pcg_se3.exe": "f965a97caa7e0ca6582e7d13bb00a35fd047024f185e0b14eca8dd77ec1ee0c8"
+    }
+  },
+  "runtime_scope": "Retained local bundles only; transitive system libraries are not fully pinned. SHA matches do not imply cross-platform performance comparability.",
+  "source_origins": {
+    "src/pgo_common.h": "paper_full_retest_20260923/pgo_pcg16/source_snapshot.zip:geometry/pgo_common.h",
+    "src/two_level_schwarz.h": "paper_full_retest_20260923/pgo_pcg16/source_snapshot.zip:geometry/two_level_schwarz.h",
+    "src/se2_geometry.h": "paper_full_retest_20260923/pgo_pcg16/source_snapshot.zip:geometry/se2_geometry.h",
+    "src/se3_geometry.h": "paper_full_retest_20260923/pgo_pcg16/source_snapshot.zip:geometry/se3_geometry.h",
+    "src/se2_main.cpp": "paper_full_retest_20260923/pgo_pcg16/source_snapshot.zip:geometry/se2_main.cpp",
+    "src/se3_main.cpp": "paper_full_retest_20260923/pgo_pcg16/source_snapshot.zip:geometry/se3_main.cpp",
+    "src/pcg_frontend.cpp": "paper_full_retest_20260923/pgo_pcg16/source_snapshot.zip:adapter/benchmark.cpp",
+    "src/cholmod_frontend.cpp": "paper_full_retest_20260923/pgo_cholesky1/source_snapshot.zip:direct/direct_main.cpp",
+    "reconstruct_cycle_vertices.py": "cpp/experiments/pgo_reviewer_baselines/scripts/reconstruct_cycle_vertices.py; archive pose_conversion_policy.json SHA256 ac5b486118ab2fb084a7bc66b313bc5398053c76c2e617573e13f923ca33dc95"
+  },
+  "dependencies": {
+    "g2o": {
+      "repository": "https://github.com/RainerKuemmerle/g2o",
+      "ref": "20241228_git",
+      "caveat": "vcpkg port patches and build flags also matter. Archives retained installed headers, not a complete reproducible toolchain; a stock tag alone is insufficient for byte-identical rebuilds."
+    },
+    "amm": {
+      "repository": "https://github.com/MurpheyLab/DPGO.git",
+      "commit": "da0157f09ab23ad92a3361ac95336e416d8588df",
+      "patch": "patches/amm-driver.patch",
+      "measured_driver_sha256": "ac42d2ae6ddf8f3125e6b6d8256199916b5d977672574876aba8d6abccc3fd91",
+      "license": "MIT"
+    },
+    "cycle": {
+      "repository": "https://bitbucket.org/FangBai/cyclebasedpgo.git",
+      "commit": "b8dc62736c907230f9b38f4e7c11160d8908d9c1",
+      "patch": "patches/cycle-output-precision.patch",
+      "license": "GPL-3.0 (see upstream notices)",
+      "measured_audit_sha256": {
+        "EC-PGO/Main.cpp": "e35a87d0712bd561f60e93541ccff20db0b4412d5599a5783770c3e92ad67bb5",
+        "EC-PGO/ECPGO_NonlinearSolver.h": "d28b94ac4934b260ff35917eee63bc3b9b22557a93c79f8960d9cc924eb14643"
+      },
+      "caveat": "17-digit export patch recovered from retained checkout; this particular header was not fingerprinted by the archived protocol. Prefer hash-matched retained binary for exact measured replay."
+    }
+  }
+}

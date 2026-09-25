@@ -42,9 +42,16 @@ and `build/ba`, preventing their different BLAS runtimes from being mixed.
 
 ## Run
 
-Set `HGBP_PGO_DATA_ROOT` and `HGBP_BA_DATA_ROOT` to your canonical input
-directories. Input SHA-256 checks guard against accidental changes to
-initialization or preprocessing.
+Download the benchmark inputs from
+[Hugging Face](https://huggingface.co/datasets/yuzhoucheng66/HGBP-Benchmarks):
+
+```powershell
+python scripts/download_datasets.py
+```
+
+The downloader verifies SHA-256 checksums and restores `data/pgo` and `data/ba`.
+Use `--suite pgo`, `--suite ba` or `--datasets Sphere Ladybug49` for a subset.
+For existing data, set `HGBP_PGO_DATA_ROOT` and `HGBP_BA_DATA_ROOT` instead.
 
 ```powershell
 python scripts/run_benchmarks.py pgo --threads 16 --output-root results/reproduction/pgo
@@ -61,6 +68,6 @@ cost; BA reports squared reprojection cost, RMSE and mean reprojection error.
 Numerical checks and timing diagnostics are separate: historical timings
 are not portable performance guarantees.
 
-Cubicle's reference graph includes an offline PSD floor. The synthetic
-Globe graphs are project-generated, not the original paper's dataset files;
-see the [generation instructions](scripts/datasets/README.md).
+Baseline adapters and reproduction commands are in [baselines/](baselines/README.md).
+Input definitions and sources are documented in the dataset card; the
+[Globe generators](scripts/datasets/README.md) reproduce the synthetic inputs.

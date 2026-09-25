@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "files": {
+    "final": {
+      "origin": "report_original_reference.py",
+      "source_sha256": "3faa97ec572a9e4c95fda09964d9f9fbc35e0ceeee36ac2b20ef20f3e3be0c8a"
+    },
+    "se3": {
+      "origin": "rescore_se3.py",
+      "source_sha256": "8867af4013bc2b131f085b63aa56ba97215bfb7de92450c9613a9b9bc93b29f6"
+    },
+    "poses": {
+      "origin": "rescore_wsl_references.py",
+      "source_sha256": "a432b907a6d783f71a50599bcc99d223f93bad6693b000e19f0d16ece4540926"
+    },
+    "se2": {
+      "origin": "report_se2_forest.py",
+      "source_sha256": "c7105d71fc28682158b0f64a0fc7ea2c86c823c98c92144db57eb2c3a7895707"
+    }
+  },
+  "extraction": "Only scorer/conversion functions retained. Removed machine-specific report imports/CLIs; localized score.residual qualifier. Numerical function bodies otherwise unchanged; validation and orchestration live in rescore.py."
+}

@@ -1,0 +1,138 @@
+diff --git a/C++/examples/CMakeLists.txt b/C++/examples/CMakeLists.txt
+index 0a5c244..794ecde 100644
+--- a/C++/examples/CMakeLists.txt
++++ b/C++/examples/CMakeLists.txt
+@@ -4,6 +4,9 @@ INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIR})
+ add_executable(dist_pgo dist_pgo.cpp)
+ target_include_directories(dist_pgo PUBLIC ${Boost_INCLUDE_DIR})
+ target_link_libraries(dist_pgo DPGO DChordal SESync ${Boost_LIBRARIES})
++if(ENABLE_OPENMP AND OpenMP_CXX_FOUND)
++  target_link_libraries(dist_pgo OpenMP::OpenMP_CXX)
++endif()
+ 
+ add_executable(se_sync se_sync.cpp)
+-target_link_libraries(se_sync SESync)
+\ No newline at end of file
++target_link_libraries(se_sync SESync)
+diff --git a/C++/examples/dist_pgo.cpp b/C++/examples/dist_pgo.cpp
+index 3a2f393..58bccc2 100644
+--- a/C++/examples/dist_pgo.cpp
++++ b/C++/examples/dist_pgo.cpp
+@@ -38,9 +38,27 @@ int main(int argc, char *argv[]) {
+       ("loss",
+        boost::program_options::value<std::string>()->default_value("trivial"),
+        "loss type (\"trivial\", \"huber\" or \"welsch\")") // loss types
++      ("loss_reg",
++       boost::program_options::value<double>()->default_value(0.25),
++       "robust loss regularization parameter")
+       ("accelerated",
+        boost::program_options::value<bool>()->default_value(true),
+        "whether accelerated or not") // whether accelerated or not
++      ("parallel_nodes",
++       boost::program_options::value<bool>()->default_value(false),
++       "execute independent logical-node updates with OpenMP")
++      ("local_max_iterations",
++       boost::program_options::value<int>()->default_value(10),
++       "maximum local Riemannian trust-region iterations per global iteration")
++      ("local_max_accepted",
++       boost::program_options::value<int>()->default_value(1),
++       "maximum accepted local trust-region steps per global iteration")
++      ("local_grad_tol",
++       boost::program_options::value<double>()->default_value(1e-3),
++       "local Riemannian gradient tolerance")
++      ("local_precon_grad_tol",
++       boost::program_options::value<double>()->default_value(1e-4),
++       "local preconditioned-gradient tolerance")
+       ("save", boost::program_options::value<bool>()->default_value(true),
+        "whether to save the optimization results or not"); // whether to save
+                                                            // the optimization
+@@ -70,8 +88,16 @@ int main(int argc, char *argv[]) {
+   int num_nodes = program_options["num_nodes"].as<int>();
+   int num_iters = program_options["iters"].as<int>();
+   bool accelerated = program_options["accelerated"].as<bool>();
++  bool parallel_nodes = program_options["parallel_nodes"].as<bool>();
++  int local_max_iterations =
++      program_options["local_max_iterations"].as<int>();
++  int local_max_accepted = program_options["local_max_accepted"].as<int>();
++  double local_grad_tol = program_options["local_grad_tol"].as<double>();
++  double local_precon_grad_tol =
++      program_options["local_precon_grad_tol"].as<double>();
+   bool dist_chordal = program_options["dist_init"].as<bool>();
+   std::string loss_type = program_options["loss"].as<std::string>();
++  double loss_reg = program_options["loss_reg"].as<double>();
+   bool save = program_options["save"].as<bool>();
+ 
+   DPGO::Loss loss;
+@@ -100,11 +126,13 @@ int main(int argc, char *argv[]) {
+   std::vector<DPGO::measurements_t> measurements;
+   DPGO::read_g2o(filename, num_nodes, num_poses, measurements, g_index);
+ 
++  auto setup_start = Stopwatch::tick();
++
+   DPGO::Options options;
+ 
+   options.rescale = DPGO::Rescale::Static;
+   options.loss = loss;
+-  options.loss_reg = 0.25;
++  options.loss_reg = loss_reg;
+   options.verbose = false;
+   options.scheme = accelerated ? DPGO::Scheme::AMM : DPGO::Scheme::MM;
+   options.STPCG_kappa = 0.05;
+@@ -113,10 +141,10 @@ int main(int argc, char *argv[]) {
+   options.eta[1] = 2.5e-2;
+   options.max_soft_restart_hits[0] = 10;
+   options.max_soft_restart_hits[1] = 25;
+-  options.max_iterations = 10;
+-  options.max_iterations_accepted = 1;
+-  options.grad_norm_tol = 1e-3;
+-  options.preconditioned_grad_norm_tol = 1e-4;
++  options.max_iterations = local_max_iterations;
++  options.max_iterations_accepted = local_max_accepted;
++  options.grad_norm_tol = local_grad_tol;
++  options.preconditioned_grad_norm_tol = local_precon_grad_tol;
+   options.regularizer = 1e-11;
+ 
+   for (int alpha = 0; alpha < num_nodes; alpha++) {
+@@ -489,11 +517,15 @@ int main(int argc, char *argv[]) {
+   std::cout << "Distributed PGO" << std::endl;
+   std::cout << "-----------------------------------------------" << std::endl;
+ 
++  double setup_wall = Stopwatch::tock(setup_start);
++  auto optimization_start = Stopwatch::tick();
++
+   for (int iter = 0; iter < num_iters; iter++) {
+     std::cout << iter << ": " << std::setprecision(20) << fobj << " " << grad
+               << std::endl;
+ 
+     auto opt_start = Stopwatch::tick();
++#pragma omp parallel for if (parallel_nodes) schedule(static)
+     for (int alpha = 0; alpha < num_nodes; alpha++) {
+       dpgo_hash[alpha]->iterate();
+     }
+@@ -515,6 +547,7 @@ int main(int argc, char *argv[]) {
+     }
+ 
+     auto update_start = Stopwatch::tick();
++#pragma omp parallel for if (parallel_nodes) schedule(static)
+     for (int alpha = 0; alpha < num_nodes; alpha++) {
+       dpgo_hash[alpha]->update();
+     }
+@@ -530,10 +563,18 @@ int main(int argc, char *argv[]) {
+         Eigen::Vector4d{DPGO::Scalar(iter) + 1, time, fobj, grad});
+   }
+ 
++  double optimization_wall = Stopwatch::tock(optimization_start);
++
+   std::cout << "---------------------------------------" << std::endl;
+   std::cout << "final objective: " << fobj << std::endl;
+   std::cout << "final gradient: " << grad << std::endl;
+   std::cout << "time: " << time / num_nodes << " s/node." << std::endl;
++  std::cout << "measured iterate+update wall: " << time << " s." << std::endl;
++  std::cout << "measured setup wall: " << setup_wall << " s." << std::endl;
++  std::cout << "measured optimization wall: " << optimization_wall << " s."
++            << std::endl;
++  std::cout << "measured algorithm wall: " << setup_wall + optimization_wall
++            << " s." << std::endl;
+ 
+   if (save) {
+     std::string resfile = "results_chordal_" + std::to_string(num_nodes) + "_" +
