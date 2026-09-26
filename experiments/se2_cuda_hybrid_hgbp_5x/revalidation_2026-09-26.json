@@ -1,0 +1,58 @@
+{
+  "date": "2026-09-26",
+  "source_sha256": "d5425baff092d82e695e78c2b035f3d15fc3c8f8a38345650a59e05d843f5ec6",
+  "original_mixed_line_ending_source_sha256": "48f5b0739649aa99854c3cc889ba4c8d304827851e6a3b2eb1df374e78e0f7e8",
+  "hardware": "NVIDIA GeForce RTX 4080 Laptop GPU",
+  "power_plan": "Beast mode",
+  "toolchain": {
+    "cuda": "12.8",
+    "visual_studio": "2022 Build Tools"
+  },
+  "dataset": {
+    "name": "M3500",
+    "nodes": 3500,
+    "edges": 5453
+  },
+  "configuration": {
+    "coarse_mode": "dense",
+    "basis_mode": "identity",
+    "group_size": 20,
+    "coarse_dim": 525,
+    "hybrid_cycles": 20,
+    "sweeps_per_cycle": 100,
+    "fixed_lambda_start": 60,
+    "huber_delta": 5.0,
+    "persistent_threads": 32
+  },
+  "cold_run": {
+    "total_ms": 270.716,
+    "core_ms": 61.269,
+    "cholmod_load_ms": 209.117
+  },
+  "warm_runs": [
+    {
+      "total_ms": 63.496,
+      "core_ms": 58.811
+    },
+    {
+      "total_ms": 68.337,
+      "core_ms": 62.773
+    },
+    {
+      "total_ms": 67.317,
+      "core_ms": 61.725
+    }
+  ],
+  "warm_total_median_ms": 67.317,
+  "historical_cpu16_denominator_ms": 340.48,
+  "ratio_to_historical_cpu16": 0.19771,
+  "speedup_over_historical_cpu16": 5.06,
+  "lower_only_verification": {
+    "gpu_sweeps_median_ms": 1.374,
+    "cpu16_reference_ms": 14.419,
+    "mean_relative_error": 2.561337e-9,
+    "belief_lambda_relative_error": 1.348296e-19,
+    "belief_eta_relative_error": 3.137788e-9
+  },
+  "note": "The CPU16 denominator is the archived historical measurement and was not rerun in this revalidation."
+}

@@ -1,0 +1,37 @@
+{
+  "status": "historical_prototype_measurement",
+  "date": "2026-07-17",
+  "dataset": "M3500",
+  "hardware": "NVIDIA GeForce RTX 4080 Laptop GPU",
+  "cpu_reference": {
+    "description": "clean CPU H-GBP, 16 threads, nonlinear outer=20, c=3, k=100, r=4",
+    "wall_ms": 340.48
+  },
+  "gpu_hybrid": [
+    {
+      "group_size": 20,
+      "coarse_dim": 525,
+      "cycles": 20,
+      "wall_ms": 66.67,
+      "ratio_to_cpu_reference": 0.1958,
+      "speedup": 5.11
+    },
+    {
+      "group_size": 15,
+      "coarse_dim": 702,
+      "cycles": 20,
+      "wall_ms": 80.23,
+      "ratio_to_cpu_reference": 0.2356,
+      "speedup": 4.24,
+      "breakdown_ms": {
+        "lower_gbp": 33.01,
+        "gpu_coarse_assemble": 1.47,
+        "d2h_coarse": 7.85,
+        "cpu_cholmod_solve": 21.79,
+        "h2d_and_gpu_apply": 0.84
+      }
+    }
+  ],
+  "lower_only_fixed_lambda_relative_error_vs_cpu16": 2.6e-9,
+  "comparability_warning": "The GPU timing is a single-linearization identity-basis prototype with 20 hybrid cycles. The CPU denominator is the full nonlinear outer=20 r=4 SVD solver, so 5.11x is a historical systems milestone, not an end-to-end algorithm-equivalent claim."
+}
