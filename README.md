@@ -42,18 +42,25 @@ ctest --test-dir build --output-on-failure
 Use `-PGOOnly` to build without RootBA. Binaries are placed in `build/pgo`
 and `build/ba`, preventing their different BLAS runtimes from being mixed.
 
-## Run
+## Benchmark inputs
 
-Download the benchmark inputs from
-[Hugging Face](https://huggingface.co/datasets/yuzhoucheng66/HGBP-Benchmarks):
+The complete benchmark release is hosted on
+[Hugging Face: HGBP-Benchmarks](https://huggingface.co/datasets/yuzhoucheng66/HGBP-Benchmarks):
+**9 pose graphs** (3 SE2 and 6 SE3) and **10 bundle-adjustment problems**.
+Download the exact inputs used by H-GBP and the baseline adapters:
 
 ```powershell
 python scripts/download_datasets.py
 ```
 
 The downloader verifies SHA-256 checksums and restores `data/pgo` and `data/ba`.
+The release revision and manifest hash are pinned in
+[`configs/data_release.json`](configs/data_release.json); the dataset card
+records input provenance and preparation.
 Use `--suite pgo`, `--suite ba` or `--datasets Sphere Ladybug49` for a subset.
 For existing data, set `HGBP_PGO_DATA_ROOT` and `HGBP_BA_DATA_ROOT` instead.
+
+## Run
 
 ```powershell
 python scripts/run_benchmarks.py pgo --threads 16 --output-root results/reproduction/pgo
