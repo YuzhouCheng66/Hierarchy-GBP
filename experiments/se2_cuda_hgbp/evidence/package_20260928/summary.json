@@ -1,0 +1,245 @@
+{
+  "scope": "full outer20; solver includes allocation/transfers, context and process wall reported separately",
+  "rows": [
+    {
+      "dataset": "FR079",
+      "variant": "transportsegment",
+      "repeats": 9,
+      "cpu16_ms": 122.3297,
+      "candidate_ms": 67.5741,
+      "candidate_over_cpu": 0.5523932454669634,
+      "speedup": 1.8103045397570963,
+      "candidate_range_ms": [
+        65.9572,
+        78.9786
+      ],
+      "cpu_range_ms": [
+        111.0811,
+        136.9166
+      ],
+      "cpu_process_ms": 260.423,
+      "cpu_cost": 18.785887502887988,
+      "candidate_cost": 18.785887502887988,
+      "cpu_validation": {
+        "passed": true,
+        "policy_mismatches": [],
+        "max_outer_cost_relative_error": 0.0,
+        "final_cost_relative_error": 0.0,
+        "max_outer_pose_relative_error": 0.0,
+        "final_pose_relative_error": 0.0
+      },
+      "old_gpu_validation": null,
+      "all_cpu_outer_gates": true,
+      "all_repeat_max_cost_error": 0.0,
+      "all_repeat_max_pose_error": 0.0,
+      "all_old_gpu_outer_gates": false,
+      "certified": true,
+      "accepted_2x": false,
+      "matched_shadow": true,
+      "shadow_passed": true,
+      "upper_passed": true,
+      "phase_passed": true,
+      "candidate_process_ms": 281.3722,
+      "cuda_context_ms": 58.2844,
+      "process_over_cpu": 1.0804429716269301,
+      "process_speedup": 0.925546304858831,
+      "accepted_wall_2x": false,
+      "phase_accounting": "basis CPU work overlaps GPU batch 1; basis and sweeps/lower-wall fields overlap and must not be added",
+      "lower_stage_timing_available": false,
+      "lower_medians_ms": {
+        "wall_ms": 49.71490000000001,
+        "kernel_ms": null,
+        "upload_ms": null,
+        "download_ms": null
+      },
+      "phase_medians_ms": {
+        "outer_total_sec": 66.39240000000001,
+        "basis_build_sec": 11.0097,
+        "coarse_lambda_sec": 1.8814,
+        "sweeps_sec": 51.3833,
+        "coarse_eta_sec": 0.7471,
+        "coarse_solve_sec": 1.6219,
+        "prolong_inject_sec": 0.893,
+        "factor_relinearize_sec": 4.0001999999999995,
+        "objective_eval_sec": 0.7943000000000001
+      },
+      "cpu_phase_medians_ms": {
+        "outer_total_sec": 111.6106,
+        "basis_build_sec": 21.7864,
+        "coarse_lambda_sec": 4.3538,
+        "sweeps_sec": 76.5164,
+        "coarse_eta_sec": 0.5486,
+        "coarse_solve_sec": 1.6508,
+        "prolong_inject_sec": 0.7496999999999999,
+        "factor_relinearize_sec": 2.3091,
+        "objective_eval_sec": 0.6133
+      },
+      "work_counts": {
+        "gbp_sweeps_executed": 6000,
+        "full_precision_sweeps": 6000,
+        "eta_only_sweeps": 0,
+        "coarse_solves": 60
+      }
+    },
+    {
+      "dataset": "FRH",
+      "variant": "transportsegment",
+      "repeats": 9,
+      "cpu16_ms": 133.0167,
+      "candidate_ms": 73.0638,
+      "candidate_over_cpu": 0.5492829095895478,
+      "speedup": 1.820555459748877,
+      "candidate_range_ms": [
+        71.3155,
+        76.2392
+      ],
+      "cpu_range_ms": [
+        121.5614,
+        138.84730000000002
+      ],
+      "cpu_process_ms": 304.5798,
+      "cpu_cost": 9.656841046587548e-05,
+      "candidate_cost": 9.656841046587548e-05,
+      "cpu_validation": {
+        "passed": true,
+        "policy_mismatches": [],
+        "max_outer_cost_relative_error": 0.0,
+        "final_cost_relative_error": 0.0,
+        "max_outer_pose_relative_error": 0.0,
+        "final_pose_relative_error": 0.0
+      },
+      "old_gpu_validation": null,
+      "all_cpu_outer_gates": true,
+      "all_repeat_max_cost_error": 0.0,
+      "all_repeat_max_pose_error": 0.0,
+      "all_old_gpu_outer_gates": false,
+      "certified": true,
+      "accepted_2x": false,
+      "matched_shadow": true,
+      "shadow_passed": true,
+      "upper_passed": true,
+      "phase_passed": true,
+      "candidate_process_ms": 315.9331,
+      "cuda_context_ms": 58.946,
+      "process_over_cpu": 1.037275288774896,
+      "process_speedup": 0.9640642275215859,
+      "accepted_wall_2x": false,
+      "phase_accounting": "basis CPU work overlaps GPU batch 1; basis and sweeps/lower-wall fields overlap and must not be added",
+      "lower_stage_timing_available": false,
+      "lower_medians_ms": {
+        "wall_ms": 48.743999999999986,
+        "kernel_ms": null,
+        "upload_ms": null,
+        "download_ms": null
+      },
+      "phase_medians_ms": {
+        "outer_total_sec": 71.1676,
+        "basis_build_sec": 13.6127,
+        "coarse_lambda_sec": 2.3449,
+        "sweeps_sec": 50.607,
+        "coarse_eta_sec": 1.0651,
+        "coarse_solve_sec": 1.5991,
+        "prolong_inject_sec": 1.0214,
+        "factor_relinearize_sec": 7.2302,
+        "objective_eval_sec": 1.5326
+      },
+      "cpu_phase_medians_ms": {
+        "outer_total_sec": 116.64720000000001,
+        "basis_build_sec": 14.8759,
+        "coarse_lambda_sec": 2.933,
+        "sweeps_sec": 86.2787,
+        "coarse_eta_sec": 0.7641,
+        "coarse_solve_sec": 1.6202,
+        "prolong_inject_sec": 0.8015,
+        "factor_relinearize_sec": 4.9347,
+        "objective_eval_sec": 1.1057000000000001
+      },
+      "work_counts": {
+        "gbp_sweeps_executed": 6000,
+        "full_precision_sweeps": 1100,
+        "eta_only_sweeps": 4900,
+        "coarse_solves": 60
+      }
+    },
+    {
+      "dataset": "M3500",
+      "variant": "transportsegment",
+      "repeats": 9,
+      "cpu16_ms": 289.2263,
+      "candidate_ms": 149.0529,
+      "candidate_over_cpu": 0.5153504366649921,
+      "speedup": 1.9404271906148756,
+      "candidate_range_ms": [
+        146.2532,
+        155.2484
+      ],
+      "cpu_range_ms": [
+        282.1862,
+        332.1617
+      ],
+      "cpu_process_ms": 602.5689,
+      "cpu_cost": 68.95754667615267,
+      "candidate_cost": 68.95754667615267,
+      "cpu_validation": {
+        "passed": true,
+        "policy_mismatches": [],
+        "max_outer_cost_relative_error": 0.0,
+        "final_cost_relative_error": 0.0,
+        "max_outer_pose_relative_error": 0.0,
+        "final_pose_relative_error": 0.0
+      },
+      "old_gpu_validation": null,
+      "all_cpu_outer_gates": true,
+      "all_repeat_max_cost_error": 0.0,
+      "all_repeat_max_pose_error": 0.0,
+      "all_old_gpu_outer_gates": false,
+      "certified": true,
+      "accepted_2x": false,
+      "matched_shadow": true,
+      "shadow_passed": true,
+      "upper_passed": true,
+      "phase_passed": true,
+      "candidate_process_ms": 529.8949,
+      "cuda_context_ms": 57.7493,
+      "process_over_cpu": 0.8793930453430305,
+      "process_speedup": 1.1371479514145162,
+      "accepted_wall_2x": false,
+      "phase_accounting": "basis CPU work overlaps GPU batch 1; basis and sweeps/lower-wall fields overlap and must not be added",
+      "lower_stage_timing_available": false,
+      "lower_medians_ms": {
+        "wall_ms": 85.59420000000001,
+        "kernel_ms": null,
+        "upload_ms": null,
+        "download_ms": null
+      },
+      "phase_medians_ms": {
+        "outer_total_sec": 144.9378,
+        "basis_build_sec": 36.2277,
+        "coarse_lambda_sec": 9.3673,
+        "sweeps_sec": 87.4766,
+        "coarse_eta_sec": 1.9091,
+        "coarse_solve_sec": 14.0303,
+        "prolong_inject_sec": 2.2995,
+        "factor_relinearize_sec": 13.6494,
+        "objective_eval_sec": 3.3314999999999997
+      },
+      "cpu_phase_medians_ms": {
+        "outer_total_sec": 254.9787,
+        "basis_build_sec": 38.8605,
+        "coarse_lambda_sec": 14.9143,
+        "sweeps_sec": 160.2435,
+        "coarse_eta_sec": 1.4981,
+        "coarse_solve_sec": 14.861799999999999,
+        "prolong_inject_sec": 2.2452,
+        "factor_relinearize_sec": 9.944400000000002,
+        "objective_eval_sec": 2.8332
+      },
+      "work_counts": {
+        "gbp_sweeps_executed": 6000,
+        "full_precision_sweeps": 2036,
+        "eta_only_sweeps": 3964,
+        "coarse_solves": 60
+      }
+    }
+  ]
+}

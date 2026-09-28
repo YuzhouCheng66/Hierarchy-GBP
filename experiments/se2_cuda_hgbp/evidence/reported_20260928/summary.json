@@ -1,0 +1,245 @@
+{
+  "scope": "full outer20; solver includes allocation/transfers, context and process wall reported separately",
+  "rows": [
+    {
+      "dataset": "FR079",
+      "variant": "transportsegment",
+      "repeats": 9,
+      "cpu16_ms": 109.4217,
+      "candidate_ms": 66.015,
+      "candidate_over_cpu": 0.6033081189562948,
+      "speedup": 1.6575278345830493,
+      "candidate_range_ms": [
+        65.2537,
+        67.53059999999999
+      ],
+      "cpu_range_ms": [
+        107.0755,
+        130.7063
+      ],
+      "cpu_process_ms": 238.6969,
+      "cpu_cost": 18.785887502887988,
+      "candidate_cost": 18.785887502887988,
+      "cpu_validation": {
+        "passed": true,
+        "policy_mismatches": [],
+        "max_outer_cost_relative_error": 0.0,
+        "final_cost_relative_error": 0.0,
+        "max_outer_pose_relative_error": 0.0,
+        "final_pose_relative_error": 0.0
+      },
+      "old_gpu_validation": null,
+      "all_cpu_outer_gates": true,
+      "all_repeat_max_cost_error": 0.0,
+      "all_repeat_max_pose_error": 0.0,
+      "all_old_gpu_outer_gates": false,
+      "certified": true,
+      "accepted_2x": false,
+      "matched_shadow": true,
+      "shadow_passed": true,
+      "upper_passed": true,
+      "phase_passed": true,
+      "candidate_process_ms": 266.8774,
+      "cuda_context_ms": 59.0915,
+      "process_over_cpu": 1.118059765334196,
+      "process_speedup": 0.894406570207893,
+      "accepted_wall_2x": false,
+      "phase_accounting": "basis CPU work overlaps GPU batch 1; basis and sweeps/lower-wall fields overlap and must not be added",
+      "lower_stage_timing_available": false,
+      "lower_medians_ms": {
+        "wall_ms": 49.01009999999999,
+        "kernel_ms": null,
+        "upload_ms": null,
+        "download_ms": null
+      },
+      "phase_medians_ms": {
+        "outer_total_sec": 65.0859,
+        "basis_build_sec": 10.2763,
+        "coarse_lambda_sec": 1.9472,
+        "sweeps_sec": 50.6241,
+        "coarse_eta_sec": 0.7186,
+        "coarse_solve_sec": 1.5529000000000002,
+        "prolong_inject_sec": 0.7940999999999999,
+        "factor_relinearize_sec": 3.9457,
+        "objective_eval_sec": 0.7979
+      },
+      "cpu_phase_medians_ms": {
+        "outer_total_sec": 101.0717,
+        "basis_build_sec": 20.9509,
+        "coarse_lambda_sec": 4.1856,
+        "sweeps_sec": 67.4442,
+        "coarse_eta_sec": 0.5236999999999999,
+        "coarse_solve_sec": 1.5773,
+        "prolong_inject_sec": 0.6452,
+        "factor_relinearize_sec": 2.1681999999999997,
+        "objective_eval_sec": 0.5910000000000001
+      },
+      "work_counts": {
+        "gbp_sweeps_executed": 6000,
+        "full_precision_sweeps": 6000,
+        "eta_only_sweeps": 0,
+        "coarse_solves": 60
+      }
+    },
+    {
+      "dataset": "FRH",
+      "variant": "transportsegment",
+      "repeats": 9,
+      "cpu16_ms": 124.74159999999999,
+      "candidate_ms": 71.4066,
+      "candidate_over_cpu": 0.5724361399885844,
+      "speedup": 1.7469197525158737,
+      "candidate_range_ms": [
+        70.0565,
+        74.9079
+      ],
+      "cpu_range_ms": [
+        121.1424,
+        131.22
+      ],
+      "cpu_process_ms": 288.009,
+      "cpu_cost": 9.656841046587548e-05,
+      "candidate_cost": 9.656841046587548e-05,
+      "cpu_validation": {
+        "passed": true,
+        "policy_mismatches": [],
+        "max_outer_cost_relative_error": 0.0,
+        "final_cost_relative_error": 0.0,
+        "max_outer_pose_relative_error": 0.0,
+        "final_pose_relative_error": 0.0
+      },
+      "old_gpu_validation": null,
+      "all_cpu_outer_gates": true,
+      "all_repeat_max_cost_error": 0.0,
+      "all_repeat_max_pose_error": 0.0,
+      "all_old_gpu_outer_gates": false,
+      "certified": true,
+      "accepted_2x": false,
+      "matched_shadow": true,
+      "shadow_passed": true,
+      "upper_passed": true,
+      "phase_passed": true,
+      "candidate_process_ms": 300.0635,
+      "cuda_context_ms": 57.3751,
+      "process_over_cpu": 1.0418545948216895,
+      "process_speedup": 0.9598268366529086,
+      "accepted_wall_2x": false,
+      "phase_accounting": "basis CPU work overlaps GPU batch 1; basis and sweeps/lower-wall fields overlap and must not be added",
+      "lower_stage_timing_available": false,
+      "lower_medians_ms": {
+        "wall_ms": 47.7839,
+        "kernel_ms": null,
+        "upload_ms": null,
+        "download_ms": null
+      },
+      "phase_medians_ms": {
+        "outer_total_sec": 69.4254,
+        "basis_build_sec": 13.1076,
+        "coarse_lambda_sec": 2.3846000000000003,
+        "sweeps_sec": 49.4292,
+        "coarse_eta_sec": 1.0378,
+        "coarse_solve_sec": 1.5510000000000002,
+        "prolong_inject_sec": 0.9941,
+        "factor_relinearize_sec": 7.0272,
+        "objective_eval_sec": 1.433
+      },
+      "cpu_phase_medians_ms": {
+        "outer_total_sec": 108.7986,
+        "basis_build_sec": 14.604,
+        "coarse_lambda_sec": 2.7262,
+        "sweeps_sec": 79.4243,
+        "coarse_eta_sec": 0.7599,
+        "coarse_solve_sec": 1.5468000000000002,
+        "prolong_inject_sec": 0.7652,
+        "factor_relinearize_sec": 4.7802,
+        "objective_eval_sec": 1.1352
+      },
+      "work_counts": {
+        "gbp_sweeps_executed": 6000,
+        "full_precision_sweeps": 1100,
+        "eta_only_sweeps": 4900,
+        "coarse_solves": 60
+      }
+    },
+    {
+      "dataset": "M3500",
+      "variant": "transportsegment",
+      "repeats": 9,
+      "cpu16_ms": 282.93309999999997,
+      "candidate_ms": 143.5412,
+      "candidate_over_cpu": 0.5073326521357876,
+      "speedup": 1.9710933167620164,
+      "candidate_range_ms": [
+        140.49259999999998,
+        146.8139
+      ],
+      "cpu_range_ms": [
+        278.1617,
+        287.9874
+      ],
+      "cpu_process_ms": 588.6862,
+      "cpu_cost": 68.95754667615267,
+      "candidate_cost": 68.95754667615267,
+      "cpu_validation": {
+        "passed": true,
+        "policy_mismatches": [],
+        "max_outer_cost_relative_error": 0.0,
+        "final_cost_relative_error": 0.0,
+        "max_outer_pose_relative_error": 0.0,
+        "final_pose_relative_error": 0.0
+      },
+      "old_gpu_validation": null,
+      "all_cpu_outer_gates": true,
+      "all_repeat_max_cost_error": 0.0,
+      "all_repeat_max_pose_error": 0.0,
+      "all_old_gpu_outer_gates": false,
+      "certified": true,
+      "accepted_2x": false,
+      "matched_shadow": true,
+      "shadow_passed": true,
+      "upper_passed": true,
+      "phase_passed": true,
+      "candidate_process_ms": 519.8458,
+      "cuda_context_ms": 57.5215,
+      "process_over_cpu": 0.8830609584529077,
+      "process_speedup": 1.1324246536184381,
+      "accepted_wall_2x": false,
+      "phase_accounting": "basis CPU work overlaps GPU batch 1; basis and sweeps/lower-wall fields overlap and must not be added",
+      "lower_stage_timing_available": false,
+      "lower_medians_ms": {
+        "wall_ms": 82.75559999999997,
+        "kernel_ms": null,
+        "upload_ms": null,
+        "download_ms": null
+      },
+      "phase_medians_ms": {
+        "outer_total_sec": 139.4839,
+        "basis_build_sec": 34.648900000000005,
+        "coarse_lambda_sec": 8.931700000000001,
+        "sweeps_sec": 84.57880000000002,
+        "coarse_eta_sec": 1.8362,
+        "coarse_solve_sec": 13.6939,
+        "prolong_inject_sec": 2.2439,
+        "factor_relinearize_sec": 12.9653,
+        "objective_eval_sec": 3.2201999999999997
+      },
+      "cpu_phase_medians_ms": {
+        "outer_total_sec": 248.8447,
+        "basis_build_sec": 37.4464,
+        "coarse_lambda_sec": 14.525,
+        "sweeps_sec": 158.0968,
+        "coarse_eta_sec": 1.4956,
+        "coarse_solve_sec": 14.59,
+        "prolong_inject_sec": 2.1844,
+        "factor_relinearize_sec": 9.431099999999999,
+        "objective_eval_sec": 2.6166
+      },
+      "work_counts": {
+        "gbp_sweeps_executed": 6000,
+        "full_precision_sweeps": 2036,
+        "eta_only_sweeps": 3964,
+        "coarse_solves": 60
+      }
+    }
+  ]
+}

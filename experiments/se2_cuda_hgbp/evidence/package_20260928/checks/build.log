@@ -1,0 +1,107 @@
+-- The CXX compiler identification is MSVC 19.44.35217.0
+-- The CUDA compiler identification is NVIDIA 12.8.61
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: D:/VS/2022/BuildTools/VC/Tools/MSVC/14.44.35207/bin/Hostx64/x64/cl.exe - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Detecting CUDA compiler ABI info
+-- Detecting CUDA compiler ABI info - done
+-- Check for working CUDA compiler: C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.8/bin/nvcc.exe - skipped
+-- Detecting CUDA compile features
+-- Detecting CUDA compile features - done
+-- Found OpenMP_CXX: -openmp (found version "2.0")
+-- Found OpenMP: TRUE (found version "2.0") found components: CXX
+-- Found OpenMP: TRUE (found version "2.0")
+-- Configuring done (6.2s)
+-- Generating done (0.1s)
+-- Build files have been written to: C:/Users/27118/Desktop/Hierarchy-GBP/experiments/se2_cuda_hgbp/build
+[1/46] Building CXX object CMakeFiles\se2_cuda_host.dir\C_\Users\27118\Desktop\Hierarchy-GBP\src\factor_graph.cpp.obj
+[2/46] Building CXX object CMakeFiles\se2_cuda_host.dir\C_\Users\27118\Desktop\Hierarchy-GBP\src\se2_internal_sync.cpp.obj
+[3/46] Building CXX object CMakeFiles\se2_cuda_host.dir\C_\Users\27118\Desktop\Hierarchy-GBP\src\variable.cpp.obj
+[4/46] Building CXX object CMakeFiles\se2_cuda_host.dir\C_\Users\27118\Desktop\Hierarchy-GBP\src\se2_internal_coarse.cpp.obj
+[5/46] Building CXX object CMakeFiles\se2_cuda_host.dir\C_\Users\27118\Desktop\Hierarchy-GBP\src\se2_internal_group_sync.cpp.obj
+[6/46] Building CXX object CMakeFiles\se2_cuda_host.dir\C_\Users\27118\Desktop\Hierarchy-GBP\src\se2_internal_dense_sync.cpp.obj
+[7/46] Building CXX object CMakeFiles\se2_cuda_host.dir\C_\Users\27118\Desktop\Hierarchy-GBP\src\se2_internal_basis.cpp.obj
+[8/46] Building CXX object CMakeFiles\se2_cuda_host.dir\C_\Users\27118\Desktop\Hierarchy-GBP\src\gaussian.cpp.obj
+[9/46] Building CXX object reference\CMakeFiles\hgbp_se2.dir\src\factor_graph.cpp.obj
+[10/46] Building CXX object reference\CMakeFiles\hgbp_se2.dir\src\variable.cpp.obj
+[11/46] Building CXX object reference\CMakeFiles\hgbp_se2.dir\src\gaussian.cpp.obj
+[12/46] Building CXX object reference\CMakeFiles\hgbp_se2.dir\src\se2_internal_sync.cpp.obj
+[13/46] Building CUDA object CMakeFiles\se2_cuda_kernels.dir\se2_cuda.cu.obj
+C:\Users\27118\Desktop\Hierarchy-GBP\experiments\se2_cuda_hgbp\se2_segment_kernel.cuh(68): warning #550-D: variable "checked" was set but never used
+          bool checked=false;
+               ^
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+ptxas info    : 3 bytes gmem, 24 bytes cmem[4]
+ptxas info    : Compiling entry function '_ZN44_GLOBAL__N__c52bfbd2_11_se2_cuda_cu_81fb6efb19sweepsSegmentKernelENS_6DeviceEid' for 'sm_89'
+ptxas info    : Function properties for _ZN44_GLOBAL__N__c52bfbd2_11_se2_cuda_cu_81fb6efb19sweepsSegmentKernelENS_6DeviceEid
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 168 registers, used 1 barriers, 80 bytes smem, 600 bytes cmem[0], 24 bytes cmem[2]
+ptxas info    : Compile time = 0.000 ms
+ptxas info    : Compiling entry function '_ZN44_GLOBAL__N__c52bfbd2_11_se2_cuda_cu_81fb6efb6unpackE11SE2CudaViewNS_6DeviceEbP12SE2CudaState' for 'sm_89'
+ptxas info    : Function properties for _ZN44_GLOBAL__N__c52bfbd2_11_se2_cuda_cu_81fb6efb6unpackE11SE2CudaViewNS_6DeviceEbP12SE2CudaState
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 30 registers, used 0 barriers, 800 bytes cmem[0], 16 bytes cmem[2]
+ptxas info    : Compile time = 0.000 ms
+ptxas info    : Compiling entry function '_ZN44_GLOBAL__N__c52bfbd2_11_se2_cuda_cu_81fb6efb18sweepsGatherKernelENS_6DeviceEid' for 'sm_89'
+ptxas info    : Function properties for _ZN44_GLOBAL__N__c52bfbd2_11_se2_cuda_cu_81fb6efb18sweepsGatherKernelENS_6DeviceEid
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 239 registers, used 1 barriers, 2128 bytes smem, 600 bytes cmem[0], 24 bytes cmem[2]
+ptxas info    : Compile time = 0.000 ms
+ptxas info    : Compiling entry function '_ZN44_GLOBAL__N__c52bfbd2_11_se2_cuda_cu_81fb6efb14patchBeliefEtaE11SE2CudaViewNS_6DeviceE' for 'sm_89'
+ptxas info    : Function properties for _ZN44_GLOBAL__N__c52bfbd2_11_se2_cuda_cu_81fb6efb14patchBeliefEtaE11SE2CudaViewNS_6DeviceE
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 20 registers, used 0 barriers, 784 bytes cmem[0]
+ptxas info    : Compile time = 0.000 ms
+ptxas info    : Compiling entry function '_ZN44_GLOBAL__N__c52bfbd2_11_se2_cuda_cu_81fb6efb17initializePendingENS_6DeviceE' for 'sm_89'
+ptxas info    : Function properties for _ZN44_GLOBAL__N__c52bfbd2_11_se2_cuda_cu_81fb6efb17initializePendingENS_6DeviceE
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 10 registers, used 0 barriers, 584 bytes cmem[0]
+ptxas info    : Compile time = 0.000 ms
+ptxas info    : Compiling entry function '_ZN44_GLOBAL__N__c52bfbd2_11_se2_cuda_cu_81fb6efb4packE11SE2CudaViewNS_6DeviceE' for 'sm_89'
+ptxas info    : Function properties for _ZN44_GLOBAL__N__c52bfbd2_11_se2_cuda_cu_81fb6efb4packE11SE2CudaViewNS_6DeviceE
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, used 0 barriers, 784 bytes cmem[0]
+
+ptxas info    : Compile time = 0.000 ms
+
+se2_cuda.cu
+
+tmpxft_00012b10_00000000-7_se2_cuda.cudafe1.cpp
+
+[14/46] Building CXX object reference\CMakeFiles\hgbp_se2.dir\src\se2_internal_coarse.cpp.obj
+[15/46] Building CXX object reference\CMakeFiles\hgbp_se2.dir\src\se2_internal_group_sync.cpp.obj
+[16/46] Building CXX object reference\CMakeFiles\hgbp_se2.dir\src\se2_internal_dense_sync.cpp.obj
+[17/46] Linking CUDA static library se2_cuda_kernels.lib
+[18/46] Building CXX object CMakeFiles\se2_cuda_solver.dir\benchmark.cpp.obj
+[19/46] Building CXX object reference\CMakeFiles\hgbp_se2.dir\src\se2_internal_basis.cpp.obj
+[20/46] Building CXX object CMakeFiles\se2_cuda_solver.dir\se2_checked_bridge.cpp.obj
+[21/46] Building CXX object CMakeFiles\se2_cuda_solver.dir\se2_host_overlap.cpp.obj
+[22/46] Building CXX object CMakeFiles\se2_cuda_host.dir\C_\Users\27118\Desktop\Hierarchy-GBP\src\se2_solver.cpp.obj
+[23/46] Building CXX object CMakeFiles\se2_cuda_solver.dir\se2_cached_coarse.cpp.obj
+[24/46] Building CXX object CMakeFiles\se2_cuda_failure_test.dir\test_se2_segment_failure.cpp.obj
+[25/46] Building CXX object CMakeFiles\se2_cuda_failure_test.dir\se2_host_overlap.cpp.obj
+[26/46] Building CXX object CMakeFiles\se2_cuda_layout_test.dir\test_se2_transfer_layout.cpp.obj
+[27/46] Building CXX object CMakeFiles\se2_cuda_overlap_test.dir\test_se2_host_overlap.cpp.obj
+[28/46] Building CXX object CMakeFiles\se2_cuda_overlap_test.dir\se2_host_overlap.cpp.obj
+[29/46] Building CXX object CMakeFiles\se2_cuda_coarse_test.dir\test_se2_coarse_cache.cpp.obj
+[30/46] Building CXX object CMakeFiles\se2_cuda_solver.dir\se2_basis_workspace.cpp.obj
+[31/46] Building CXX object CMakeFiles\se2_cuda_host.dir\residual_reference.cpp.obj
+[32/46] Linking CXX executable pgo\se2_cuda_failure_test.exe
+[33/46] Linking CXX executable pgo\se2_cuda_layout_test.exe
+[34/46] Linking CXX executable pgo\se2_cuda_overlap_test.exe
+[35/46] Building CXX object CMakeFiles\se2_cuda_coarse_test.dir\se2_cached_coarse.cpp.obj
+[36/46] Building CXX object reference\CMakeFiles\se2_benchmark.dir\src\se2_benchmark.cpp.obj
+[37/46] Building CXX object CMakeFiles\se2_cuda_solver.dir\se2_overlap_solver.cpp.obj
+[38/46] Building CXX object reference\CMakeFiles\hgbp_se2.dir\src\se2_solver.cpp.obj
+[39/46] Building CXX object reference\CMakeFiles\hgbp_se2.dir\src\se2_internal_residual.cpp.obj
+[40/46] Building CXX object CMakeFiles\se2_cuda_host.dir\C_\Users\27118\Desktop\Hierarchy-GBP\src\factor.cpp.obj
+[41/46] Linking CXX static library se2_cuda_host.lib
+[42/46] Linking CXX executable pgo\se2_cuda_coarse_test.exe
+[43/46] Linking CXX executable pgo\se2_cuda_benchmark.exe
+[44/46] Building CXX object reference\CMakeFiles\hgbp_se2.dir\src\factor.cpp.obj
+[45/46] Linking CXX static library reference\hgbp_se2.lib
+[46/46] Linking CXX executable pgo\se2_benchmark.exe

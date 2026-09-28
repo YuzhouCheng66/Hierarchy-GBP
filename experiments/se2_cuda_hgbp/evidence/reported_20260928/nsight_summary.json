@@ -1,0 +1,383 @@
+[
+  {
+    "trace": "FR079.transportsegment.0.sqlite",
+    "scope": "Profile diagnostic only; CUDA API waits overlap GPU work",
+    "kernels": {
+      "pack": {
+        "calls": 20,
+        "gpu_union_ms": 0.185725,
+        "summed_gpu_ms": 0.185725,
+        "launches": [
+          {
+            "registers": 40,
+            "blocks": 11,
+            "threads": 256
+          }
+        ]
+      },
+      "lower_sweeps": {
+        "calls": 60,
+        "gpu_union_ms": 35.564021,
+        "summed_gpu_ms": 35.564021,
+        "launches": [
+          {
+            "registers": 168,
+            "blocks": 84,
+            "threads": 32
+          }
+        ]
+      },
+      "unpack": {
+        "calls": 60,
+        "gpu_union_ms": 0.227866,
+        "summed_gpu_ms": 0.227866,
+        "launches": [
+          {
+            "registers": 30,
+            "blocks": 11,
+            "threads": 256
+          }
+        ]
+      },
+      "patch_belief": {
+        "calls": 40,
+        "gpu_union_ms": 0.060638,
+        "summed_gpu_ms": 0.060638,
+        "launches": [
+          {
+            "registers": 20,
+            "blocks": 4,
+            "threads": 256
+          }
+        ]
+      }
+    },
+    "lower_batches": {
+      "kind": "persistent",
+      "batches": 60,
+      "device_span_ms": 35.564021
+    },
+    "all_kernel_union_ms": 36.03825,
+    "copies": {
+      "calls": 128,
+      "bytes": 15955996,
+      "gpu_union_ms": 0.996743
+    },
+    "largest_cuda_api_durations": [
+      {
+        "name": "cudaFree_v3020",
+        "calls": 28,
+        "ms": 58.334343
+      },
+      {
+        "name": "cudaStreamSynchronize_v3020",
+        "calls": 62,
+        "ms": 30.966629
+      },
+      {
+        "name": "cudaGraphLaunch_v10000",
+        "calls": 60,
+        "ms": 3.368633
+      },
+      {
+        "name": "cuLibraryUnload",
+        "calls": 1,
+        "ms": 0.662815
+      },
+      {
+        "name": "cudaMallocHost_v3020",
+        "calls": 10,
+        "ms": 0.430326
+      },
+      {
+        "name": "cudaFreeHost_v3020",
+        "calls": 10,
+        "ms": 0.407773
+      },
+      {
+        "name": "cudaMalloc_v3020",
+        "calls": 27,
+        "ms": 0.391262
+      },
+      {
+        "name": "cudaGraphInstantiate_v12000",
+        "calls": 2,
+        "ms": 0.234061
+      },
+      {
+        "name": "cudaMemcpyAsync_v3020",
+        "calls": 12,
+        "ms": 0.212429
+      },
+      {
+        "name": "cudaLaunchKernel_v7000",
+        "calls": 4,
+        "ms": 0.120422
+      },
+      {
+        "name": "cudaGraphExecDestroy_v10000",
+        "calls": 2,
+        "ms": 0.107576
+      },
+      {
+        "name": "cudaStreamCreateWithFlags_v5000",
+        "calls": 1,
+        "ms": 0.066612
+      }
+    ]
+  },
+  {
+    "trace": "FRH.transportsegment.0.sqlite",
+    "scope": "Profile diagnostic only; CUDA API waits overlap GPU work",
+    "kernels": {
+      "pack": {
+        "calls": 20,
+        "gpu_union_ms": 0.179642,
+        "summed_gpu_ms": 0.179642,
+        "launches": [
+          {
+            "registers": 40,
+            "blocks": 25,
+            "threads": 256
+          }
+        ]
+      },
+      "lower_sweeps": {
+        "calls": 60,
+        "gpu_union_ms": 31.176768,
+        "summed_gpu_ms": 31.176768,
+        "launches": [
+          {
+            "registers": 168,
+            "blocks": 199,
+            "threads": 32
+          }
+        ]
+      },
+      "unpack": {
+        "calls": 60,
+        "gpu_union_ms": 0.228029,
+        "summed_gpu_ms": 0.228029,
+        "launches": [
+          {
+            "registers": 30,
+            "blocks": 25,
+            "threads": 256
+          }
+        ]
+      },
+      "patch_belief": {
+        "calls": 40,
+        "gpu_union_ms": 0.061086,
+        "summed_gpu_ms": 0.061086,
+        "launches": [
+          {
+            "registers": 20,
+            "blocks": 6,
+            "threads": 256
+          }
+        ]
+      }
+    },
+    "lower_batches": {
+      "kind": "persistent",
+      "batches": 60,
+      "device_span_ms": 31.176768
+    },
+    "all_kernel_union_ms": 31.645525,
+    "copies": {
+      "calls": 128,
+      "bytes": 28966468,
+      "gpu_union_ms": 1.409601
+    },
+    "largest_cuda_api_durations": [
+      {
+        "name": "cudaFree_v3020",
+        "calls": 28,
+        "ms": 65.503092
+      },
+      {
+        "name": "cudaStreamSynchronize_v3020",
+        "calls": 62,
+        "ms": 24.124899
+      },
+      {
+        "name": "cudaGraphLaunch_v10000",
+        "calls": 60,
+        "ms": 3.500599
+      },
+      {
+        "name": "cuLibraryUnload",
+        "calls": 1,
+        "ms": 0.527371
+      },
+      {
+        "name": "cudaMallocHost_v3020",
+        "calls": 10,
+        "ms": 0.45844
+      },
+      {
+        "name": "cudaMalloc_v3020",
+        "calls": 27,
+        "ms": 0.364084
+      },
+      {
+        "name": "cudaMemcpyAsync_v3020",
+        "calls": 12,
+        "ms": 0.307732
+      },
+      {
+        "name": "cudaFreeHost_v3020",
+        "calls": 10,
+        "ms": 0.294483
+      },
+      {
+        "name": "cudaGraphInstantiate_v12000",
+        "calls": 2,
+        "ms": 0.217901
+      },
+      {
+        "name": "cudaLaunchKernel_v7000",
+        "calls": 4,
+        "ms": 0.156795
+      },
+      {
+        "name": "cudaMemsetAsync_v3020",
+        "calls": 2,
+        "ms": 0.057068
+      },
+      {
+        "name": "cudaGraphExecDestroy_v10000",
+        "calls": 2,
+        "ms": 0.045842
+      }
+    ]
+  },
+  {
+    "trace": "M3500.transportsegment.0.sqlite",
+    "scope": "Profile diagnostic only; CUDA API waits overlap GPU work",
+    "kernels": {
+      "pack": {
+        "calls": 20,
+        "gpu_union_ms": 0.270299,
+        "summed_gpu_ms": 0.270299,
+        "launches": [
+          {
+            "registers": 40,
+            "blocks": 52,
+            "threads": 256
+          }
+        ]
+      },
+      "lower_sweeps": {
+        "calls": 60,
+        "gpu_union_ms": 50.229991,
+        "summed_gpu_ms": 50.229991,
+        "launches": [
+          {
+            "registers": 168,
+            "blocks": 410,
+            "threads": 32
+          }
+        ]
+      },
+      "unpack": {
+        "calls": 60,
+        "gpu_union_ms": 0.23222,
+        "summed_gpu_ms": 0.23222,
+        "launches": [
+          {
+            "registers": 30,
+            "blocks": 52,
+            "threads": 256
+          }
+        ]
+      },
+      "patch_belief": {
+        "calls": 40,
+        "gpu_union_ms": 0.061343,
+        "summed_gpu_ms": 0.061343,
+        "launches": [
+          {
+            "registers": 20,
+            "blocks": 14,
+            "threads": 256
+          }
+        ]
+      }
+    },
+    "lower_batches": {
+      "kind": "persistent",
+      "batches": 60,
+      "device_span_ms": 50.229991
+    },
+    "all_kernel_union_ms": 50.793853,
+    "copies": {
+      "calls": 128,
+      "bytes": 63816148,
+      "gpu_union_ms": 3.139643
+    },
+    "largest_cuda_api_durations": [
+      {
+        "name": "cudaFree_v3020",
+        "calls": 28,
+        "ms": 61.311682
+      },
+      {
+        "name": "cudaStreamSynchronize_v3020",
+        "calls": 62,
+        "ms": 35.544562
+      },
+      {
+        "name": "cudaGraphLaunch_v10000",
+        "calls": 60,
+        "ms": 3.897738
+      },
+      {
+        "name": "cudaMallocHost_v3020",
+        "calls": 10,
+        "ms": 0.948066
+      },
+      {
+        "name": "cudaMalloc_v3020",
+        "calls": 27,
+        "ms": 0.593085
+      },
+      {
+        "name": "cudaFreeHost_v3020",
+        "calls": 10,
+        "ms": 0.435819
+      },
+      {
+        "name": "cuLibraryUnload",
+        "calls": 1,
+        "ms": 0.36237
+      },
+      {
+        "name": "cudaMemcpyAsync_v3020",
+        "calls": 12,
+        "ms": 0.194528
+      },
+      {
+        "name": "cudaGraphInstantiate_v12000",
+        "calls": 2,
+        "ms": 0.144017
+      },
+      {
+        "name": "cudaLaunchKernel_v7000",
+        "calls": 4,
+        "ms": 0.133452
+      },
+      {
+        "name": "cudaGraphExecDestroy_v10000",
+        "calls": 2,
+        "ms": 0.053286
+      },
+      {
+        "name": "cudaMemsetAsync_v3020",
+        "calls": 2,
+        "ms": 0.051937
+      }
+    ]
+  }
+]

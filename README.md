@@ -20,8 +20,11 @@ efficient single-threaded and parallel execution. See
 - `scripts/run_benchmarks.py`: reproducible runs, including previously unseen inputs.
 - `tests/`: numerical kernels and runner checks.
 - `scripts/datasets/`: reproducible synthetic Globe generators.
-- `experiments/se2_cuda_hybrid_hgbp_5x/`: archived first-generation CUDA/CPU
-  hybrid H-GBP prototype and its carefully scoped historical 5x result.
+- [`experiments/se2_cuda_hgbp/`](experiments/se2_cuda_hgbp/README.md): validated
+  SE2 CUDA/CPU hybrid with matching outer20, conditioned basis and adaptive GBP.
+  Includes reproducible CPU16 comparisons, complete-process wall time, phase
+  breakdown and numerical evidence. The complete-process 2x target is not met;
+  this replaces the historical, unequal-budget 5x prototype.
 
 Policies are shared across datasets within SE2, SE3 and BA respectively.
 Dataset names select input metadata, not numerical parameter overrides.

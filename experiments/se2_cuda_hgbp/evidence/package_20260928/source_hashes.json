@@ -1,0 +1,106 @@
+[
+  {
+    "file": "archive_results.py",
+    "sha256": "43953eb320621c1d19f4e50c49ca63104eaec05c4d22a6194663cdf84886f4e9"
+  },
+  {
+    "file": "benchmark.cpp",
+    "sha256": "c546a7d2870fd07bff3f8caa9a060854c2b40f70469987d88c8ade2d86480d67"
+  },
+  {
+    "file": "build.ps1",
+    "sha256": "b2207dbe7d1806ab335c76001e112c7f3404455563d386f37021a91e8551894d"
+  },
+  {
+    "file": "CMakeLists.txt",
+    "sha256": "b37ca79e944b363b593999458b8405216f4efed0049952f2796aee3ef5846bf0"
+  },
+  {
+    "file": "compare_resident.py",
+    "sha256": "c6637ad988005c9e14711406b508594abec5afa42bde7b7ff4ed80159d918ef4"
+  },
+  {
+    "file": "compare.py",
+    "sha256": "097a2b26599650e75264b769c9a9ef54f7645422a7e413ca6ecf3af55a133e1a"
+  },
+  {
+    "file": "residual_reference.cpp",
+    "sha256": "7ca9a0d4ade8f1793f051aa3e27c42d724e43ec7986416c48261cd0ec44477d7"
+  },
+  {
+    "file": "run.ps1",
+    "sha256": "191f4120c62c37a25f3e2c78ee16cdd09399d599e08049c9148360ee30919731"
+  },
+  {
+    "file": "se2_basis_workspace.cpp",
+    "sha256": "0ec9c4781b702e84b8167aba78c25f15ec8aa6fb710aca4b7a2a5811d5cea044"
+  },
+  {
+    "file": "se2_cached_coarse.cpp",
+    "sha256": "0aea2cc19bf1e4ba4217609acac23c7aafefb80c1608fb86e6c88fab7d604c48"
+  },
+  {
+    "file": "se2_checked_bridge.cpp",
+    "sha256": "e7d5fbab272801c12373f6bc9265508ef3091efaf4ac7a4329003341f2185079"
+  },
+  {
+    "file": "se2_cuda_sourcewarp.cu",
+    "sha256": "9eb8701f2df92f4f3509778bbc9f516066651ebcc56d1354fad16910005f661e"
+  },
+  {
+    "file": "se2_cuda.cu",
+    "sha256": "209d90f601daddd6aa1dedd82ac116ffaacd6a7afae6e50b9174904f29d6af0a"
+  },
+  {
+    "file": "se2_cuda.h",
+    "sha256": "aa190b3f4c143107785e75cb1e0e05aa8dba863b92ce65bda479e98c7e5ed5c6"
+  },
+  {
+    "file": "se2_host_overlap.cpp",
+    "sha256": "1a4adef4c1ca784c97a7c682be23759af4cf2243d2e2572fcda7078b2b928cf5"
+  },
+  {
+    "file": "se2_host_overlap.h",
+    "sha256": "2cfd35ccdc23a1a713b3f76457c2ec03e0b44e7412bbd3f4efc60e74cb5dede1"
+  },
+  {
+    "file": "se2_overlap_solver.cpp",
+    "sha256": "c17e8f10539acc073112c0a04cb2d63d94e1736ded5e4721908005050e55ff2a"
+  },
+  {
+    "file": "se2_segment_kernel.cuh",
+    "sha256": "b59eb4c7591a39d80372c9c50b390cf03027a8203ad367111086503c0f17ce7d"
+  },
+  {
+    "file": "se2_transfer_layout.h",
+    "sha256": "53cb45757466e090a6d6d4036b9a8ade0df6578f85557a6cb52662e969de8cb4"
+  },
+  {
+    "file": "se2_transport_graph.cuh",
+    "sha256": "be0cda8e2acec11bb96e59777e232f9a51380773da7bf482f8db7e6c82a93044"
+  },
+  {
+    "file": "test_compare_resident.py",
+    "sha256": "8c25946255e45ef7425071c7f95d59eebcf3b978e743c59809c972318b76ab71"
+  },
+  {
+    "file": "test_se2_coarse_cache.cpp",
+    "sha256": "f6b7059277113baf3a8947b62e0c5824a7de51e082c511c2275270e094133110"
+  },
+  {
+    "file": "test_se2_host_overlap.cpp",
+    "sha256": "37cb44b256204cf90162e44f3ba71f8112c465927b33f45688513abcd4a9b317"
+  },
+  {
+    "file": "test_se2_segment_failure.cpp",
+    "sha256": "2072af639dcfeb8168c1e1f5358cf6bdd59dde342836508cf04187185da52e70"
+  },
+  {
+    "file": "test_se2_transfer_layout.cpp",
+    "sha256": "bd79f2551904734f0c6a8d4ea839e9a5a0b2bb06ec78faa45a7df6c8ec17200a"
+  },
+  {
+    "file": "test_segment_schedule.py",
+    "sha256": "c977d6d987ac4b2dfcfc7d856a91b183d9aa4350209dd6cddf4467bcd0926ad6"
+  }
+]

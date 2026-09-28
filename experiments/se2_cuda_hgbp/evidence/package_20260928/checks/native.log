@@ -1,0 +1,14 @@
+Internal ctest changing into directory: C:/Users/27118/Desktop/Hierarchy-GBP/experiments/se2_cuda_hgbp/build
+Test project C:/Users/27118/Desktop/Hierarchy-GBP/experiments/se2_cuda_hgbp/build
+    Start 1: se2_cuda_failure_test
+1/4 Test #1: se2_cuda_failure_test ............   Passed    0.12 sec
+    Start 2: se2_cuda_layout_test
+2/4 Test #2: se2_cuda_layout_test .............   Passed    0.01 sec
+    Start 3: se2_cuda_overlap_test
+3/4 Test #3: se2_cuda_overlap_test ............   Passed    0.02 sec
+    Start 4: se2_cuda_coarse_test
+4/4 Test #4: se2_cuda_coarse_test .............   Passed    0.02 sec
+
+100% tests passed, 0 tests failed out of 4
+
+Total Test time (real) =   0.18 sec

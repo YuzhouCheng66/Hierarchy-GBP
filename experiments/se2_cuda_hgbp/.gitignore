@@ -1,0 +1,6 @@
+/build*/
+/results/
+/build_validation.log
+*.nsys-rep
+*.ncu-rep
+*.sqlite
