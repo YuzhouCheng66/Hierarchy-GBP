@@ -100,9 +100,9 @@ the first eight rows are three-run medians, while Globe100k has one pair.
 | Globe10k | 5.278 | 9.911 | 1.878 | 1.000014 |
 | Globe100k | 41.957 | 94.665 | 2.256 | 1.000003 |
 
-The geometric mean runtime ratio is 1.911. These measurements demonstrate a
-working all-GBP hierarchy, not a speed improvement over the default coarse
-direct solve. No timing ratio is claimed against other solvers here.
+These measurements demonstrate a working all-GBP hierarchy, not a speed
+improvement over the default coarse direct solve. No timing ratio is claimed
+against other solvers here.
 See `evidence/summary.json` for the
 measured times, costs and run counts, and `evidence/runs.json` for commands,
 input/binary hashes and effective configurations. Historical timings are not
