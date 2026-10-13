@@ -1,4 +1,7 @@
 #include "internal/se2_solver_impl.h"
+#ifdef HGBP_PURE_GBP
+#include "pure_gbp/projection.h"
+#endif
 #include "internal/scoped_worker_affinity.h"
 #include "internal/se2_sync.h"
 #include "internal/se2_group_sync.h"
@@ -2421,6 +2424,9 @@ ExperimentResults runSyntheticSE2Experiment(
             coarse_factor = &fastsync_local_packed_coarse_factor;
             reuse_coarse_pattern = fastsync_local_packed_coarse_factor_valid;
         }
+#ifdef HGBP_PURE_GBP
+        pure_gbp::begin(coarse_lam,1e-10,4,sync_num_threads);
+#else
         factorizeSparseCholesky(
             coarse_lam,
             1e-10,
@@ -2428,6 +2434,7 @@ ExperimentResults runSyntheticSE2Experiment(
             reuse_coarse_pattern,
             use_packed_residual_solver || use_packed_non_sweeps
         );
+#endif
         if (use_packed_residual_solver) {
             packed_residual_coarse_factor_valid = true;
         } else if (use_packed_non_sweeps) {
@@ -2534,7 +2541,14 @@ ExperimentResults runSyntheticSE2Experiment(
             coarse_eta_sec += elapsedSeconds(coarse_eta_t0, coarse_eta_t1);
 
             const auto coarse_solve_t0 = SteadyClock::now();
+#ifdef HGBP_PURE_GBP
+            if(!use_packed_residual_solver)throw std::runtime_error("pure GBP requires the packed SE2 fine path");
+            if(pure_gbp::needsProjectedInitialization())
+                pure_gbp::initializeProjected(pure_gbp::projectSE2(packed_residual_workspace,basis,packed_coarse_threads));
+            pure_gbp::solve(coarse_eta,delta_z);
+#else
             solveWithSparseCholeskyInto(*coarse_factor, coarse_eta, delta_z);
+#endif
             ++coarse_solves;
             const auto coarse_solve_t1 = SteadyClock::now();
             coarse_solve_sec += elapsedSeconds(coarse_solve_t0, coarse_solve_t1);
@@ -2849,6 +2863,11 @@ void writeExperimentResultsJson(
     out << "    \"num_poses\": " << results.num_poses << ",\n";
     out << "    \"num_edges\": " << results.num_edges << "\n";
     out << "  },\n";
+#ifdef HGBP_PURE_GBP
+    out << "  \"coarse_linear_backend\": \"pure_gbp\",\n";
+#else
+    out << "  \"coarse_linear_backend\": \"cholesky\",\n";
+#endif
     out << "  \"initial_objective\": " << jsonNumber(results.initial_objective) << ",\n";
     out << "  \"residual_workspace_build_sec\": " << jsonNumber(results.residual_workspace_build_sec) << ",\n";
     out << "  \"residual_workspace_variable_alloc_sec\": " << jsonNumber(results.residual_workspace_variable_alloc_sec) << ",\n";

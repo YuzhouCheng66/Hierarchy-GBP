@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 include(CTest)
 option(HGBP_BUILD_BA "Build BA (requires the compiled RootBA dependency)." ON)
+option(HGBP_PURE_GBP "Experimental PGO: GBP at every hierarchy level." OFF)
 
 set(HGBP_DEPENDENCY_ROOT "$ENV{HGBP_DEPENDENCY_ROOT}" CACHE PATH "Dependency workspace.")
 foreach(_dep EIGEN VCPKG_INSTALLED ROOTBA)
@@ -76,6 +77,13 @@ if(MSVC)
     target_link_libraries(hgbp_se3 PRIVATE "${_banded_import}")
 endif()
 
+if(HGBP_PURE_GBP)
+    if(HGBP_BUILD_BA)
+        message(FATAL_ERROR "The pure_gbp experiment is PGO-only; set HGBP_BUILD_BA=OFF.")
+    endif()
+    include(experiments/pure_gbp/targets.cmake)
+endif()
+
 if(HGBP_BUILD_BA)
     add_library(hgbp_ba_dependencies INTERFACE)
     target_include_directories(hgbp_ba_dependencies INTERFACE ${HGBP_EIGEN_DIR}
@@ -114,7 +122,7 @@ if(BUILD_TESTING)
         set_tests_properties(${name} PROPERTIES ENVIRONMENT "OPENBLAS_NUM_THREADS=1;MKL_NUM_THREADS=1;OMP_NUM_THREADS=1")
     endfunction()
     foreach(_test serial_reciprocal_test banded_symmetric_eigen_test
-            se3_schur_solve_test se3_precision_test se3_boundary_test se3_objective_test
+            se3_schur_solve_test se3_schur_projection_test se3_precision_test se3_boundary_test se3_objective_test
             se3_eta_lift_test se3_precision_defect_test)
         hgbp_test(${_test} hgbp_se3)
     endforeach()

@@ -55,4 +55,49 @@ inline void solveSpd6CrossEtaPackedBatched(const double* l, const double* cross,
     solveSpd6CrossEtaPackedReciprocal(l,cross,eta,out);
 }
 
+#if defined(_MSC_VER)
+#define SCHUR_FORWARD_INLINE __forceinline
+#else
+#define SCHUR_FORWARD_INLINE inline __attribute__((always_inline))
+#endif
+SCHUR_FORWARD_INLINE double dotSchur6(const double* a, const double* b) noexcept {
+    double sum=a[0]*b[0];
+    sum+=a[1]*b[1]; sum+=a[2]*b[2]; sum+=a[3]*b[3]; sum+=a[4]*b[4]; sum+=a[5]*b[5];
+    return sum;
+}
+
+// Q=LL^T, Y=L^-1 C^T, y=L^-1 h: compute C Q^-1 C^T and C Q^-1 h
+// as Y^T Y and Y^T y, eliminating all seven backward triangular solves.
+SCHUR_FORWARD_INLINE void projectForwardSchur6(const double* diagonal, const double* forward,
+                                              double* precision, double* eta_projected) noexcept {
+    const double* y0=forward; const double* y1=forward+6; const double* y2=forward+12;
+    const double* y3=forward+18; const double* y4=forward+24; const double* y5=forward+30;
+    const double* e=forward+36;
+    precision[0]=diagonal[0]-dotSchur6(y0,y0);
+    precision[1]=diagonal[1]-dotSchur6(y0,y1);
+    precision[2]=diagonal[2]-dotSchur6(y1,y1);
+    precision[3]=diagonal[3]-dotSchur6(y0,y2);
+    precision[4]=diagonal[4]-dotSchur6(y1,y2);
+    precision[5]=diagonal[5]-dotSchur6(y2,y2);
+    precision[6]=diagonal[6]-dotSchur6(y0,y3);
+    precision[7]=diagonal[7]-dotSchur6(y1,y3);
+    precision[8]=diagonal[8]-dotSchur6(y2,y3);
+    precision[9]=diagonal[9]-dotSchur6(y3,y3);
+    precision[10]=diagonal[10]-dotSchur6(y0,y4);
+    precision[11]=diagonal[11]-dotSchur6(y1,y4);
+    precision[12]=diagonal[12]-dotSchur6(y2,y4);
+    precision[13]=diagonal[13]-dotSchur6(y3,y4);
+    precision[14]=diagonal[14]-dotSchur6(y4,y4);
+    precision[15]=diagonal[15]-dotSchur6(y0,y5);
+    precision[16]=diagonal[16]-dotSchur6(y1,y5);
+    precision[17]=diagonal[17]-dotSchur6(y2,y5);
+    precision[18]=diagonal[18]-dotSchur6(y3,y5);
+    precision[19]=diagonal[19]-dotSchur6(y4,y5);
+    precision[20]=diagonal[20]-dotSchur6(y5,y5);
+    eta_projected[0]=dotSchur6(y0,e); eta_projected[1]=dotSchur6(y1,e);
+    eta_projected[2]=dotSchur6(y2,e); eta_projected[3]=dotSchur6(y3,e);
+    eta_projected[4]=dotSchur6(y4,e); eta_projected[5]=dotSchur6(y5,e);
+}
+#undef SCHUR_FORWARD_INLINE
+
 }  // namespace slam

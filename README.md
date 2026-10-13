@@ -11,6 +11,8 @@ the landmark-reduced camera system within a flexible conjugate-gradient solve.
 Optimized fixed-size kernels, packed message storage and cached updates support
 efficient single-threaded and parallel execution. See
 [algorithm and policy details](docs/policies.md).
+SE3 full-precision messages use forward-Schur/Gram projections to avoid
+redundant backward triangular solves, with dedicated numerical regression tests.
 
 ## Layout
 
@@ -83,3 +85,14 @@ are not portable performance guarantees.
 Baseline adapters and reproduction commands are in [baselines/](baselines/README.md).
 Input definitions and sources are documented in the dataset card; the
 [Globe generators](scripts/datasets/README.md) reproduce the synthetic inputs.
+
+## GBP at every level
+
+The optional [`pure_gbp`](experiments/pure_gbp/README.md) variant retains
+hierarchical abstraction and recovery while using GBP for fine smoothing and
+both coarse levels, **without a coarse direct or Krylov solve**. Same-machine
+16-thread, outer20 tests on all nine PGO inputs take **1.45-2.51x** the default
+runtime (geometric mean **1.91x**), with a maximum final-cost increase of
+**0.451%**. The faster coarse-direct route remains the default.
+The independent folder contains the shared-policy configuration, build/run
+instructions, numerical tests and [paired evidence](experiments/pure_gbp/evidence/summary.json).

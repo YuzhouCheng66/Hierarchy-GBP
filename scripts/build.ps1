@@ -8,11 +8,13 @@ param(
     [string]$VcpkgInstalledDir = $env:HGBP_VCPKG_INSTALLED_DIR,
     [string]$RootBADir = $env:HGBP_ROOTBA_DIR,
     [string]$PGORuntimeDir = $env:HGBP_PGO_RUNTIME,
-    [switch]$PGOOnly
+    [switch]$PGOOnly,
+    [switch]$PureGBP
 )
 
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
+if ($PureGBP -and !$PGOOnly) { throw "PureGBP is a PGO-only experiment; also pass -PGOOnly." }
 
 if ($DependencyRoot) {
     if (!$EigenDir) {
@@ -61,6 +63,7 @@ function Invoke-CMakeBuild {
         "-DHGBP_VCPKG_INSTALLED_DIR=$VcpkgInstalledDir",
         "-DHGBP_ROOTBA_DIR=$RootBADir",
         "-DHGBP_BUILD_BA=$(!$PGOOnly)"
+        "-DHGBP_PURE_GBP=$($PureGBP.IsPresent)"
     )
 
     & cmake @configureArgs

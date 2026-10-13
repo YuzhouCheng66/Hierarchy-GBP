@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "description": "One coarse GBP policy for all SE2/SE3 inputs; fine policies are inherited unchanged from configs/pgo.json.",
+  "coarse": {
+    "group_size": 16,
+    "cycles": 3,
+    "pre_sweeps": 40,
+    "top_sweeps": 400,
+    "top_serial_limit": 256,
+    "tolerance": 1e-8,
+    "precision_tolerance": 1e-12
+  }
+}

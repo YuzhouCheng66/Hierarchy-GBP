@@ -1,0 +1,365 @@
+{
+  "metric": "native optimization wall seconds; ratio=pure/main",
+  "threads": [
+    16
+  ],
+  "geometric_mean_ratio": 1.9108014021424697,
+  "ratio_range": [
+    1.4479029007791464,
+    2.513590557705803
+  ],
+  "maximum_cost_ratio": 1.0045103416226104,
+  "datasets": [
+    {
+      "dataset": "Cubicle",
+      "main": {
+        "runs": 3,
+        "completed": 3,
+        "binary_sha256": [
+          "f2e37aa353cc7e48e4d8f40c29cdb1d83fab95d99d1b79d4e0b8907805b01698"
+        ],
+        "native_sec": 4.636763,
+        "process_sec": 4.907036300050095,
+        "cost": 1378.5343286563966,
+        "coarse_sec": 0.1655753,
+        "sweeps": 4400,
+        "time_range": [
+          4.6050418,
+          4.6445856
+        ],
+        "failures": []
+      },
+      "pure": {
+        "runs": 3,
+        "completed": 3,
+        "binary_sha256": [
+          "fb5c45eedb3c02d195cb17990a1442a4e57951ab6909bf4167ce21c152d1c910"
+        ],
+        "native_sec": 8.8559571,
+        "process_sec": 9.155625400017016,
+        "cost": 1379.3015298536307,
+        "coarse_sec": 3.2647955,
+        "sweeps": 4250,
+        "time_range": [
+          8.7089178,
+          8.8564536
+        ],
+        "failures": []
+      },
+      "pure_over_main": 1.909943876795083,
+      "cost_ratio": 1.000556533980537
+    },
+    {
+      "dataset": "FR079",
+      "main": {
+        "runs": 3,
+        "completed": 3,
+        "binary_sha256": [
+          "1000fad99e78a6964d4f92826002fdbf82ea232f02116b9137316e178b02e8e9"
+        ],
+        "native_sec": 0.1128504,
+        "process_sec": 0.15377019997686148,
+        "cost": 18.785887502887988,
+        "coarse_sec": 0.0016484,
+        "sweeps": 6000,
+        "time_range": [
+          0.1007492,
+          0.1156725
+        ],
+        "failures": []
+      },
+      "pure": {
+        "runs": 3,
+        "completed": 3,
+        "binary_sha256": [
+          "c0ffc9e10d8560051aa3b21c664c0a4a9204f37f1a1340d12f3ef4d98dbe0203"
+        ],
+        "native_sec": 0.199974,
+        "process_sec": 0.23997270001564175,
+        "cost": 18.785928613313118,
+        "coarse_sec": 0.08861340000000001,
+        "sweeps": 6000,
+        "time_range": [
+          0.1903617,
+          0.2029415
+        ],
+        "failures": []
+      },
+      "pure_over_main": 1.7720273920163332,
+      "cost_ratio": 1.0000021883674712
+    },
+    {
+      "dataset": "FRH",
+      "main": {
+        "runs": 3,
+        "completed": 3,
+        "binary_sha256": [
+          "1000fad99e78a6964d4f92826002fdbf82ea232f02116b9137316e178b02e8e9"
+        ],
+        "native_sec": 0.1276437,
+        "process_sec": 0.17445950000546873,
+        "cost": 9.656841046587548e-05,
+        "coarse_sec": 0.0015995,
+        "sweeps": 6000,
+        "time_range": [
+          0.122864,
+          0.130473
+        ],
+        "failures": []
+      },
+      "pure": {
+        "runs": 3,
+        "completed": 3,
+        "binary_sha256": [
+          "c0ffc9e10d8560051aa3b21c664c0a4a9204f37f1a1340d12f3ef4d98dbe0203"
+        ],
+        "native_sec": 0.221878,
+        "process_sec": 0.26761189999524504,
+        "cost": 9.656855767616629e-05,
+        "coarse_sec": 0.1004432,
+        "sweeps": 6000,
+        "time_range": [
+          0.2189747,
+          0.2324063
+        ],
+        "failures": []
+      },
+      "pure_over_main": 1.7382604860247706,
+      "cost_ratio": 1.0000015244145586
+    },
+    {
+      "dataset": "Globe10k",
+      "main": {
+        "runs": 3,
+        "completed": 3,
+        "binary_sha256": [
+          "f2e37aa353cc7e48e4d8f40c29cdb1d83fab95d99d1b79d4e0b8907805b01698"
+        ],
+        "native_sec": 5.2779583,
+        "process_sec": 5.715364800009411,
+        "cost": 3039.927579192686,
+        "coarse_sec": 1.0238436,
+        "sweeps": 3150,
+        "time_range": [
+          5.2722375,
+          5.4714566
+        ],
+        "failures": []
+      },
+      "pure": {
+        "runs": 3,
+        "completed": 3,
+        "binary_sha256": [
+          "fb5c45eedb3c02d195cb17990a1442a4e57951ab6909bf4167ce21c152d1c910"
+        ],
+        "native_sec": 9.9112581,
+        "process_sec": 10.35426270001335,
+        "cost": 3039.9712866499617,
+        "coarse_sec": 4.7140450000000005,
+        "sweeps": 4700,
+        "time_range": [
+          9.9015093,
+          10.8160492
+        ],
+        "failures": []
+      },
+      "pure_over_main": 1.8778583567058496,
+      "cost_ratio": 1.0000143777955681
+    },
+    {
+      "dataset": "Grid",
+      "main": {
+        "runs": 3,
+        "completed": 3,
+        "binary_sha256": [
+          "f2e37aa353cc7e48e4d8f40c29cdb1d83fab95d99d1b79d4e0b8907805b01698"
+        ],
+        "native_sec": 3.7984898,
+        "process_sec": 4.191996300010942,
+        "cost": 42179.978945067975,
+        "coarse_sec": 0.2981552,
+        "sweeps": 1700,
+        "time_range": [
+          3.7811029,
+          3.9894157
+        ],
+        "failures": []
+      },
+      "pure": {
+        "runs": 3,
+        "completed": 3,
+        "binary_sha256": [
+          "fb5c45eedb3c02d195cb17990a1442a4e57951ab6909bf4167ce21c152d1c910"
+        ],
+        "native_sec": 5.4998444,
+        "process_sec": 5.893702000030316,
+        "cost": 42202.23854637819,
+        "coarse_sec": 1.7754614,
+        "sweeps": 2200,
+        "time_range": [
+          5.466372,
+          5.5791374
+        ],
+        "failures": []
+      },
+      "pure_over_main": 1.4479029007791464,
+      "cost_ratio": 1.0005277290759014
+    },
+    {
+      "dataset": "M3500",
+      "main": {
+        "runs": 3,
+        "completed": 3,
+        "binary_sha256": [
+          "1000fad99e78a6964d4f92826002fdbf82ea232f02116b9137316e178b02e8e9"
+        ],
+        "native_sec": 0.301425,
+        "process_sec": 0.37228370003867894,
+        "cost": 68.95754667615267,
+        "coarse_sec": 0.0151935,
+        "sweeps": 6000,
+        "time_range": [
+          0.2877016,
+          0.3307117
+        ],
+        "failures": []
+      },
+      "pure": {
+        "runs": 3,
+        "completed": 3,
+        "binary_sha256": [
+          "c0ffc9e10d8560051aa3b21c664c0a4a9204f37f1a1340d12f3ef4d98dbe0203"
+        ],
+        "native_sec": 0.6781495,
+        "process_sec": 0.7477985000004992,
+        "cost": 69.26856876911923,
+        "coarse_sec": 0.3697285,
+        "sweeps": 6000,
+        "time_range": [
+          0.646169,
+          0.7376813
+        ],
+        "failures": []
+      },
+      "pure_over_main": 2.2498117276271046,
+      "cost_ratio": 1.0045103416226104
+    },
+    {
+      "dataset": "ParkingGarage",
+      "main": {
+        "runs": 3,
+        "completed": 3,
+        "binary_sha256": [
+          "f2e37aa353cc7e48e4d8f40c29cdb1d83fab95d99d1b79d4e0b8907805b01698"
+        ],
+        "native_sec": 1.6796257,
+        "process_sec": 1.803150399995502,
+        "cost": 0.6341924087619283,
+        "coarse_sec": 0.0411123,
+        "sweeps": 4400,
+        "time_range": [
+          1.6679995,
+          1.9023341
+        ],
+        "failures": []
+      },
+      "pure": {
+        "runs": 3,
+        "completed": 3,
+        "binary_sha256": [
+          "fb5c45eedb3c02d195cb17990a1442a4e57951ab6909bf4167ce21c152d1c910"
+        ],
+        "native_sec": 4.2218913,
+        "process_sec": 4.360852900019381,
+        "cost": 0.6356858663373872,
+        "coarse_sec": 2.4980256,
+        "sweeps": 4700,
+        "time_range": [
+          4.1913087,
+          4.2418963
+        ],
+        "failures": []
+      },
+      "pure_over_main": 2.513590557705803,
+      "cost_ratio": 1.0023548966446547
+    },
+    {
+      "dataset": "Sphere",
+      "main": {
+        "runs": 3,
+        "completed": 3,
+        "binary_sha256": [
+          "f2e37aa353cc7e48e4d8f40c29cdb1d83fab95d99d1b79d4e0b8907805b01698"
+        ],
+        "native_sec": 1.2515411,
+        "process_sec": 1.348848800000269,
+        "cost": 675.7009629259366,
+        "coarse_sec": 0.0575672,
+        "sweeps": 3500,
+        "time_range": [
+          1.2372952,
+          1.2712372
+        ],
+        "failures": []
+      },
+      "pure": {
+        "runs": 3,
+        "completed": 3,
+        "binary_sha256": [
+          "fb5c45eedb3c02d195cb17990a1442a4e57951ab6909bf4167ce21c152d1c910"
+        ],
+        "native_sec": 2.0823233,
+        "process_sec": 2.198426400020253,
+        "cost": 675.700962925937,
+        "coarse_sec": 0.8771751999999999,
+        "sweeps": 3700,
+        "time_range": [
+          2.073494,
+          2.1259658
+        ],
+        "failures": []
+      },
+      "pure_over_main": 1.6638073651756222,
+      "cost_ratio": 1.0000000000000007
+    },
+    {
+      "dataset": "Globe100k",
+      "main": {
+        "runs": 1,
+        "completed": 1,
+        "binary_sha256": [
+          "f2e37aa353cc7e48e4d8f40c29cdb1d83fab95d99d1b79d4e0b8907805b01698"
+        ],
+        "native_sec": 41.9567607,
+        "process_sec": 45.70148899999913,
+        "cost": 20090.740925345734,
+        "coarse_sec": 2.8086898,
+        "sweeps": 2250,
+        "time_range": [
+          41.9567607,
+          41.9567607
+        ],
+        "failures": []
+      },
+      "pure": {
+        "runs": 1,
+        "completed": 1,
+        "binary_sha256": [
+          "fb5c45eedb3c02d195cb17990a1442a4e57951ab6909bf4167ce21c152d1c910"
+        ],
+        "native_sec": 94.6651208,
+        "process_sec": 98.41470659995684,
+        "cost": 20090.803007693605,
+        "coarse_sec": 40.144855899999996,
+        "sweeps": 4850,
+        "time_range": [
+          94.6651208,
+          94.6651208
+        ],
+        "failures": []
+      },
+      "pure_over_main": 2.2562542775138503,
+      "cost_ratio": 1.0000030900974783
+    }
+  ]
+}

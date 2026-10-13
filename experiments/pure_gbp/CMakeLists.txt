@@ -1,0 +1,7 @@
+cmake_minimum_required(VERSION 3.20)
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
+project(PureGBP LANGUAGES CXX)
+include(CTest)
+set(HGBP_PURE_GBP ON CACHE BOOL "GBP at every hierarchy level." FORCE)
+set(HGBP_BUILD_BA OFF CACHE BOOL "PGO-only experiment." FORCE)
+add_subdirectory(../.. hgbp)

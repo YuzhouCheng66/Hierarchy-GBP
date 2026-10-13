@@ -646,83 +646,6 @@ SE3_PACKED_FORCEINLINE void solveSpd6Lower7Raw(
     solveSpd6LowerOneRaw(l, rhs + 36, out + 36);
 }
 
-SE3_PACKED_FORCEINLINE void solveSpd6LowerCrossEtaRepeatedRaw(
-    const double* l,
-    const double* cross_rhs_col_major,
-    const double* eta_rhs,
-    double* out
-) noexcept {
-    solveSpd6CrossEtaBatched(l, cross_rhs_col_major, eta_rhs, out);
-}
-
-SE3_PACKED_FORCEINLINE void solveSpd6LowerCrossEtaPackedRepeatedRaw(
-    const double* l,
-    const double* cross_rhs_col_major,
-    const double* eta_rhs,
-    double* out
-) noexcept {
-    solveSpd6CrossEtaPackedBatched(l, cross_rhs_col_major, eta_rhs, out);
-}
-
-SE3_PACKED_FORCEINLINE double dotCrossSolvedRow6(
-    const double* cross_col_major,
-    const double* solved_col,
-    int row
-) noexcept {
-    double projected = cross_col_major[row] * solved_col[0];
-    projected += cross_col_major[row + 6] * solved_col[1];
-    projected += cross_col_major[row + 12] * solved_col[2];
-    projected += cross_col_major[row + 18] * solved_col[3];
-    projected += cross_col_major[row + 24] * solved_col[4];
-    projected += cross_col_major[row + 30] * solved_col[5];
-    return projected;
-}
-
-SE3_PACKED_FORCEINLINE void projectSchurTargetRaw(
-    const double* diag_target,
-    const double* cross_target_other,
-    const double* solved,
-    double* out_lam,
-    double* out_eta_projected
-) noexcept {
-    const double* s0 = solved;
-    const double* s1 = solved + 6;
-    const double* s2 = solved + 12;
-    const double* s3 = solved + 18;
-    const double* s4 = solved + 24;
-    const double* s5 = solved + 30;
-    const double* se = solved + 36;
-
-    out_lam[0] = diag_target[0] - dotCrossSolvedRow6(cross_target_other, s0, 0);
-    out_lam[1] = diag_target[1] - dotCrossSolvedRow6(cross_target_other, s1, 0);
-    out_lam[2] = diag_target[2] - dotCrossSolvedRow6(cross_target_other, s1, 1);
-    out_lam[3] = diag_target[3] - dotCrossSolvedRow6(cross_target_other, s2, 0);
-    out_lam[4] = diag_target[4] - dotCrossSolvedRow6(cross_target_other, s2, 1);
-    out_lam[5] = diag_target[5] - dotCrossSolvedRow6(cross_target_other, s2, 2);
-    out_lam[6] = diag_target[6] - dotCrossSolvedRow6(cross_target_other, s3, 0);
-    out_lam[7] = diag_target[7] - dotCrossSolvedRow6(cross_target_other, s3, 1);
-    out_lam[8] = diag_target[8] - dotCrossSolvedRow6(cross_target_other, s3, 2);
-    out_lam[9] = diag_target[9] - dotCrossSolvedRow6(cross_target_other, s3, 3);
-    out_lam[10] = diag_target[10] - dotCrossSolvedRow6(cross_target_other, s4, 0);
-    out_lam[11] = diag_target[11] - dotCrossSolvedRow6(cross_target_other, s4, 1);
-    out_lam[12] = diag_target[12] - dotCrossSolvedRow6(cross_target_other, s4, 2);
-    out_lam[13] = diag_target[13] - dotCrossSolvedRow6(cross_target_other, s4, 3);
-    out_lam[14] = diag_target[14] - dotCrossSolvedRow6(cross_target_other, s4, 4);
-    out_lam[15] = diag_target[15] - dotCrossSolvedRow6(cross_target_other, s5, 0);
-    out_lam[16] = diag_target[16] - dotCrossSolvedRow6(cross_target_other, s5, 1);
-    out_lam[17] = diag_target[17] - dotCrossSolvedRow6(cross_target_other, s5, 2);
-    out_lam[18] = diag_target[18] - dotCrossSolvedRow6(cross_target_other, s5, 3);
-    out_lam[19] = diag_target[19] - dotCrossSolvedRow6(cross_target_other, s5, 4);
-    out_lam[20] = diag_target[20] - dotCrossSolvedRow6(cross_target_other, s5, 5);
-
-    out_eta_projected[0] = dotCrossSolvedRow6(cross_target_other, se, 0);
-    out_eta_projected[1] = dotCrossSolvedRow6(cross_target_other, se, 1);
-    out_eta_projected[2] = dotCrossSolvedRow6(cross_target_other, se, 2);
-    out_eta_projected[3] = dotCrossSolvedRow6(cross_target_other, se, 3);
-    out_eta_projected[4] = dotCrossSolvedRow6(cross_target_other, se, 4);
-    out_eta_projected[5] = dotCrossSolvedRow6(cross_target_other, se, 5);
-}
-
 double normalizedPrecisionResidual(
     const double* candidate, const double* old, const double* diagonal
 ) noexcept {
@@ -758,7 +681,6 @@ bool computeFullTargetRaw(
     const double* eta_other,
     const double* diag_target,
     const double* diag_other,
-    const double* cross_target_other,
     const double* cross_other_target,
     const double* belief_other_eta,
     const double* belief_other_lam,
@@ -784,7 +706,7 @@ bool computeFullTargetRaw(
         for (int i = 0; i < 6; ++i) {
             eta_rhs[i] = eta_other[i] + belief_other_eta[i] - old_other_eta[i];
         }
-        solveSpd6LowerCrossEtaPackedRepeatedRaw(l, cross_other_target, eta_rhs, solved);
+        forwardSpd6CrossEtaReciprocal<true>(l, cross_other_target, eta_rhs, solved);
     } else {
         double l[36];
         if (!factorizeSpd6LowerSym21TripleRaw(diag_other, belief_other_lam, old_other_lam, l)) {
@@ -794,11 +716,11 @@ bool computeFullTargetRaw(
         for (int i = 0; i < 6; ++i) {
             eta_rhs[i] = eta_other[i] + belief_other_eta[i] - old_other_eta[i];
         }
-        solveSpd6LowerCrossEtaRepeatedRaw(l, cross_other_target, eta_rhs, solved);
+        forwardSpd6CrossEtaReciprocal(l, cross_other_target, eta_rhs, solved);
     }
 
     double eta_projected[6];
-    projectSchurTargetRaw(diag_target, cross_target_other, solved, out_lam, eta_projected);
+    projectForwardSchur6(diag_target, solved, out_lam, eta_projected);
     if (precision_residual != nullptr) {
         *precision_residual = normalizedPrecisionResidual(out_lam, old_target_lam, diag_target);
     }
@@ -882,7 +804,6 @@ double computeFullLambdaFactor(
         eta1,
         diag0,
         diag1,
-        cross01_ptr,
         cross10_ptr,
         b1_eta,
         b1_lam,
@@ -903,7 +824,6 @@ double computeFullLambdaFactor(
         eta0,
         diag1,
         diag0,
-        cross10_ptr,
         cross01_ptr,
         b0_eta,
         b0_lam,

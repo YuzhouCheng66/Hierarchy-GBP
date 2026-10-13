@@ -1,4 +1,7 @@
 #include "internal/se3_solver_impl.h"
+#ifdef HGBP_PURE_GBP
+#include "pure_gbp/projection.h"
+#endif
 #include "internal/scoped_worker_affinity.h"
 #include "internal/partial_symmetric_eigen.h"
 #include "internal/banded_symmetric_eigen.h"
@@ -4287,6 +4290,9 @@ SyntheticSE3ExperimentResults runSyntheticSE3Experiment(
             SparseCholeskyFactor* coarse_factor_ptr =
                 persist_coarse_factor ? &coarse_factor_cache : &coarse_factor_local;
             const auto coarse_factor_t0 = SteadyClock::now();
+#ifdef HGBP_PURE_GBP
+            pure_gbp::begin(coarse_lam,coarse_ridge_added_inplace?0.0:1e-8,12,thread_count);
+#else
             if (rebuild_coarse_numeric) {
                 factorizeSparseCholesky(
                     coarse_lam,
@@ -4298,6 +4304,7 @@ SyntheticSE3ExperimentResults runSyntheticSE3Experiment(
                 coarse_factor_cache_valid = persist_coarse_factor;
                 coarse_extra_work = 0.0;
             }
+#endif
             const auto coarse_factor_t1 = SteadyClock::now();
             double coarse_factorize_sec = elapsedSeconds(coarse_factor_t0, coarse_factor_t1);
             bool coarse_factor_current=rebuild_coarse_numeric;
@@ -4433,6 +4440,11 @@ SyntheticSE3ExperimentResults runSyntheticSE3Experiment(
                     delta_z.setZero();
                 } else {
                 ++coarse_solves;
+#ifdef HGBP_PURE_GBP
+                if(pure_gbp::needsProjectedInitialization())
+                    pure_gbp::initializeProjected(pure_gbp::projectSE3(graph,basis,thread_count));
+                pure_gbp::solve(coarse_eta,delta_z);
+#else
                 bool certified_reused=false;
                 if(automatic_coarse && !coarse_factor_current) {
                     ++coarse_reuse_attempts;
@@ -4482,6 +4494,7 @@ SyntheticSE3ExperimentResults runSyntheticSE3Experiment(
                         coarse_pcg_matrix_direction
                     );
                 }
+#endif
                 }
                 const auto coarse_solve_t1 = SteadyClock::now();
                 const double backsolve_elapsed = elapsedSeconds(coarse_solve_t0, coarse_solve_t1);
@@ -4884,7 +4897,11 @@ void writeSyntheticSE3ExperimentResultsJson(
     out << "    \"cycle_message_rebuild\": " << (se3EnvFlagEnabled("HGBP_SE3_CYCLE_MESSAGE_REBUILD")?"true":"false") << ",\n";
     out << "    \"automatic_coarse\": " << (se3EnvFlagEnabled("HGBP_SE3_AUTOMATIC_COARSE")?"true":"false") << ",\n";
     out << "    \"coarse_linear_backend\": \""
+#ifdef HGBP_PURE_GBP
+        << "pure_gbp"
+#else
         << (se3EnvFlagEnabled("HGBP_SE3_COARSE_CHOLMOD") ? "cholmod_auto" : "eigen_simplicial_ldlt")
+#endif
         << "\",\n";
     out << "    \"boundary_basis\": \"" << (std::getenv("HGBP_SE3_BOUNDARY_BASIS")?
         std::getenv("HGBP_SE3_BOUNDARY_BASIS"):"none") << "\",\n";
