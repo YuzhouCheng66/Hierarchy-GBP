@@ -1,5 +1,9 @@
 # Hierarchy-GBP
 
+[**Paper (arXiv)**](https://arxiv.org/abs/2610.06978)
+
+![Hierarchy-GBP: abstraction, coarse correction, recovery, and GBP refinement.](docs/assets/teaser.png)
+
 High-performance CPU solvers for SE2/SE3 pose-graph optimization and bundle
 adjustment, built around **hierarchical Gaussian belief propagation (H-GBP)**.
 
