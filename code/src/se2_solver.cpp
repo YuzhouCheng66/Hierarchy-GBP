@@ -992,32 +992,6 @@ bool rowsAreContiguous(const std::vector<int>& rows) {
     return true;
 }
 
-void restrictToCoarseInto(
-    const BasisData& basis,
-    const Eigen::VectorXd& fine_vec,
-    Eigen::VectorXd& coarse
-) {
-    if (coarse.size() != basis.coarse_dim) {
-        coarse.resize(basis.coarse_dim);
-    }
-    coarse.setZero();
-    for (int g = 0; g < static_cast<int>(basis.local_bases.size()); ++g) {
-        const std::vector<int>& rows = basis.full_indices_per_group[g];
-        const int coarse_offset = basis.coarse_offsets[g];
-        const int coarse_dim = basis.local_bases[g].cols();
-        if (rowsAreContiguous(rows)) {
-            coarse.segment(coarse_offset, coarse_dim).noalias() =
-                basis.local_bases[g].transpose() * fine_vec.segment(rows.front(), rows.size());
-        } else {
-            Eigen::VectorXd fine_local(rows.size());
-            for (int i = 0; i < static_cast<int>(rows.size()); ++i) {
-                fine_local(i) = fine_vec(rows[i]);
-            }
-            coarse.segment(coarse_offset, coarse_dim).noalias() =
-                basis.local_bases[g].transpose() * fine_local;
-        }
-    }
-}
 
 void prolongToFineInto(
     const BasisData& basis,

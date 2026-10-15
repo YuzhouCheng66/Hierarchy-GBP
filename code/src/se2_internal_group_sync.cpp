@@ -331,53 +331,6 @@ FASTLOCAL_PACKED_FORCEINLINE void copy3x3BlockColMajor(const double* src6x6, int
     }
 }
 
-FASTLOCAL_PACKED_FORCEINLINE void schurMessage3x3NoDampingInversePackedSym(
-    double eo0,
-    double eo1,
-    double eo2,
-    double eno0,
-    double eno1,
-    double eno2,
-    const double* loo6,
-    double b00,
-    double b10,
-    double b20,
-    double b01,
-    double b11,
-    double b21,
-    double b02,
-    double b12,
-    double b22,
-    double s00,
-    double s10,
-    double s20,
-    double s11,
-    double s21,
-    double s22,
-    double* out_eta,
-    double* out_lam6
-) noexcept {
-    const double c00 = b00 * s00 + b01 * s10 + b02 * s20;
-    const double c01 = b00 * s10 + b01 * s11 + b02 * s21;
-    const double c02 = b00 * s20 + b01 * s21 + b02 * s22;
-    const double c10 = b10 * s00 + b11 * s10 + b12 * s20;
-    const double c11 = b10 * s10 + b11 * s11 + b12 * s21;
-    const double c12 = b10 * s20 + b11 * s21 + b12 * s22;
-    const double c20 = b20 * s00 + b21 * s10 + b22 * s20;
-    const double c21 = b20 * s10 + b21 * s11 + b22 * s21;
-    const double c22 = b20 * s20 + b21 * s21 + b22 * s22;
-
-    out_eta[0] = eo0 - (c00 * eno0 + c01 * eno1 + c02 * eno2);
-    out_eta[1] = eo1 - (c10 * eno0 + c11 * eno1 + c12 * eno2);
-    out_eta[2] = eo2 - (c20 * eno0 + c21 * eno1 + c22 * eno2);
-
-    out_lam6[0] = loo6[0] - (c00 * b00 + c01 * b01 + c02 * b02);
-    out_lam6[1] = loo6[1] - (c10 * b00 + c11 * b01 + c12 * b02);
-    out_lam6[2] = loo6[2] - (c20 * b00 + c21 * b01 + c22 * b02);
-    out_lam6[3] = loo6[3] - (c10 * b10 + c11 * b11 + c12 * b12);
-    out_lam6[4] = loo6[4] - (c20 * b10 + c21 * b11 + c22 * b12);
-    out_lam6[5] = loo6[5] - (c20 * b20 + c21 * b21 + c22 * b22);
-}
 
 FASTLOCAL_PACKED_FORCEINLINE void computeUnaryFactorAtNoDamping(
     SyntheticSE2FastSyncLocalPackedLayout& layout,

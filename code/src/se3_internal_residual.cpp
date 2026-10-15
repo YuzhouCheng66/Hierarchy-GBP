@@ -121,15 +121,6 @@ SE3_PACKED_FORCEINLINE void copy21(const double* src, double* dst) noexcept {
     std::memcpy(dst, src, 21 * sizeof(double));
 }
 
-void sym21FromFullColMajor(const double* full36, double* sym21) noexcept {
-    for (int col = 0; col < 6; ++col) {
-        for (int row = 0; row <= col; ++row) {
-            const double a = full36[row + col * 6];
-            const double b = full36[col + row * 6];
-            sym21[sym21Index(row, col)] = 0.5 * (a + b);
-        }
-    }
-}
 
 void sym21FromUpperColMajor(const double* full36, double* sym21) noexcept {
     for (int col = 0; col < 6; ++col) {
@@ -232,41 +223,6 @@ SE3_PACKED_FORCEINLINE double cavityEntrySym21Raw(
     return diag[idx] + belief[idx] - old_msg[idx];
 }
 
-SE3_PACKED_FORCEINLINE void cavityFullColMajorFromSym21Raw(
-    const double* diag,
-    const double* belief,
-    const double* old_msg,
-    double* out
-) noexcept {
-    const double c00 = cavityEntrySym21Raw(diag, belief, old_msg, 0) + kJitter;
-    const double c01 = cavityEntrySym21Raw(diag, belief, old_msg, 1);
-    const double c11 = cavityEntrySym21Raw(diag, belief, old_msg, 2) + kJitter;
-    const double c02 = cavityEntrySym21Raw(diag, belief, old_msg, 3);
-    const double c12 = cavityEntrySym21Raw(diag, belief, old_msg, 4);
-    const double c22 = cavityEntrySym21Raw(diag, belief, old_msg, 5) + kJitter;
-    const double c03 = cavityEntrySym21Raw(diag, belief, old_msg, 6);
-    const double c13 = cavityEntrySym21Raw(diag, belief, old_msg, 7);
-    const double c23 = cavityEntrySym21Raw(diag, belief, old_msg, 8);
-    const double c33 = cavityEntrySym21Raw(diag, belief, old_msg, 9) + kJitter;
-    const double c04 = cavityEntrySym21Raw(diag, belief, old_msg, 10);
-    const double c14 = cavityEntrySym21Raw(diag, belief, old_msg, 11);
-    const double c24 = cavityEntrySym21Raw(diag, belief, old_msg, 12);
-    const double c34 = cavityEntrySym21Raw(diag, belief, old_msg, 13);
-    const double c44 = cavityEntrySym21Raw(diag, belief, old_msg, 14) + kJitter;
-    const double c05 = cavityEntrySym21Raw(diag, belief, old_msg, 15);
-    const double c15 = cavityEntrySym21Raw(diag, belief, old_msg, 16);
-    const double c25 = cavityEntrySym21Raw(diag, belief, old_msg, 17);
-    const double c35 = cavityEntrySym21Raw(diag, belief, old_msg, 18);
-    const double c45 = cavityEntrySym21Raw(diag, belief, old_msg, 19);
-    const double c55 = cavityEntrySym21Raw(diag, belief, old_msg, 20) + kJitter;
-
-    out[0] = c00; out[1] = c01; out[2] = c02; out[3] = c03; out[4] = c04; out[5] = c05;
-    out[6] = c01; out[7] = c11; out[8] = c12; out[9] = c13; out[10] = c14; out[11] = c15;
-    out[12] = c02; out[13] = c12; out[14] = c22; out[15] = c23; out[16] = c24; out[17] = c25;
-    out[18] = c03; out[19] = c13; out[20] = c23; out[21] = c33; out[22] = c34; out[23] = c35;
-    out[24] = c04; out[25] = c14; out[26] = c24; out[27] = c34; out[28] = c44; out[29] = c45;
-    out[30] = c05; out[31] = c15; out[32] = c25; out[33] = c35; out[34] = c45; out[35] = c55;
-}
 
 SE3_PACKED_FORCEINLINE void damp6(const double* old_eta, double damping, double* out_eta) noexcept {
     if (damping == 0.0) return;
@@ -592,34 +548,6 @@ SE3_PACKED_FORCEINLINE void solveSpd6LowerOneRaw(
     out[5] = x5;
 }
 
-SE3_PACKED_FORCEINLINE void solveSpd6LowerOnePackedRaw(
-    const double* l,
-    const double* rhs,
-    double* out
-) noexcept {
-    const double y0 = rhs[0] / l[0];
-    const double y1 = (rhs[1] - l[1] * y0) / l[2];
-    const double y2 = (rhs[2] - l[3] * y0 - l[4] * y1) / l[5];
-    const double y3 = (rhs[3] - l[6] * y0 - l[7] * y1 - l[8] * y2) / l[9];
-    const double y4 = (rhs[4] - l[10] * y0 - l[11] * y1 - l[12] * y2 - l[13] * y3) / l[14];
-    const double y5 =
-        (rhs[5] - l[15] * y0 - l[16] * y1 - l[17] * y2 - l[18] * y3 - l[19] * y4) / l[20];
-
-    const double x5 = y5 / l[20];
-    const double x4 = (y4 - l[19] * x5) / l[14];
-    const double x3 = (y3 - l[13] * x4 - l[18] * x5) / l[9];
-    const double x2 = (y2 - l[12] * x4 - l[17] * x5 - l[8] * x3) / l[5];
-    const double x1 = (y1 - l[11] * x4 - l[16] * x5 - l[7] * x3 - l[4] * x2) / l[2];
-    const double x0 =
-        (y0 - l[10] * x4 - l[15] * x5 - l[6] * x3 - l[3] * x2 - l[1] * x1) / l[0];
-
-    out[0] = x0;
-    out[1] = x1;
-    out[2] = x2;
-    out[3] = x3;
-    out[4] = x4;
-    out[5] = x5;
-}
 
 SE3_PACKED_FORCEINLINE void solveSpd6LowerRaw(
     const double* l,
@@ -632,19 +560,6 @@ SE3_PACKED_FORCEINLINE void solveSpd6LowerRaw(
     }
 }
 
-SE3_PACKED_FORCEINLINE void solveSpd6Lower7Raw(
-    const double* l,
-    const double* rhs,
-    double* out
-) noexcept {
-    solveSpd6LowerOneRaw(l, rhs + 0, out + 0);
-    solveSpd6LowerOneRaw(l, rhs + 6, out + 6);
-    solveSpd6LowerOneRaw(l, rhs + 12, out + 12);
-    solveSpd6LowerOneRaw(l, rhs + 18, out + 18);
-    solveSpd6LowerOneRaw(l, rhs + 24, out + 24);
-    solveSpd6LowerOneRaw(l, rhs + 30, out + 30);
-    solveSpd6LowerOneRaw(l, rhs + 36, out + 36);
-}
 
 double normalizedPrecisionResidual(
     const double* candidate, const double* old, const double* diagonal

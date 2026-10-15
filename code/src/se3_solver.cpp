@@ -426,14 +426,6 @@ Eigen::Matrix3d skew(const Eigen::Vector3d& v) {
     return m;
 }
 
-Mat6 adjointInverseSE3(const SE3Pose& pose) {
-    Mat6 A = Mat6::Zero();
-    const Eigen::Matrix3d Rt = pose.q.toRotationMatrix().transpose();
-    A.topLeftCorner<3, 3>() = Rt;
-    A.topRightCorner<3, 3>() = -Rt * skew(pose.t);
-    A.bottomRightCorner<3, 3>() = Rt;
-    return A;
-}
 
 Eigen::Matrix3d so3Exp(const Eigen::Vector3d& w) {
     const double theta = w.norm();
@@ -1213,21 +1205,6 @@ void solveWithReusedCoarsePcgInto(
     }
 }
 
-Eigen::MatrixXd densePrincipalSubmatrix(
-    const Eigen::SparseMatrix<double>& matrix,
-    const std::vector<int>& rows
-) {
-    const int n = static_cast<int>(rows.size());
-    Eigen::MatrixXd block = Eigen::MatrixXd::Zero(n, n);
-    for (int c = 0; c < n; ++c) {
-        for (int r = 0; r < n; ++r) {
-            block(r, c) = matrix.coeff(rows[r], rows[c]);
-        }
-    }
-    block.template triangularView<Eigen::StrictlyLower>() =
-        block.transpose().template triangularView<Eigen::StrictlyLower>();
-    return block;
-}
 
 Eigen::VectorXd stackedMeanVector(gbp::FactorGraph& graph) {
     int total_dim = 0;
@@ -4037,27 +4014,17 @@ SyntheticSE3ExperimentResults runSyntheticSE3Experiment(
         {
             const auto total_t0 = SteadyClock::now();
             const auto build_t0 = SteadyClock::now();
-            std::unique_ptr<gbp::FactorGraph> graph_owned;
-            gbp::FactorGraph* graph_ptr = nullptr;
             SyntheticSE3ResidualRelinearizeStats relin_stats;
-            if (mg_workspace) {
-                relinearizeSyntheticSE3ResidualGraph(
-                    *mg_workspace,
-                    problem,
-                    mg_poses,
-                    thread_count,
-                    outer,
-                    &relin_stats,
-                    robust_loss_config
-                );
-                graph_ptr = &mg_workspace->graph;
-            } else {
-                graph_owned = std::make_unique<gbp::FactorGraph>(
-                    buildLinearizedResidualGraph(problem, mg_poses, 1e-12, robust_loss_config)
-                );
-                graph_ptr = graph_owned.get();
-            }
-            gbp::FactorGraph& graph = *graph_ptr;
+            relinearizeSyntheticSE3ResidualGraph(
+                *mg_workspace,
+                problem,
+                mg_poses,
+                thread_count,
+                outer,
+                &relin_stats,
+                robust_loss_config
+            );
+            gbp::FactorGraph& graph = mg_workspace->graph;
             graph.setSyncNumThreads(thread_count);
             graph.setProfileSyncTiming(se3ProfileSyncTimingEnabled());
             graph.resetSyncTiming();
@@ -4372,7 +4339,6 @@ SyntheticSE3ExperimentResults runSyntheticSE3Experiment(
                 const auto sweeps_t0 = SteadyClock::now();
                 SE3SmootherSweepStats smoother_stats;
                 smoother_stats.residual_before_norm = residual_before_sweeps_norm;
-                bool residual_after_sweeps_is_current = false;
                 const Eigen::VectorXd e_before_gbp_sweeps = e_now;
 
                 const bool defer_packed_graph_copy =
@@ -4405,17 +4371,12 @@ SyntheticSE3ExperimentResults runSyntheticSE3Experiment(
                 );
                 assemble_fine_residual(e_now, residual_after_sweeps);
                 smoother_stats.residual_after_norm = residual_after_sweeps.norm();
-                residual_after_sweeps_is_current = true;
                 const auto sweeps_t1 = SteadyClock::now();
                 sweeps_sec += elapsedSeconds(sweeps_t0, sweeps_t1);
                 smoother_translation_update_norm_sum += smoother_stats.translation_update_norm_sum;
                 smoother_rotation_update_norm_sum += smoother_stats.rotation_update_norm_sum;
                 smoother_local_rejects_total += smoother_stats.local_rejects;
 
-                if (!residual_after_sweeps_is_current) {
-                    assemble_fine_residual(e_now, residual_after_sweeps);
-                    smoother_stats.residual_after_norm = residual_after_sweeps.norm();
-                }
                 const double residual_after_sweeps_norm = smoother_stats.residual_after_norm;
                 if (cyc == 0) {
                     first_cycle_residual_before_sweeps = residual_before_sweeps_norm;
