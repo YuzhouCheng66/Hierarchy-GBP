@@ -49,7 +49,8 @@ if __name__=='__main__':
     write(args.output/'summary.json',summary);write(args.output/'runs.json',records)
     files={ROOT/'CMakeLists.txt',ROOT/'code/CMakeLists.txt',ROOT/'benchmarks/configs/pgo.json',ROOT/'benchmarks/configs/datasets.json',ROOT/'benchmarks/configs/data_release.json'}
     files.update((ROOT/'code/include').rglob('*.h'))
-    for suffix in ('*.cpp','*.h'):files.update((ROOT/'code/src').glob(suffix))
+    for suffix in ('*.cpp','*.h','*.inc'):files.update((ROOT/'code/src').rglob(suffix))
+    files.update((ROOT/'code/apps').glob('*.cpp'))
     files.update((ROOT/'code/tests').glob('*.cpp'))
     files.update(path for path in HERE.rglob('*') if path.is_file() and path.suffix in ('.h','.cpp','.py','.ps1','.json','.cmake')
                  and not any(p in ('build','results','evidence','__pycache__') or p.startswith('build-') for p in path.relative_to(HERE).parts))

@@ -41,20 +41,20 @@ function(hgbp_compile target)
 endfunction()
 
 set(_sparse_libraries cholmod suitesparseconfig amd colamd camd ccolamd lapack openblas)
-set(_common_sources src/gaussian.cpp src/factor.cpp src/variable.cpp src/factor_graph.cpp)
+set(_common_sources src/detail/gaussian.cpp src/detail/factor.cpp src/detail/variable.cpp src/detail/factor_graph.cpp)
 add_library(hgbp_se2 ${_common_sources}
-    src/se2_internal_sync.cpp src/se2_internal_group_sync.cpp src/se2_internal_dense_sync.cpp
-    src/se2_internal_basis.cpp src/se2_internal_coarse.cpp src/se2_internal_residual.cpp src/se2_solver.cpp)
+    src/detail/se2_internal_sync.cpp src/detail/se2_internal_group_sync.cpp src/detail/se2_internal_dense_sync.cpp
+    src/detail/se2_internal_basis.cpp src/detail/se2_internal_coarse.cpp src/detail/se2_internal_residual.cpp src/se2_solver.cpp)
 add_library(hgbp_se3 ${_common_sources}
-    src/se3_internal_residual.cpp src/se3_precision_defect.cpp src/se3_precision_warm.cpp
-    src/se3_warm_audit.cpp src/se3_solver.cpp)
+    src/detail/se3_internal_residual.cpp src/detail/se3_precision_defect.cpp src/detail/se3_precision_warm.cpp
+    src/detail/se3_warm_audit.cpp src/se3_solver.cpp)
 foreach(_space se2 se3)
     target_include_directories(hgbp_${_space} PUBLIC include ${HGBP_EIGEN_DIR}
         ${HGBP_VCPKG_INSTALLED_DIR}/include ${HGBP_VCPKG_INSTALLED_DIR}/include/suitesparse)
     target_link_directories(hgbp_${_space} PUBLIC ${HGBP_VCPKG_INSTALLED_DIR}/lib)
     target_link_libraries(hgbp_${_space} PUBLIC OpenMP::OpenMP_CXX PRIVATE ${_sparse_libraries})
     hgbp_compile(hgbp_${_space})
-    add_executable(${_space}_benchmark src/${_space}_benchmark.cpp)
+    add_executable(${_space}_benchmark apps/${_space}_benchmark.cpp)
     set_target_properties(${_space}_benchmark PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/pgo")
     target_link_libraries(${_space}_benchmark PRIVATE hgbp_${_space})
     hgbp_compile(${_space}_benchmark)
@@ -66,7 +66,7 @@ foreach(_space se2 se3)
     endif()
 endforeach()
 if(MSVC)
-    set_source_files_properties(src/se2_internal_residual.cpp PROPERTIES COMPILE_OPTIONS /fp:fast)
+    set_source_files_properties(src/detail/se2_internal_residual.cpp PROPERTIES COMPILE_OPTIONS /fp:fast)
     set(_banded_import "${CMAKE_CURRENT_BINARY_DIR}/openblas_banded.lib")
     add_custom_command(OUTPUT "${_banded_import}"
         COMMAND "${CMAKE_LINKER}" /LIB /NOLOGO /MACHINE:X64
@@ -150,12 +150,17 @@ if(BUILD_TESTING)
         set_tests_properties(se2_fixed_eta_delta_${_delta} PROPERTIES ENVIRONMENT
             "OPENBLAS_NUM_THREADS=1;GBP_SE2_FIXED_ETA_AFTER_SWEEP=8;HGBP_SE2_ETA_RELAXATION=1;GBP_SE2_FIXED_ETA_SERIAL_DELTA=1;GBP_SE2_FIXED_ETA_PARALLEL_DELTA=${_delta}")
     endforeach()
+    # These matrix/message tests do not require RootBA or any BA input data.
+    hgbp_test(ba_operator_test hgbp_se3)
+    hgbp_test(ba_messages_test hgbp_se3)
+    if(MSVC)
+        target_compile_options(ba_operator_test PRIVATE /Zc:__cplusplus)
+        target_compile_options(ba_messages_test PRIVATE /Zc:__cplusplus)
+    endif()
     if(HGBP_BUILD_BA)
         hgbp_test(ba_model_test hgbp_ba_dependencies)
-        hgbp_test(ba_operator_test hgbp_ba_dependencies)
         if(MSVC)
             target_compile_options(ba_model_test PRIVATE /Zc:__cplusplus)
-            target_compile_options(ba_operator_test PRIVATE /Zc:__cplusplus)
         endif()
     endif()
     find_package(Python3 COMPONENTS Interpreter)

@@ -3,7 +3,7 @@
 #include <iostream>
 #include "se2_cuda.h"
 #define main referenceBenchmarkMain
-#include "../../src/se2_benchmark.cpp"
+#include "../../apps/se2_benchmark.cpp"
 #undef main
 
 int main(int argc, char** argv) {

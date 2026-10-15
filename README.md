@@ -20,7 +20,8 @@ efficient single-threaded and parallel execution. See
 
 ```text
 code/
-  src/        SE2, SE3 and BA solvers
+  src/        Three solver entry points; private helpers in detail/
+  apps/       PGO command-line frontends
   include/    C++ interfaces and kernels
   tests/      Numerical and runner regression tests
   variants/   Optional all-GBP coarse and SE2 CUDA implementations
@@ -33,6 +34,7 @@ benchmarks/
 
 Build with `code/build.ps1`; download and run benchmarks with
 `benchmarks/download.py` and `benchmarks/run.py`.
+Start reading from [the solver entry points](code/docs/architecture.md).
 
 Policies are shared across datasets within SE2, SE3 and BA respectively.
 Dataset names select input metadata, not numerical parameter overrides.

@@ -1,4 +1,4 @@
-#include "../src/ba_internal.h"
+#include "../src/detail/ba_internal.h"
 
 int main() {
     const Eigen::Vector3d residual(2.0, -1.0, 0.5);
