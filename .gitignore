@@ -16,7 +16,7 @@
 *.profraw
 *.vtune
 
-# Local runs are not release files; validation references live in configs/.
+# Local runs are not release files; validation references live in benchmarks/configs/.
 /results/
 
 # Python and editor noise.
@@ -24,3 +24,7 @@
 *.py[cod]
 *.swp
 .DS_Store
+
+# Optional variants keep local builds and runs out of the release.
+/code/variants/*/build*/
+/code/variants/*/results/

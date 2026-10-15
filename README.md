@@ -2,7 +2,7 @@
 
 [**Paper (arXiv)**](https://arxiv.org/abs/2610.06978)
 
-![Hierarchy-GBP: abstraction, coarse correction, recovery, and GBP refinement.](docs/assets/teaser.png)
+![Hierarchy-GBP: abstraction, coarse correction, recovery, and GBP refinement.](code/docs/assets/teaser.png)
 
 High-performance CPU solvers for SE2/SE3 pose-graph optimization and bundle
 adjustment, built around **hierarchical Gaussian belief propagation (H-GBP)**.
@@ -14,23 +14,25 @@ the landmark-reduced camera system within a flexible conjugate-gradient solve.
 
 Optimized fixed-size kernels, packed message storage and cached updates support
 efficient single-threaded and parallel execution. See
-[algorithm and policy details](docs/policies.md).
-SE3 full-precision messages use forward-Schur/Gram projections to avoid
-redundant backward triangular solves, with dedicated numerical regression tests.
+[algorithm and policy details](code/docs/policies.md).
 
 ## Layout
 
-- `src/se2_solver.cpp`, `src/se3_solver.cpp`, `src/ba_solver.cpp`: solvers.
-- `include/hgbp/`: PGO public interfaces; `include/internal/`: implementation support.
-- `configs/`: one policy per problem family, input hashes and validation references.
-- `scripts/run_benchmarks.py`: reproducible runs, including previously unseen inputs.
-- `tests/`: numerical kernels and runner checks.
-- `scripts/datasets/`: reproducible synthetic Globe generators.
-- [`experiments/se2_cuda_hgbp/`](experiments/se2_cuda_hgbp/README.md): validated
-  SE2 CUDA/CPU hybrid with matching outer20, conditioned basis and adaptive GBP.
-  Includes reproducible CPU16 comparisons, complete-process wall time, phase
-  breakdown and numerical evidence. The complete-process 2x target is not met;
-  this replaces the historical, unequal-budget 5x prototype.
+```text
+code/
+  src/        SE2, SE3 and BA solvers
+  include/    C++ interfaces and kernels
+  tests/      Numerical and runner regression tests
+  variants/   Optional all-GBP coarse and SE2 CUDA implementations
+  docs/       Policies, dependencies and project assets
+benchmarks/
+  configs/    Shared solver policies and pinned inputs
+  baselines/  PGO and BA reproduction adapters
+  datasets/   Synthetic generators and release tools
+```
+
+Build with `code/build.ps1`; download and run benchmarks with
+`benchmarks/download.py` and `benchmarks/run.py`.
 
 Policies are shared across datasets within SE2, SE3 and BA respectively.
 Dataset names select input metadata, not numerical parameter overrides.
@@ -40,11 +42,11 @@ Older research code remains in Git history and the `legacy` branch.
 
 The validated environment is Windows x64, Visual Studio 2022, CMake/Ninja,
 Python 3.10+, Eigen, SuiteSparse and OpenBLAS. BA also needs the compiled
-RootBA dependency. See [dependencies](docs/dependencies.md) for the required
+RootBA dependency. See [dependencies](code/docs/dependencies.md) for the required
 layout and runtime separation; dependencies and input data are not vendored.
 
 ```powershell
-.\scripts\build.ps1 -DependencyRoot C:\deps -PGORuntimeDir C:\deps\pgo-runtime
+.\code\build.ps1 -DependencyRoot C:\deps -PGORuntimeDir C:\deps\pgo-runtime
 ctest --test-dir build --output-on-failure
 ```
 
@@ -59,12 +61,12 @@ The complete benchmark release is hosted on
 Download the exact inputs used by H-GBP and the baseline adapters:
 
 ```powershell
-python scripts/download_datasets.py
+python benchmarks/download.py
 ```
 
 The downloader verifies SHA-256 checksums and restores `data/pgo` and `data/ba`.
 The release revision and manifest hash are pinned in
-[`configs/data_release.json`](configs/data_release.json); the dataset card
+[`benchmarks/configs/data_release.json`](benchmarks/configs/data_release.json); the dataset card
 records input provenance and preparation.
 Use `--suite pgo`, `--suite ba` or `--datasets Sphere Ladybug49` for a subset.
 For existing data, set `HGBP_PGO_DATA_ROOT` and `HGBP_BA_DATA_ROOT` instead.
@@ -72,8 +74,8 @@ For existing data, set `HGBP_PGO_DATA_ROOT` and `HGBP_BA_DATA_ROOT` instead.
 ## Run
 
 ```powershell
-python scripts/run_benchmarks.py pgo --threads 16 --output-root results/reproduction/pgo
-python scripts/run_benchmarks.py ba --threads 16 --output-root results/reproduction/ba
+python benchmarks/run.py pgo --threads 16 --output-root results/reproduction/pgo
+python benchmarks/run.py ba --threads 16 --output-root results/reproduction/ba
 ```
 
 Use `--threads 1` for the serial path, `--compare-threads` for sequential
@@ -86,17 +88,17 @@ cost; BA reports squared reprojection cost, RMSE and mean reprojection error.
 Numerical checks and timing diagnostics are separate: historical timings
 are not portable performance guarantees.
 
-Baseline adapters and reproduction commands are in [baselines/](baselines/README.md).
+See [baseline reproduction](benchmarks/baselines/README.md) for comparison methods.
 Input definitions and sources are documented in the dataset card; the
-[Globe generators](scripts/datasets/README.md) reproduce the synthetic inputs.
+[Globe generators](benchmarks/datasets/README.md) reproduce the synthetic inputs.
 
 ## GBP at every level
 
-The optional [`pure_gbp`](experiments/pure_gbp/README.md) variant retains
+The optional [`pure_gbp`](code/variants/pure_gbp/README.md) variant retains
 hierarchical abstraction and recovery while using GBP for fine smoothing and
 both coarse levels, **without a coarse direct or Krylov solve**. Same-machine
 16-thread, outer20 tests on all nine PGO inputs take **1.45-2.51x** the default
 runtime, with a maximum final-cost increase of
 **0.451%**. The faster coarse-direct route remains the default.
 The independent folder contains the shared-policy configuration, build/run
-instructions, numerical tests and [paired evidence](experiments/pure_gbp/evidence/summary.json).
+instructions, numerical tests and [paired evidence](code/variants/pure_gbp/evidence/summary.json).
