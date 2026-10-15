@@ -15,9 +15,8 @@ import time
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
-spec = importlib.util.spec_from_file_location("release_driver_utils", ROOT / "benchmarks/run.py")
-core = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(core)
+sys.path.insert(0, str(ROOT))
+from benchmarks import common as core
 POLICIES = core.load_json(HERE / "policies.json")["methods"]
 PINS = core.load_json(HERE / "provenance.json")
 MANIFEST_PATH = ROOT / "benchmarks/configs/datasets.json"
@@ -261,6 +260,7 @@ def run(args):
             plan.append(record)
     out.mkdir(parents=True, exist_ok=False)
     core.write_json(out / "protocol.json", {"driver_sha256": core.sha256(Path(__file__)), "policy": policy,
+                    "support_sha256": core.sha256(core.__file__),
                     "policy_sha256": core.sha256(HERE / "policies.json"), "manifest_sha256": core.sha256(MANIFEST_PATH),
                     "python": sys.version, "host": sys.platform, "dry_run": args.dry_run, "timeout_sec": args.timeout,
                     "address_space_limit_gib": 24 if linux else None, "timing": policy["timing"],

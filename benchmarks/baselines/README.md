@@ -7,7 +7,7 @@ not modify its algorithm, configuration or build dependencies.
 - [PGO](pgo/README.md): g2o-CHOLMOD, g2o-PCG, AMM-PGO, Cycle-PGO and Schwarz-PGO.
 - [BA](ba/README.md): Ceres Sparse Schur, Ceres Iterative Schur, RootBA-QR and PowerBA.
 
-Start by running `python benchmarks/download.py` from the code root.
+Start by running `python benchmarks/download.py` from the repository root.
 Build each external implementation with its documented revision and use
 the corresponding runner. External sources are obtained from their authors,
 not silently replaced with a different solver. Dependencies and large

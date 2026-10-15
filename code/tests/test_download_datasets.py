@@ -59,6 +59,33 @@ class DownloadTests(unittest.TestCase):
             self.install()
         self.assertEqual(p.read_bytes(), b'user data')
 
+    def test_final_install_does_not_replace_concurrent_file(self):
+        def obtain(name, target):
+            self.obtain(name, target)
+            destination = self.root/'out/pgo/sample.g2o'
+            destination.write_bytes(b'concurrent user data')
+
+        with self.assertRaises(FileExistsError):
+            downloader.install_one('sample', self.row, self.expected, self.root/'out', obtain)
+        self.assertEqual((self.root/'out/pgo/sample.g2o').read_bytes(), b'concurrent user data')
+        self.assertFalse(list((self.root/'out/pgo').glob('.hgbp-download-*')))
+
+    def test_incomplete_payload_never_installed(self):
+        self.row['bytes'] += 1
+        with self.assertRaisesRegex(ValueError, 'canonical input'):
+            self.install()
+        self.assertFalse((self.root/'out/pgo/sample.g2o').exists())
+        self.assertFalse(list((self.root/'out/pgo').glob('.hgbp-download-*')))
+
+    def test_cached_input_never_downloaded_again(self):
+        self.install()
+
+        def forbidden(name, target):
+            self.fail('already verified input was downloaded')
+
+        self.assertEqual(downloader.install_one('sample', self.row, self.expected,
+                                               self.root/'out', forbidden), 'already verified')
+
     def test_unsafe_paths(self):
         for path in ['../x', '/x', 'C:/x', 'a\\b', 'a/../b', 'a//b']:
             with self.subTest(path=path), self.assertRaises(ValueError):

@@ -42,5 +42,12 @@ For explicit locations, the build script accepts `-EigenDir`,
 `-VcpkgInstalledDir` and `-RootBADir`. PGO-only users may omit RootBA with
 `-PGOOnly` (CMake: `-DHGBP_BUILD_BA=OFF`).
 
+Use `-CheckOnly` with the same arguments to check required files and tool
+availability without creating a build directory, installing packages or changing
+dependency trees. Missing libraries are listed before compilation. This is a
+preflight check, not a numerical or binary-compatibility certification; run the
+build and tests afterward. Main and CUDA build scripts share the x64 MSVC setup
+in `cmake/msvc.ps1`; the optional CUDA build still requires its own validation.
+
 Dataset checksums and preprocessing are specified in `benchmarks/configs/datasets.json`.
 Absolute paths in local validation records are not required by the release.

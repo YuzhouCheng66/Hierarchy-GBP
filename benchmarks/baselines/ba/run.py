@@ -1,9 +1,6 @@
 """Sequential measured BA profiles; Python stdlib only, no implicit builds/downloads."""
 
 import argparse
-from contextlib import contextmanager
-import ctypes
-import hashlib
 import json
 import math
 import os
@@ -17,6 +14,10 @@ import time
 
 HERE = Path(__file__).resolve().parent
 RELEASE = HERE.parents[2]
+sys.path.insert(0, str(RELEASE))
+from benchmarks import common
+from benchmarks.common import process_affinity as affinity, sha256, write_json
+
 PROFILES = json.loads((HERE / "profiles.json").read_text(encoding="utf-8"))
 EVIDENCE = json.loads((HERE / "evidence.json").read_text(encoding="utf-8"))
 THREAD_ENV = {
@@ -25,19 +26,6 @@ THREAD_ENV = {
     "MKL_NUM_THREADS": "{threads}", "OMP_WAIT_POLICY": "PASSIVE",
     "KMP_BLOCKTIME": "0",
 }
-
-
-def sha256(path):
-    digest = hashlib.sha256()
-    with Path(path).open("rb") as stream:
-        for block in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(block)
-    return digest.hexdigest()
-
-
-def write_json(path, value):
-    Path(path).write_text(json.dumps(value, indent=2, allow_nan=False) + "\n",
-                          encoding="utf-8")
 
 
 def environment(threads, runtime_dirs):
@@ -102,45 +90,6 @@ def metrics(log, dataset, profile):
             "mre": means[-1], "actual_iterations": iterations[-1],
             "seconds": finite_nonnegative(solver["total_time_in_seconds"], "seconds"),
             "solver_details": solver}
-
-
-@contextmanager
-def affinity(mask):
-    """Children inherit the requested mask; restore this process on exit."""
-    if mask is None:
-        yield
-        return
-    if os.name == "nt":
-        kernel = ctypes.WinDLL("kernel32", use_last_error=True)
-        kernel.GetCurrentProcess.restype = ctypes.c_void_p
-        kernel.GetProcessAffinityMask.argtypes = [ctypes.c_void_p,
-                                                  ctypes.POINTER(ctypes.c_size_t),
-                                                  ctypes.POINTER(ctypes.c_size_t)]
-        kernel.SetProcessAffinityMask.argtypes = [ctypes.c_void_p, ctypes.c_size_t]
-        handle = kernel.GetCurrentProcess()
-        original, system = ctypes.c_size_t(), ctypes.c_size_t()
-        if not kernel.GetProcessAffinityMask(handle, ctypes.byref(original),
-                                              ctypes.byref(system)):
-            raise OSError(ctypes.get_last_error(), "cannot read affinity")
-        if mask & system.value != mask or not kernel.SetProcessAffinityMask(handle, mask):
-            raise ValueError("requested CPU affinity unavailable")
-        try:
-            yield
-        finally:
-            if not kernel.SetProcessAffinityMask(handle, original.value):
-                raise OSError(ctypes.get_last_error(), "cannot restore affinity")
-    elif hasattr(os, "sched_getaffinity"):
-        original = os.sched_getaffinity(0)
-        requested = {i for i in range(mask.bit_length()) if mask & (1 << i)}
-        if not requested <= original:
-            raise ValueError("requested CPU affinity unavailable")
-        os.sched_setaffinity(0, requested)
-        try:
-            yield
-        finally:
-            os.sched_setaffinity(0, original)
-    else:
-        raise ValueError("CPU affinity unsupported; explicitly use --affinity-mask none")
 
 
 def execute(job, dataset, profile, env, timeout):
@@ -270,6 +219,7 @@ def prepare(args):
             "profiles": PROFILES, "binaries": binaries, "runtime_libraries_sha256": libraries,
             "runtime_dirs": [str(p) for p in runtime], "jobs": jobs,
             "manifest_sha256": sha256(args.manifest), "runner_sha256": sha256(__file__),
+            "support_sha256": sha256(common.__file__),
             "profiles_sha256": sha256(HERE / "profiles.json"),
             "affinity_mask": None if mask is None else hex(mask),
             "affinity_applied": False, "timeout_process_seconds": args.timeout,

@@ -3,32 +3,19 @@ from __future__ import annotations
 
 import argparse
 import gzip
-import hashlib
 import json
 import os
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 import re
 import shutil
+import sys
 import tempfile
 import urllib.parse
 import urllib.request
 
 ROOT = Path(__file__).resolve().parents[1]
-
-
-def digest(path):
-    h = hashlib.sha256()
-    with Path(path).open('rb') as f:
-        for block in iter(lambda: f.read(4*1024*1024), b''):
-            h.update(block)
-    return h.hexdigest()
-
-
-def relative_path(value):
-    p = PurePosixPath(value)
-    if not value or p.is_absolute() or any(x in ('', '.', '..') for x in value.split('/')) or '\\' in value or ':' in value:
-        raise ValueError(f'Unsafe relative path: {value}')
-    return p
+sys.path.insert(0, str(ROOT))
+from benchmarks.common import relative_path, sha256 as digest
 
 
 def url_for(repo_id, revision, name):
@@ -46,16 +33,21 @@ def fetch(url, target):
         shutil.copyfileobj(src, dst, 4*1024*1024)
 
 
+def dataset_path(root, row):
+    relative_path(row['suite'])
+    relative_path(row['path'])
+    target = root/row['suite']/row['path']
+    if not target.resolve().is_relative_to(root.resolve()):
+        raise ValueError('Dataset path escapes the output root')
+    return target
+
+
 def install_one(name, row, expected, root, obtain):
     for key in ('suite', 'path', 'sha256'):
         if row.get(key) != expected[key]:
             raise ValueError(f'{name}: manifest does not match the solver catalog ({key})')
     relative_path(row['archive'])
-    relative_path(row['path'])
-    target = root/row['suite']/row['path']
-    resolved_root = root.resolve()
-    if not target.resolve().is_relative_to(resolved_root):
-        raise ValueError('Dataset path escapes the output root')
+    target = dataset_path(root, row)
     if target.exists():
         if digest(target) != row['sha256']:
             raise ValueError(f'{target}: existing file has the wrong hash; refusing to overwrite')
@@ -100,7 +92,7 @@ def main(argv=None):
     if a.verify_only:
         for name in names:
             row = catalog['datasets'][name]
-            path = a.output_root/row['suite']/row['path']
+            path = dataset_path(a.output_root, row)
             if not path.is_file() or digest(path) != row['sha256']:
                 raise ValueError(f'{name}: missing file or checksum mismatch: {path}')
             print(name, 'verified', flush=True)

@@ -32,3 +32,33 @@ by the benchmark suite is not, by itself, considered dead code.
 replaces the coarse solver at build time. It remains separate from the default
 coarse-direct configuration. Policies are in `benchmarks/configs/` at the
 repository root; dataset names do not select alternative solver code.
+
+## Reproduction tools
+
+These entry points are separate from solver code and need no Python package
+installation. Run them from the repository root, or use their absolute paths.
+
+| Task | Entry | Responsibility |
+| --- | --- | --- |
+| Configure/build | [build.ps1](../build.ps1) | Explicit dependency paths; `-CheckOnly` for preflight |
+| Download/verify inputs | [download.py](../../benchmarks/download.py) | Pinned release, hashes, no input overwrite |
+| Run H-GBP | [run.py](../../benchmarks/run.py) | Shared policies, sequential runs, metrics and quality checks |
+| Compare baselines | [baselines](../../benchmarks/baselines/README.md) | Separate external implementations and runtimes |
+| Numerical/runner checks | [tests](../tests/) | Small regression tests, not benchmark configurations |
+| Generate/publish data | [datasets](../../benchmarks/datasets/README.md) | Maintainer tools; not needed to run downloaded inputs |
+
+`benchmarks/common.py` supplies only small stdlib utilities (hashes, JSON,
+argument validation and affinity). It does not select solver policies or import
+the main runner. Independent PGO scoring remains in the baseline package and
+requires its own NumPy/SciPy dependencies. Dataset generation requires NumPy;
+downloading, packaging and runner planning do not.
+
+Use `python -m unittest discover -s code/tests -p "test_*.py"` for tooling
+checks and `ctest --test-dir build --output-on-failure` after building for
+compiled numerical tests. Test coverage does not certify an unbuilt external
+baseline, BA dependency stack or optional CUDA backend.
+
+Historical validation JSON, archived runs, licenses and source/runtime locks
+are retained as evidence, not executable configuration. Paths embedded in
+those records describe the original measurement environment, not required
+locations on a new machine.

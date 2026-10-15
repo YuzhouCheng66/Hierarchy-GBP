@@ -1,7 +1,7 @@
 param(
     [ValidateSet("Release", "RelWithDebInfo")]
     [string]$Config = "Release",
-    [int]$Jobs = 12,
+    [ValidateRange(1, 1024)][int]$Jobs = 12,
     [string]$BuildDirectory = "build",
     [string]$DependencyRoot = $env:HGBP_DEPENDENCY_ROOT,
     [string]$EigenDir = $env:HGBP_EIGEN_DIR,
@@ -9,7 +9,8 @@ param(
     [string]$RootBADir = $env:HGBP_ROOTBA_DIR,
     [string]$PGORuntimeDir = $env:HGBP_PGO_RUNTIME,
     [switch]$PGOOnly,
-    [switch]$PureGBP
+    [switch]$PureGBP,
+    [switch]$CheckOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -44,6 +45,24 @@ $EigenDir = Resolve-DependencyDirectory $EigenDir "Eigen"
 $VcpkgInstalledDir = Resolve-DependencyDirectory $VcpkgInstalledDir "vcpkg installed tree"
 if (!$PGOOnly) { $RootBADir = Resolve-DependencyDirectory $RootBADir "RootBA checkout" }
 $PGORuntimeDir = Resolve-DependencyDirectory $PGORuntimeDir "PGO runtime (OpenBLAS with LAPACKE)"
+
+# Check files as well as directories before launching a long build.
+$requiredFiles = @((Join-Path $EigenDir "Eigen/Core"),
+    (Join-Path $VcpkgInstalledDir "include/suitesparse/cholmod.h"),
+    (Join-Path $PGORuntimeDir "openblas.dll"))
+foreach ($name in @('cholmod', 'suitesparseconfig', 'amd', 'colamd', 'camd', 'ccolamd', 'lapack', 'openblas')) {
+    $requiredFiles += Join-Path $VcpkgInstalledDir "lib/$name.lib"
+}
+if (!$PGOOnly) {
+    $requiredFiles += Join-Path $RootBADir "src/rootba/bal/bal_problem.hpp"
+    $requiredFiles += Join-Path $RootBADir "build-win/src/rootba/Release/rootba.lib"
+    foreach ($name in @('tbb12', 'fmt', 'glog', 'gflags')) {
+        $requiredFiles += Join-Path $RootBADir "conda_env/Library/lib/$name.lib"
+        $requiredFiles += Join-Path $RootBADir "conda_env/Library/bin/$name.dll"
+    }
+}
+$missing = @($requiredFiles | Where-Object { !(Test-Path -LiteralPath $_ -PathType Leaf) })
+if ($missing.Count) { throw "Missing build prerequisites:`n$($missing -join "`n")" }
 
 if ([System.IO.Path]::IsPathRooted($BuildDirectory)) {
     $BuildDir = [System.IO.Path]::GetFullPath($BuildDirectory)
@@ -90,56 +109,20 @@ function Invoke-CMakeBuild {
     }
 }
 
-$vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-if (!(Test-Path -LiteralPath $vswhere)) {
-    throw "Could not find vswhere.exe. Install Visual Studio 2022 C++ Build Tools."
+. (Join-Path $PSScriptRoot 'cmake/msvc.ps1')
+$MsvcCompilerCMake = Initialize-HgbpMsvc
+foreach ($command in @('cmake', 'ninja')) { $null = Get-Command $command -ErrorAction Stop }
+if ($CheckOnly) {
+    [ordered]@{
+        Compiler = $MsvcCompilerCMake
+        Eigen = $EigenDir
+        SuiteSparse = $VcpkgInstalledDir
+        PGORuntime = $PGORuntimeDir
+        RootBA = $(if ($PGOOnly) { $null } else { $RootBADir })
+        BuildDirectory = $BuildDir
+        Scope = 'Required files and tools only; not a compile or runtime certification.'
+    } | ConvertTo-Json
+    return
 }
-$vsInstall = & $vswhere -latest -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
-if (!$vsInstall) {
-    throw "Could not find a Visual Studio installation with C++ tools."
-}
-
-if (!$env:VSCMD_ARG_TGT_ARCH) {
-    $vcvars = Join-Path $vsInstall "VC\Auxiliary\Build\vcvars64.bat"
-    if (!(Test-Path -LiteralPath $vcvars)) {
-        throw "Could not find vcvars64.bat at $vcvars."
-    }
-
-    $vcEnvironment = & $env:ComSpec /d /s /c "`"$vcvars`" >nul && set"
-    if ($LASTEXITCODE -ne 0) {
-        throw "Visual Studio environment setup failed with exit code $LASTEXITCODE."
-    }
-    foreach ($line in $vcEnvironment) {
-        $separator = $line.IndexOf("=")
-        if ($separator -gt 0) {
-            $name = $line.Substring(0, $separator)
-            $value = $line.Substring($separator + 1)
-            [Environment]::SetEnvironmentVariable($name, $value, "Process")
-        }
-    }
-}
-
-# Some VS installations keep vcvars on an older toolset and omit the MSVC
-# library directory. Select the newest installed x64 toolset explicitly.
-$msvcToolsRoot = Join-Path $vsInstall "VC\Tools\MSVC"
-$msvcToolsDir = Get-ChildItem -LiteralPath $msvcToolsRoot -Directory |
-    Sort-Object Name -Descending |
-    Select-Object -First 1
-if (!$msvcToolsDir) {
-    throw "Could not find MSVC tools under $msvcToolsRoot."
-}
-$msvcBinDir = Join-Path $msvcToolsDir.FullName "bin\Hostx64\x64"
-$msvcLibDir = Join-Path $msvcToolsDir.FullName "lib\x64"
-$msvcIncludeDir = Join-Path $msvcToolsDir.FullName "include"
-$msvcCompiler = Join-Path $msvcBinDir "cl.exe"
-foreach ($requiredPath in @($msvcCompiler, $msvcLibDir, $msvcIncludeDir)) {
-    if (!(Test-Path -LiteralPath $requiredPath)) {
-        throw "Required MSVC path is missing: $requiredPath"
-    }
-}
-$env:Path = "$msvcBinDir;$env:Path"
-$env:LIB = "$msvcLibDir;$env:LIB"
-$env:INCLUDE = "$msvcIncludeDir;$env:INCLUDE"
-$MsvcCompilerCMake = $msvcCompiler -replace "\\", "/"
 
 Invoke-CMakeBuild

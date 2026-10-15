@@ -17,9 +17,9 @@ def write(path,value):path.write_text(json.dumps(value,indent=2,allow_nan=False)
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('runs',nargs='+',type=Path)
-    parser.add_argument('--output',type=Path,default=HERE/'evidence')
+    parser.add_argument('--output',type=Path,default=HERE/'evidence',help='New directory only; never overwrite archived evidence')
     args=parser.parse_args()
-    args.output.mkdir(parents=True,exist_ok=True)
+    args.output.mkdir(parents=True,exist_ok=False)
     records=[]
     for directory in args.runs:
         records.extend(json.loads(path.read_text()) for path in sorted(directory.glob('*/record.json')))
@@ -47,7 +47,9 @@ if __name__=='__main__':
              'ratio_range':[min(r['pure_over_main'] for r in comparable),max(r['pure_over_main'] for r in comparable)],
              'maximum_cost_ratio':max(r['cost_ratio'] for r in comparable),'datasets':rows}
     write(args.output/'summary.json',summary);write(args.output/'runs.json',records)
-    files={ROOT/'CMakeLists.txt',ROOT/'code/CMakeLists.txt',ROOT/'benchmarks/configs/pgo.json',ROOT/'benchmarks/configs/datasets.json',ROOT/'benchmarks/configs/data_release.json'}
+    files={ROOT/'CMakeLists.txt',ROOT/'code/CMakeLists.txt',ROOT/'code/build.ps1',ROOT/'code/cmake/msvc.ps1',
+           ROOT/'benchmarks/__init__.py',ROOT/'benchmarks/common.py',ROOT/'benchmarks/run.py',
+           ROOT/'benchmarks/configs/pgo.json',ROOT/'benchmarks/configs/datasets.json',ROOT/'benchmarks/configs/data_release.json'}
     files.update((ROOT/'code/include').rglob('*.h'))
     for suffix in ('*.cpp','*.h','*.inc'):files.update((ROOT/'code/src').rglob(suffix))
     files.update((ROOT/'code/apps').glob('*.cpp'))

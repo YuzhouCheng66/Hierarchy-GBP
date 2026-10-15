@@ -2,10 +2,7 @@
 from __future__ import annotations
 
 import argparse
-from contextlib import contextmanager
-import ctypes
 from datetime import datetime, timezone
-import hashlib
 import json
 import math
 import os
@@ -19,52 +16,15 @@ import time
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-CONFIG_ROOT = Path(__file__).resolve().parent / "configs"
-DRIVER_VERSION = "3"
-NUMERICAL_PREFIXES = (
-    "GBP_", "HGBP_", "OMP_", "KMP_", "GOMP_", "MKL_", "OPENBLAS_",
-    "BLIS_", "VECLIB_", "NUMEXPR_", "TBB_", "EIGEN_", "GOTO_", "BLAS_",
+sys.path.insert(0, str(PROJECT_ROOT))
+from benchmarks import common
+from benchmarks.common import (
+    NUMERICAL_PREFIXES, affinity_mask, load_json, positive_int, positive_seconds,
+    process_affinity, sha256, write_json,
 )
 
-
-def load_json(path):
-    return json.loads(Path(path).read_text(encoding="utf-8-sig"))
-
-
-def write_json(path, value):
-    Path(path).write_text(json.dumps(value, indent=2, allow_nan=False) + "\n", encoding="utf-8")
-
-
-def sha256(path):
-    digest = hashlib.sha256()
-    with Path(path).open("rb") as stream:
-        for block in iter(lambda: stream.read(4 * 1024 * 1024), b""):
-            digest.update(block)
-    return digest.hexdigest()
-
-
-def positive_int(value):
-    number = int(value)
-    if number <= 0:
-        raise argparse.ArgumentTypeError("must be positive")
-    return number
-
-
-def affinity_mask(value):
-    try:
-        mask = int(value, 0)
-    except ValueError as exc:
-        raise argparse.ArgumentTypeError("expected an integer CPU mask, e.g. 0xffff") from exc
-    if not 0 < mask < 2**64:
-        raise argparse.ArgumentTypeError("affinity mask must be a nonzero 64-bit mask")
-    return hex(mask)
-
-
-def positive_seconds(value):
-    seconds = float(value)
-    if not math.isfinite(seconds) or seconds <= 0:
-        raise argparse.ArgumentTypeError("must be finite positive seconds")
-    return seconds
+CONFIG_ROOT = Path(__file__).resolve().parent / "configs"
+DRIVER_VERSION = "3"
 
 
 def parse_args(argv=None):
@@ -130,7 +90,7 @@ def select_inputs(args, manifest):
 
 
 def ba_arguments(policy, threads):
-    # Matches the accepted run_ba.py:hgbp_arguments boolean conventions.
+    # Boolean flags follow the native BA CLI, including its two negative forms.
     result = []
     for name, value in policy.items():
         if name in ("description", "threads"):
@@ -174,44 +134,6 @@ def environment_for(template, threads, runtime_root=None, inherited=None):
     environment.update(overrides)
     return environment, {"set": overrides, "removed": removed,
                          "inherited_temp": {k: environment[k] for k in ("TEMP", "TMP", "TMPDIR") if k in environment}}
-
-
-@contextmanager
-def process_affinity(mask):
-    """Apply and restore the driver's CPU allocation; every child inherits it."""
-    if mask is None:
-        yield
-        return
-    bits = int(mask, 0)
-    if os.name == "nt":
-        kernel = ctypes.WinDLL("kernel32", use_last_error=True)
-        kernel.GetCurrentProcess.restype = ctypes.c_void_p
-        kernel.GetProcessAffinityMask.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_size_t), ctypes.POINTER(ctypes.c_size_t)]
-        kernel.SetProcessAffinityMask.argtypes = [ctypes.c_void_p, ctypes.c_size_t]
-        handle = kernel.GetCurrentProcess()
-        previous, available = ctypes.c_size_t(), ctypes.c_size_t()
-        if not kernel.GetProcessAffinityMask(handle, ctypes.byref(previous), ctypes.byref(available)):
-            raise ctypes.WinError(ctypes.get_last_error())
-        if bits & available.value != bits:
-            raise ValueError("requested affinity is unavailable; select --affinity-mask or --no-affinity")
-        def set_mask(value):
-            if not kernel.SetProcessAffinityMask(handle, value):
-                raise ctypes.WinError(ctypes.get_last_error())
-        set_mask(bits)
-        restore = lambda: set_mask(previous.value)
-    elif hasattr(os, "sched_setaffinity"):
-        previous = os.sched_getaffinity(0)
-        selected = {cpu for cpu in range(64) if bits & (1 << cpu)}
-        if not selected <= previous:
-            raise ValueError("requested affinity is unavailable; select --affinity-mask or --no-affinity")
-        os.sched_setaffinity(0, selected)
-        restore = lambda: os.sched_setaffinity(0, previous)
-    else:
-        raise ValueError("affinity is unsupported on this OS; use --no-affinity")
-    try:
-        yield
-    finally:
-        restore()
 
 
 def require_fields(actual, expected):
@@ -336,6 +258,7 @@ def version_info():
         except (OSError, subprocess.CalledProcessError):
             return None
     return {"driver_version": DRIVER_VERSION, "driver_sha256": sha256(Path(__file__)),
+            "support_sha256": sha256(common.__file__),
             "git_head": git("rev-parse", "HEAD"), "git_status": git("status", "--porcelain"),
             "python": sys.version, "platform": platform.platform(), "processor": platform.processor(),
             "logical_cpus": os.cpu_count()}

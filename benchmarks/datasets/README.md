@@ -66,3 +66,18 @@ python .\benchmarks\datasets\reseed_globe_odometry.py `
 
 The reseeded file has a different SHA-256 and is not the formal benchmark
 input listed above.
+
+## Publish a data mirror
+
+This is a maintainer operation, not part of normal setup. `package_benchmarks.py`
+validates the catalog's canonical g2o/BAL files and emits deterministic gzip
+archives, a hash manifest, metadata and attribution into a **new** directory:
+
+```powershell
+python benchmarks/datasets/package_benchmarks.py --pgo-root data/pgo --ba-root data/ba --output release-data
+python benchmarks/download.py --source-dir release-data --output-root restored-data
+```
+
+Structural validation remains enabled under `python -O`. Packaging never
+changes source inputs. A new mirror revision must be verified before updating
+the pinned release config; the scripts do not upload data or change that pin.

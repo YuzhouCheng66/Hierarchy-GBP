@@ -2,12 +2,12 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import importlib.util
 import json
 import math
 import os
 from pathlib import Path
+import sys
 import time
 from types import SimpleNamespace
 
@@ -16,6 +16,9 @@ import scipy
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
+sys.path.insert(0, str(ROOT))
+from benchmarks import common
+from benchmarks.common import sha256
 
 
 def helper(name):
@@ -29,14 +32,6 @@ se2 = helper("retained_se2")
 se3 = helper("retained_se3")
 conversion = helper("retained_poses")
 cycle = helper("reconstruct_cycle_vertices")
-
-
-def sha256(path):
-    digest = hashlib.sha256()
-    with Path(path).open("rb") as stream:
-        for block in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(block)
-    return digest.hexdigest()
 
 
 def poses_from_g2o(path, space):
@@ -112,7 +107,7 @@ def score_run(method, input_path, space, run_dir, expected_sha256):
     # The soft-anchor diagnostic is not part of the shared factor objective.
     values["anchor_cost_excluded"] = values.pop("anchor_cost")
     artifacts[pose_path.name] = sha256(pose_path)
-    sources = [Path(__file__), HERE / "retained_se2.py", HERE / "retained_se3.py",
+    sources = [Path(__file__), Path(common.__file__), HERE / "retained_se2.py", HERE / "retained_se3.py",
                HERE / "retained_poses.py", HERE / "reconstruct_cycle_vertices.py"]
     return {"method": method, "space": space, "input_sha256": digest, "poses_sha256": artifacts,
             "objective": "original full-information Lie-log; half-SSR and half-Huber(delta=5); excludes anchor",

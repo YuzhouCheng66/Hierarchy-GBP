@@ -112,5 +112,7 @@ the repository paths used when those measurements were collected.
 To regenerate the compact evidence archive from completed run directories:
 
 ```powershell
-python code/variants/pure_gbp/archive.py <paired-run-directory> [<additional-run-directory> ...]
+python code/variants/pure_gbp/archive.py <paired-run-directory> [<additional-run-directory> ...] --output results/pure-gbp-evidence
 ```
+
+The output must be new; the bundled historical evidence is never overwritten.

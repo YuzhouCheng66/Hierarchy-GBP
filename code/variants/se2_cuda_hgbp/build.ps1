@@ -2,26 +2,13 @@ param(
     [Parameter(Mandatory=$true)][string]$DependencyRoot,
     [Parameter(Mandatory=$true)][string]$RuntimeDir,
     [string]$Ninja,
-    [int]$Jobs=12,
+    [ValidateRange(1, 1024)][int]$Jobs=12,
     [string[]]$Targets=@('se2_benchmark','se2_cuda_benchmark','se2_cuda_failure_test','se2_cuda_layout_test','se2_cuda_overlap_test','se2_cuda_coarse_test'),
     [switch]$SkipConfigure
 )
 $ErrorActionPreference='Stop'
-$vswhere="${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-$vs=& $vswhere -latest -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
-$vcvars=Join-Path $vs 'VC\Auxiliary\Build\vcvars64.bat'
-$lines=& $env:ComSpec /d /s /c "`"$vcvars`" >nul && set"
-if($LASTEXITCODE) { throw 'vcvars failed' }
-foreach($line in $lines) {
-    $pos=$line.IndexOf('=')
-    if($pos -gt 0) { [Environment]::SetEnvironmentVariable($line.Substring(0,$pos),$line.Substring($pos+1),'Process') }
-}
-$tool=Get-ChildItem (Join-Path $vs 'VC\Tools\MSVC') -Directory | Sort-Object Name -Descending | Select-Object -First 1
-$bin=Join-Path $tool.FullName 'bin\Hostx64\x64'
-$compiler=(Join-Path $bin 'cl.exe') -replace '\\','/'
-$env:Path="$bin;$env:Path"
-$env:LIB="$(Join-Path $tool.FullName 'lib\x64');$env:LIB"
-$env:INCLUDE="$(Join-Path $tool.FullName 'include');$env:INCLUDE"
+. (Join-Path $PSScriptRoot '../../cmake/msvc.ps1')
+$compiler=Initialize-HgbpMsvc -ForceEnvironment
 if(!$Ninja) { $Ninja=(Get-Command ninja -ErrorAction Stop).Source }
 $build=Join-Path $PSScriptRoot 'build'
 $argsCmake=@('--fresh','-S',$PSScriptRoot,'-B',$build,'-G','Ninja',"-DCMAKE_MAKE_PROGRAM=$Ninja",
