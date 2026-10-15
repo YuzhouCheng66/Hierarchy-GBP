@@ -30,8 +30,7 @@ THREAD_ENV = {
 
 def environment(threads, runtime_dirs):
     env = {k: v for k, v in os.environ.items()
-           if not k.upper().startswith(("GBP_", "HGBP_"))
-           and k.upper() not in THREAD_ENV}
+           if not k.upper().startswith(common.NUMERICAL_PREFIXES)}
     env.update({k: v.format(threads=threads) for k, v in THREAD_ENV.items()})
     env["PATH"] = os.pathsep.join([*(str(p) for p in runtime_dirs),
                                    env.get("PATH", "")])
@@ -228,6 +227,8 @@ def prepare(args):
             "environment": {name: {k: v for k, v in environment(PROFILES['profiles'][name]['threads'], runtime).items()
                                     if k in THREAD_ENV or k in ("PATH", "LD_LIBRARY_PATH", "TEMP", "TMP")}
                             for name in args.profiles},
+            "removed_environment_overrides": sorted(k for k in os.environ
+                                                     if k.upper().startswith(common.NUMERICAL_PREFIXES)),
             "metric_source": "native log, not independent final-geometry rescoring",
             "timing": "native solver total and separate process wall; see README for boundaries"}
     return plan, output, mask, runtime

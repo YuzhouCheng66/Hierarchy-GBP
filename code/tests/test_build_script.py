@@ -65,6 +65,28 @@ class BuildScriptTests(unittest.TestCase):
         self.assertIn('tbb12.dll', result.stderr)
         self.assertFalse((self.root/'build').exists())
 
+    def test_ba_independent_library_and_prefix_are_read_only(self):
+        rootba = self.deps/'external_baselines/rootba'
+        source = rootba/'src/rootba/bal/bal_problem.hpp'
+        source.parent.mkdir(parents=True)
+        source.write_bytes(b'fixture only')
+        library = self.root/'external-build/rootba.lib'
+        library.parent.mkdir()
+        library.write_bytes(b'fixture only')
+        prefix = self.root/'external-prefix'
+        for name in ('tbb12', 'fmt', 'glog', 'gflags'):
+            for folder, suffix in (('lib', '.lib'), ('bin', '.dll')):
+                path = prefix/folder/(name+suffix)
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(b'fixture only')
+        before = set(self.root.rglob('*'))
+        result = self.invoke('-RootBALibrary '+ps_literal(library)+' -RootBAPrefix '+ps_literal(prefix))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        report = json.loads(result.stdout)
+        self.assertEqual(Path(report['RootBALibrary']), library)
+        self.assertEqual(Path(report['RootBAPrefix']), prefix)
+        self.assertEqual(set(self.root.rglob('*')), before)
+
     def test_missing_pgo_dependency_and_invalid_flags(self):
         (self.runtime/'openblas.dll').unlink()
         result = self.invoke('-PGOOnly')

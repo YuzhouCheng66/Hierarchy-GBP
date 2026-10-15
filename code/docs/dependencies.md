@@ -42,6 +42,25 @@ For explicit locations, the build script accepts `-EigenDir`,
 `-VcpkgInstalledDir` and `-RootBADir`. PGO-only users may omit RootBA with
 `-PGOOnly` (CMake: `-DHGBP_BUILD_BA=OFF`).
 
+RootBA source, build and installed dependencies need not share a directory.
+After preparing the pinned checkout and Release library using the
+[BA dependency recipe](../../benchmarks/baselines/ba/README.md#source-and-build),
+pass the actual library and prefix explicitly; no copying into `build-win` or
+`conda_env` is required:
+
+```powershell
+.\code\build.ps1 -DependencyRoot C:\deps\hgbp -PGORuntimeDir C:\deps\pgo-runtime `
+  -RootBADir C:\deps\rootba -RootBALibrary C:\deps\rootba\build\src\rootba\Release\rootba.lib `
+  -RootBAPrefix C:\deps\rootba-runtime
+```
+
+The prefix contains matching `include/`, `lib/` and `bin/` directories for
+TBB (`tbb12`), fmt, glog and gflags. The library path must name the actual output
+of your generator; Ninja may omit the `Release` component. CMake equivalents
+are `HGBP_ROOTBA_LIBRARY` and `HGBP_ROOTBA_PREFIX`; the original paths above
+remain the defaults. Keep compiler, CRT, Eigen and dependency versions matched
+to the pinned build; a different installation is not automatically certified.
+
 Use `-CheckOnly` with the same arguments to check required files and tool
 availability without creating a build directory, installing packages or changing
 dependency trees. Missing libraries are listed before compilation. This is a

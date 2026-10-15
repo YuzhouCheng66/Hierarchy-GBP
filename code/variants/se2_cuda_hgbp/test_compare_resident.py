@@ -1,4 +1,7 @@
 import copy
+import subprocess
+import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -7,6 +10,18 @@ from compare_resident import summarize
 
 
 class ResidentReportTests(unittest.TestCase):
+    def test_retired_schema_cli_redirects_without_writing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            record = directory/'runs.json'
+            record.write_bytes(b'preserve original record')
+            process = subprocess.run([sys.executable, '-B', str(Path(__file__).with_name('compare.py')), tmp],
+                                     cwd=tmp, capture_output=True, text=True, timeout=10)
+            self.assertNotEqual(process.returncode, 0)
+            self.assertIn('compare_resident.py', process.stderr)
+            self.assertEqual(record.read_bytes(), b'preserve original record')
+            self.assertFalse((directory/'summary.json').exists())
+
     def setUp(self):
         base = dict(dataset="test", repeat=1, shadow=False, sanitizer="", exit_code=0,
                     process_ms=3.0, cuda_context_ms=0.1, cost=4.0, lower=None,

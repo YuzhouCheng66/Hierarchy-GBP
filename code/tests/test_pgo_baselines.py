@@ -147,6 +147,18 @@ class FileTests(unittest.TestCase):
         return runner.parse_args([method, "FR079", "--binary-root", str(self.binary),
                                   "--data-root", str(self.data), "--output-root", str(self.root / "out")] + list(extra))
 
+    def linux_runtime(self, method):
+        library_root = self.root / (method + "-libs")
+        library_root.mkdir()
+        executable = self.binary / runner.POLICIES[method]["executables"]["SE2"]
+        expected = {executable.name: runner.core.sha256(executable)}
+        for name in runner.PINS["archived_runtime_sha256"][method]:
+            if name != executable.name:
+                path = library_root / name
+                path.write_bytes(("archived fixture: " + name).encode("ascii"))
+                expected[name] = runner.core.sha256(path)
+        return executable, library_root, expected
+
     def metric(self, method, data):
         runner.core.write_json(self.run_dir / "result.json", data)
         return runner.read_metrics(method, self.run_dir, "FR079")
@@ -223,6 +235,99 @@ class FileTests(unittest.TestCase):
     def test_runtime_strict_rejects_unverified_binary(self):
         with self.assertRaisesRegex(ValueError, "runtime mismatch"):
             runner.run(self.args("cholmod1", "--dry-run", "--require-archived-runtime"))
+
+    def test_linux_explicit_library_root_fingerprints_selected_files(self):
+        for method in ("amm16", "cycle16"):
+            with self.subTest(method=method):
+                executable, libraries, expected = self.linux_runtime(method)
+                name = next(n for n in expected if n != executable.name)
+                adjacent = self.binary / name
+                adjacent.write_bytes(b"conflicting adjacent library")
+                args = self.args(method, "--dry-run", "--library-root", str(libraries))
+                args.output_root = self.root / (method + "-out")
+                with mock.patch.dict(runner.PINS["archived_runtime_sha256"], {method: expected}), \
+                     mock.patch.object(runner.subprocess, "run") as execute, \
+                     contextlib.redirect_stdout(io.StringIO()):
+                    self.assertEqual(runner.run(args), 0)
+                execute.assert_not_called()
+                record = runner.core.load_json(args.output_root / "runs.json")[0]
+                runtime = record["runtime"]
+                self.assertEqual(record["environment"]["set"]["LD_LIBRARY_PATH"], str(libraries))
+                self.assertEqual(runtime["sha256"][name], expected[name])
+                self.assertEqual(runtime["paths"][name], str((libraries / name).resolve()))
+                self.assertEqual(runtime["conflicts"][name], {
+                    "adjacent_path": str(adjacent.resolve()), "adjacent_sha256": runner.core.sha256(adjacent)})
+                self.assertFalse(runtime["archived_bundle_match"])
+
+    def test_linux_strict_runtime_rejects_conflicting_adjacent_copy(self):
+        for method in ("amm16", "cycle16"):
+            with self.subTest(method=method):
+                executable, libraries, expected = self.linux_runtime(method)
+                name = next(n for n in expected if n != executable.name)
+                (self.binary / name).write_bytes(b"conflicting adjacent library")
+                with mock.patch.dict(runner.PINS["archived_runtime_sha256"], {method: expected}), \
+                     mock.patch.object(runner.subprocess, "run") as execute, \
+                     self.assertRaisesRegex(ValueError, "conflicting library copies"):
+                    runner.run(self.args(method, "--dry-run", "--require-archived-runtime",
+                                         "--library-root", str(libraries)))
+                execute.assert_not_called()
+                self.assertFalse((self.root / "out").exists())
+
+    def test_linux_strict_runtime_rejects_selected_mismatch(self):
+        for method in ("amm16", "cycle16"):
+            with self.subTest(method=method):
+                executable, libraries, expected = self.linux_runtime(method)
+                for name in expected:
+                    if name != executable.name:
+                        (self.binary / name).write_bytes((libraries / name).read_bytes())
+                name = next(n for n in expected if n != executable.name)
+                (libraries / name).write_bytes(b"changed selected library")
+                with mock.patch.dict(runner.PINS["archived_runtime_sha256"], {method: expected}), \
+                     self.assertRaisesRegex(ValueError, "runtime mismatch"):
+                    runner.run(self.args(method, "--dry-run", "--require-archived-runtime",
+                                         "--library-root", str(libraries)))
+                self.assertFalse((self.root / "out").exists())
+
+    def test_linux_strict_runtime_does_not_fallback_to_adjacent_copy(self):
+        for method in ("amm16", "cycle16"):
+            with self.subTest(method=method):
+                executable, libraries, expected = self.linux_runtime(method)
+                for name in expected:
+                    if name != executable.name:
+                        (self.binary / name).write_bytes((libraries / name).read_bytes())
+                name = next(n for n in expected if n != executable.name)
+                (libraries / name).unlink()
+                with mock.patch.dict(runner.PINS["archived_runtime_sha256"], {method: expected}):
+                    identity = runner.fingerprint(method, executable, libraries)
+                    self.assertNotIn(name, identity["sha256"])
+                    self.assertNotIn(name, identity["paths"])
+                    with self.assertRaisesRegex(ValueError, "runtime mismatch"):
+                        runner.run(self.args(method, "--dry-run", "--require-archived-runtime",
+                                             "--library-root", str(libraries)))
+                self.assertFalse((self.root / "out").exists())
+
+    def test_linux_strict_runtime_accepts_split_and_identical_copies(self):
+        for method in ("amm16", "cycle16"):
+            with self.subTest(method=method):
+                executable, libraries, expected = self.linux_runtime(method)
+                # The launched executable must never be fingerprinted from library-root.
+                (libraries / executable.name).write_bytes(b"not the launched executable")
+                with mock.patch.dict(runner.PINS["archived_runtime_sha256"], {method: expected}):
+                    identity = runner.fingerprint(method, executable, libraries)
+                    self.assertTrue(identity["archived_bundle_match"])
+                    self.assertEqual(identity["sha256"][executable.name], expected[executable.name])
+                    self.assertEqual(identity["paths"][executable.name], str(executable.resolve()))
+                    for name in expected:
+                        if name != executable.name:
+                            (self.binary / name).write_bytes((libraries / name).read_bytes())
+                    args = self.args(method, "--dry-run", "--require-archived-runtime",
+                                     "--library-root", str(libraries))
+                    args.output_root = self.root / (method + "-out")
+                    with contextlib.redirect_stdout(io.StringIO()):
+                        self.assertEqual(runner.run(args), 0)
+                identity = runner.core.load_json(args.output_root / "runs.json")[0]["runtime"]
+                self.assertTrue(identity["archived_bundle_match"])
+                self.assertEqual(identity["conflicts"], {})
 
     def test_output_root_must_be_new_and_selector_known(self):
         args = self.args("cholmod1", "--dry-run")

@@ -85,20 +85,34 @@ if(HGBP_PURE_GBP)
 endif()
 
 if(HGBP_BUILD_BA)
+    set(_rootba_library "${HGBP_ROOTBA_DIR}/build-win/src/rootba/Release/rootba.lib")
+    set(_rootba_prefix "${HGBP_ROOTBA_DIR}/conda_env/Library")
+    if(DEFINED ENV{HGBP_ROOTBA_LIBRARY})
+        set(_rootba_library "$ENV{HGBP_ROOTBA_LIBRARY}")
+    endif()
+    if(DEFINED ENV{HGBP_ROOTBA_PREFIX})
+        set(_rootba_prefix "$ENV{HGBP_ROOTBA_PREFIX}")
+    endif()
+    set(HGBP_ROOTBA_LIBRARY "${_rootba_library}" CACHE FILEPATH "Compiled RootBA core library.")
+    set(HGBP_ROOTBA_PREFIX "${_rootba_prefix}" CACHE PATH "RootBA dependency prefix (include/lib/bin).")
+    if(NOT EXISTS "${HGBP_ROOTBA_LIBRARY}")
+        message(FATAL_ERROR "Set HGBP_ROOTBA_LIBRARY to the compiled matching RootBA core library.")
+    endif()
+    get_filename_component(_rootba_library_dir "${HGBP_ROOTBA_LIBRARY}" DIRECTORY)
     add_library(hgbp_ba_dependencies INTERFACE)
     target_include_directories(hgbp_ba_dependencies INTERFACE ${HGBP_EIGEN_DIR}
         ${HGBP_VCPKG_INSTALLED_DIR}/include ${HGBP_VCPKG_INSTALLED_DIR}/include/suitesparse
-        ${HGBP_ROOTBA_DIR}/src ${HGBP_ROOTBA_DIR}/conda_env/Library/include)
+        ${HGBP_ROOTBA_DIR}/src ${HGBP_ROOTBA_PREFIX}/include)
     foreach(_include Sophus visit_struct/include wise_enum enum-flags/include nameof/include
             toml11 json basalt-headers/include magic_enum pprint cereal/include)
         target_include_directories(hgbp_ba_dependencies INTERFACE ${HGBP_ROOTBA_DIR}/external/${_include})
     endforeach()
     target_link_directories(hgbp_ba_dependencies INTERFACE ${HGBP_VCPKG_INSTALLED_DIR}/lib
-        ${HGBP_ROOTBA_DIR}/build-win/src/rootba/Release ${HGBP_ROOTBA_DIR}/conda_env/Library/lib)
+        ${_rootba_library_dir} ${HGBP_ROOTBA_PREFIX}/lib)
     target_compile_definitions(hgbp_ba_dependencies INTERFACE ROOTBA_DISABLE_ASSERTS ROOTBA_INSTANTIATIONS_DOUBLE
         ROOTBA_INSTANTIATIONS_STATIC_LMB CEREAL_THREAD_SAFE=1 FMT_SHARED GLOG_USE_GLOG_EXPORT
         GLOG_USE_GFLAGS GLOG_NO_ABBREVIATED_SEVERITIES GFLAGS_IS_A_DLL=1)
-    target_link_libraries(hgbp_ba_dependencies INTERFACE OpenMP::OpenMP_CXX rootba tbb12 glog gflags fmt ${_sparse_libraries})
+    target_link_libraries(hgbp_ba_dependencies INTERFACE OpenMP::OpenMP_CXX "${HGBP_ROOTBA_LIBRARY}" tbb12 glog gflags fmt ${_sparse_libraries})
     add_executable(ba_solver src/ba_solver.cpp)
     set_target_properties(ba_solver PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/ba")
     target_link_libraries(ba_solver PRIVATE hgbp_ba_dependencies)

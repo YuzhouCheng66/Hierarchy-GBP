@@ -114,13 +114,54 @@ class BaselinesTest(unittest.TestCase):
                     BA.metrics(value, self.dataset, self.profile)
 
     def test_environment(self):
-        with patch.dict(os.environ, {"GBP_DEBUG": "1", "hgbp_debug": "2", "OMP_NUM_THREADS": "99"}):
+        inherited = {prefix + "AUDIT": "inherited" for prefix in BA.common.NUMERICAL_PREFIXES}
+        inherited.update({"hgbp_debug": "2", "openblas_coretype": "wrong", "OMP_NUM_THREADS": "99",
+                          "OMP_PLACES": "cores", "OMP_PROC_BIND": "close", "MKL_CBWR": "COMPATIBLE",
+                          "KEEP": "yes", "PATH": "inherited-path"})
+        with patch.dict(os.environ, inherited, clear=True):
+            parent = dict(os.environ)
             env = BA.environment(16, [self.runtime])
-        self.assertFalse(any(k.upper().startswith(("GBP_", "HGBP_")) for k in env))
-        self.assertEqual(env["OMP_NUM_THREADS"], "16")
-        self.assertEqual(env["OMP_DYNAMIC"], "FALSE")
-        self.assertEqual(env["OPENBLAS_NUM_THREADS"], "16")
-        self.assertTrue(env["PATH"].startswith(str(self.runtime)))
+            self.assertEqual(dict(os.environ), parent)
+        for key in parent:
+            if key.upper().startswith(BA.common.NUMERICAL_PREFIXES) and key not in BA.THREAD_ENV:
+                self.assertNotIn(key, env)
+        for key, value in BA.THREAD_ENV.items():
+            self.assertEqual(env[key], value.format(threads=16))
+        self.assertEqual(env["KEEP"], "yes")
+        self.assertEqual(env["PATH"], str(self.runtime) + os.pathsep + "inherited-path")
+
+    def test_cleared_overrides_recorded_in_dry_run(self):
+        inherited = {prefix + "AUDIT": "inherited" for prefix in BA.common.NUMERICAL_PREFIXES}
+        inherited.update({"openblas_coretype": "wrong", "OMP_NUM_THREADS": "99", "KEEP": "yes"})
+        stdout = io.StringIO()
+        before = set(self.root.rglob("*"))
+        with patch.dict(os.environ, inherited, clear=True), redirect_stdout(stdout):
+            removed = sorted(set(os.environ) - {"KEEP"})
+            self.assertEqual(BA.main([*self.argv, "--dry-run"]), 0)
+        plan = json.loads(stdout.getvalue())
+        self.assertEqual(plan["removed_environment_overrides"], removed)
+        self.assertEqual(plan["environment"]["Ceres-Sparse-1"]["OMP_NUM_THREADS"], "1")
+        self.assertEqual(before, set(self.root.rglob("*")))
+
+    def test_cleared_overrides_match_launched_environment_and_protocol(self):
+        inherited = {"OPENBLAS_CORETYPE": "wrong", "OMP_PROC_BIND": "close", "OMP_PLACES": "cores",
+                     "MKL_CBWR": "COMPATIBLE", "OMP_NUM_THREADS": "99", "KEEP": "yes"}
+
+        def solver(cmd, **kwargs):
+            env = kwargs["env"]
+            self.assertEqual(env["KEEP"], "yes")
+            self.assertEqual(env["OMP_NUM_THREADS"], "1")
+            for key in set(inherited) - {"OMP_NUM_THREADS", "KEEP"}:
+                self.assertNotIn(key, env)
+            return self.fake_solver(cmd, **kwargs)
+
+        with patch.dict(os.environ, inherited, clear=True), \
+             patch.object(BA.subprocess, "run", side_effect=solver), \
+             patch.object(BA, "affinity", return_value=nullcontext()):
+            self.assertEqual(BA.main(self.argv), 0)
+            self.assertEqual(dict(os.environ), inherited)
+        plan = json.loads((self.root / "output/protocol.json").read_text())
+        self.assertEqual(plan["removed_environment_overrides"], sorted(set(inherited) - {"KEEP"}))
 
     def test_dry_run_no_writes_no_process(self):
         before = set(self.root.rglob("*"))

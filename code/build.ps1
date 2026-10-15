@@ -7,6 +7,8 @@ param(
     [string]$EigenDir = $env:HGBP_EIGEN_DIR,
     [string]$VcpkgInstalledDir = $env:HGBP_VCPKG_INSTALLED_DIR,
     [string]$RootBADir = $env:HGBP_ROOTBA_DIR,
+    [string]$RootBALibrary = $env:HGBP_ROOTBA_LIBRARY,
+    [string]$RootBAPrefix = $env:HGBP_ROOTBA_PREFIX,
     [string]$PGORuntimeDir = $env:HGBP_PGO_RUNTIME,
     [switch]$PGOOnly,
     [switch]$PureGBP,
@@ -43,7 +45,13 @@ function Resolve-DependencyDirectory {
 
 $EigenDir = Resolve-DependencyDirectory $EigenDir "Eigen"
 $VcpkgInstalledDir = Resolve-DependencyDirectory $VcpkgInstalledDir "vcpkg installed tree"
-if (!$PGOOnly) { $RootBADir = Resolve-DependencyDirectory $RootBADir "RootBA checkout" }
+if (!$PGOOnly) {
+    $RootBADir = Resolve-DependencyDirectory $RootBADir "RootBA checkout"
+    if (!$RootBALibrary) { $RootBALibrary = Join-Path $RootBADir "build-win/src/rootba/Release/rootba.lib" }
+    if (!$RootBAPrefix) { $RootBAPrefix = Join-Path $RootBADir "conda_env/Library" }
+    $RootBALibrary = [IO.Path]::GetFullPath($RootBALibrary)
+    $RootBAPrefix = [IO.Path]::GetFullPath($RootBAPrefix)
+}
 $PGORuntimeDir = Resolve-DependencyDirectory $PGORuntimeDir "PGO runtime (OpenBLAS with LAPACKE)"
 
 # Check files as well as directories before launching a long build.
@@ -55,10 +63,10 @@ foreach ($name in @('cholmod', 'suitesparseconfig', 'amd', 'colamd', 'camd', 'cc
 }
 if (!$PGOOnly) {
     $requiredFiles += Join-Path $RootBADir "src/rootba/bal/bal_problem.hpp"
-    $requiredFiles += Join-Path $RootBADir "build-win/src/rootba/Release/rootba.lib"
+    $requiredFiles += $RootBALibrary
     foreach ($name in @('tbb12', 'fmt', 'glog', 'gflags')) {
-        $requiredFiles += Join-Path $RootBADir "conda_env/Library/lib/$name.lib"
-        $requiredFiles += Join-Path $RootBADir "conda_env/Library/bin/$name.dll"
+        $requiredFiles += Join-Path $RootBAPrefix "lib/$name.lib"
+        $requiredFiles += Join-Path $RootBAPrefix "bin/$name.dll"
     }
 }
 $missing = @($requiredFiles | Where-Object { !(Test-Path -LiteralPath $_ -PathType Leaf) })
@@ -81,6 +89,8 @@ function Invoke-CMakeBuild {
         "-DHGBP_EIGEN_DIR=$EigenDir",
         "-DHGBP_VCPKG_INSTALLED_DIR=$VcpkgInstalledDir",
         "-DHGBP_ROOTBA_DIR=$RootBADir",
+        "-DHGBP_ROOTBA_LIBRARY=$RootBALibrary",
+        "-DHGBP_ROOTBA_PREFIX=$RootBAPrefix",
         "-DHGBP_BUILD_BA=$(!$PGOOnly)"
         "-DHGBP_PURE_GBP=$($PureGBP.IsPresent)"
     )
@@ -100,7 +110,7 @@ function Invoke-CMakeBuild {
     Copy-Item -Force -Path (Join-Path $PGORuntimeDir "*.dll") -Destination (Join-Path $BuildDir "pgo")
     if (!$PGOOnly) {
         $baBin = Join-Path $BuildDir "ba"
-        $runtimeBin = Join-Path $RootBADir "conda_env/Library/bin"
+        $runtimeBin = Join-Path $RootBAPrefix "bin"
         # Do not shadow the system MSVC/OpenMP runtime with conda's older DLLs.
         foreach ($name in @('tbb12.dll', 'fmt.dll', 'glog.dll', 'gflags.dll')) {
             Copy-Item -Force -LiteralPath (Join-Path $runtimeBin $name) -Destination $baBin
@@ -119,6 +129,8 @@ if ($CheckOnly) {
         SuiteSparse = $VcpkgInstalledDir
         PGORuntime = $PGORuntimeDir
         RootBA = $(if ($PGOOnly) { $null } else { $RootBADir })
+        RootBALibrary = $(if ($PGOOnly) { $null } else { $RootBALibrary })
+        RootBAPrefix = $(if ($PGOOnly) { $null } else { $RootBAPrefix })
         BuildDirectory = $BuildDir
         Scope = 'Required files and tools only; not a compile or runtime certification.'
     } | ConvertTo-Json

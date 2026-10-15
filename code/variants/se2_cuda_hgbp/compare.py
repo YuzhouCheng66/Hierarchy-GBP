@@ -1,8 +1,6 @@
-"""Validate all outer trajectories and summarize interleaved full-solver timings."""
-import argparse
+"""Shared CPU/GPU outer-trajectory validation; use compare_resident.py for reports."""
 import json
 import math
-import statistics
 from pathlib import Path
 
 
@@ -56,54 +54,5 @@ def compare_payload(cpu, gpu, p, q):
                 final_pose_relative_error=pose_rel[-1])
 
 
-def summarize(directory):
-    runs = read(directory / "runs.json")
-    if isinstance(runs, dict):
-        runs = [runs]
-    rows = []
-    for dataset in sorted({r["dataset"] for r in runs}):
-        selected = [r for r in runs if r["dataset"] == dataset and r["repeat"] > 0 and not r["shadow"]]
-        cpu = [r for r in selected if r["backend"] == "reference"]
-        gpu = [r for r in selected if r["backend"] == "gpu"]
-        if not cpu or len(cpu) != len(gpu):
-            raise ValueError(f"Missing paired timing samples for {dataset}")
-        checks = [compare(a["json"], b["json"]) for a, b in zip(cpu, gpu)]
-        trajectory_passed = all(x["passed"] for x in checks)
-        shadow = [r for r in runs if r["dataset"] == dataset and r["shadow"]]
-        if len(shadow) != 1 or shadow[0]["lower"]["calls"] != 60:
-            raise ValueError("Require a normal batch-shadow run (not single-sweep replay)")
-        med = lambda xs: statistics.median(xs)
-        cpu_ms, gpu_ms = med(r["solver_s"]*1000 for r in cpu), med(r["solver_s"]*1000 for r in gpu)
-        profile = {}
-        fields = ["sweeps_sec", "basis_build_sec", "coarse_lambda_sec", "coarse_eta_sec",
-                  "coarse_solve_sec", "prolong_inject_sec", "factor_relinearize_sec", "objective_eval_sec"]
-        for backend, records in [("cpu", cpu), ("gpu", gpu)]:
-            profile[backend] = {field: med(sum(x[field] for x in read(r["json"])["mg_history"])*1000
-                                           for r in records) for field in fields}
-        lower_fraction = profile["cpu"]["sweeps_sec"]/cpu_ms
-        rows.append(dict(dataset=dataset, accepted_speedup=trajectory_passed,
-            status="passed" if trajectory_passed else "PROVISIONAL: strict outer-cost gate failed",
-            repeats=len(cpu), cpu_ms=cpu_ms, gpu_ms=gpu_ms,
-            gpu_over_cpu=gpu_ms/cpu_ms, speedup=cpu_ms/gpu_ms,
-            cpu_ms_range=[min(r["solver_s"] for r in cpu)*1000,max(r["solver_s"] for r in cpu)*1000],
-            gpu_ms_range=[min(r["solver_s"] for r in gpu)*1000,max(r["solver_s"] for r in gpu)*1000],
-            cpu_process_ms=med(r["process_s"]*1000 for r in cpu),
-            gpu_process_ms=med(r["process_s"]*1000 for r in gpu),
-            cpu_cost=cpu[0]["cost"], gpu_cost=gpu[0]["cost"],
-            full_sweeps=gpu[0]["full_sweeps"],eta_sweeps=gpu[0]["eta_sweeps"],
-            shadow_max_relative=shadow[0]["lower"]["shadow_max_relative"],
-            validation=checks[0],phase_medians_ms=profile,
-            lower_fraction=lower_fraction, infinite_lower_speedup_bound=1/(1-lower_fraction),
-            cuda_lower={key:med(r["lower"][key] for r in gpu) for key in
-                ["wall_ms","upload_ms","kernel_ms","download_ms"]}))
-    return rows
-
-
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("directory", type=Path)
-    args = parser.parse_args()
-    result = summarize(args.directory)
-    (args.directory / "summary.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
-    print(json.dumps(result, indent=2))
-    raise SystemExit(0 if all(row["accepted_speedup"] for row in result) else 1)
+    raise SystemExit("Use compare_resident.py for the supported run-record schema.")

@@ -21,8 +21,9 @@ def load_json(path):
 
 
 def write_json(path, value, *, newline=None):
-    Path(path).write_text(json.dumps(value, indent=2, allow_nan=False) + "\n",
-                          encoding="utf-8", newline=newline)
+    encoded = json.dumps(value, indent=2, allow_nan=False) + "\n"
+    with Path(path).open("w", encoding="utf-8", newline=newline) as stream:
+        stream.write(encoded)
 
 
 def sha256(path):

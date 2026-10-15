@@ -137,9 +137,17 @@ again. Solver-only gains must not be presented as complete-process speedups.
 - Main Python tooling tests: 111 run, 110 pass, one Windows symlink-privilege skip.
 - CUDA Python tests: 15/15 pass.
 
-Local raw BA/PGO evidence is retained under
-`E:/HGBP_profiles/recert_20261015/{ba,pgo}`; CUDA evidence and orchestration
-logs are under the ignored `results/recert_20261015/` directory. Binary, input,
-runtime, raw-record and archive hashes are recorded in the JSON. Those local
-paths are provenance, not dependencies for using the repository. No competing
-baseline results were rescaled or overwritten by this revalidation.
+Before disk cleanup, local raw BA/PGO evidence and CUDA/orchestration records
+were losslessly archived under `E:/HGBP_evidence/cleanup_20261015/`. Every
+archived file was decompressed and SHA-256 checked against its source before
+the duplicate working outputs were removed. The JSON records the original
+binary, input, runtime and raw-record hashes; historical paths remain provenance,
+not dependencies for using the repository. No competing baseline results were
+rescaled or overwritten by this revalidation.
+
+A final source/API audit found no omitted solver functionality relative to
+the preceding main tree. Public interfaces, configurations, safeguards, build
+targets and documented optional variants remain available. The additional
+`pure_gbp` compiled suite passed 22/22 tests. An obsolete, unbuilt standalone
+CMake cache was not treated as an executable test result. No further tracked
+solver code was removed on the basis of benchmark coverage alone.

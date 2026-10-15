@@ -38,7 +38,8 @@ Start reading from [the solver entry points](code/docs/architecture.md).
 
 Policies are shared across datasets within SE2, SE3 and BA respectively.
 Dataset names select input metadata, not numerical parameter overrides.
-Older research code remains in Git history and the `legacy` branch.
+`main` contains the maintained solvers and reproduction tools; `legacy`
+preserves the preceding main version.
 
 ## Build
 
@@ -89,10 +90,14 @@ time and process wall time separately. PGO reports its common quadratic
 cost; BA reports squared reprojection cost, RMSE and mean reprojection error.
 Numerical checks and timing diagnostics are separate: historical timings
 are not portable performance guarantees.
+The [cleanup validation](code/docs/recertification.md) records full BA,
+sampled PGO and native SE2 CUDA checks against retained reference executables.
 
 See [baseline reproduction](benchmarks/baselines/README.md) for comparison methods.
 Input definitions and sources are documented in the dataset card; the
 [Globe generators](benchmarks/datasets/README.md) reproduce the synthetic inputs.
+
+### Reference results
 
 Runtime [s] / final cost, from [Tables 1 and 2 of the paper](https://arxiv.org/abs/2610.06978v1).
 

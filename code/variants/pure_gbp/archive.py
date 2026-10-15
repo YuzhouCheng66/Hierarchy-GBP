@@ -19,10 +19,12 @@ if __name__=='__main__':
     parser.add_argument('runs',nargs='+',type=Path)
     parser.add_argument('--output',type=Path,default=HERE/'evidence',help='New directory only; never overwrite archived evidence')
     args=parser.parse_args()
-    args.output.mkdir(parents=True,exist_ok=False)
+    if args.output.exists():raise FileExistsError(args.output)
     records=[]
     for directory in args.runs:
         records.extend(json.loads(path.read_text()) for path in sorted(directory.glob('*/record.json')))
+    if len(set(r['threads'] for r in records))>1:
+        raise ValueError('Mixed thread budgets are not supported; archive each thread budget separately')
     rows=[]
     for name in dict.fromkeys(r['dataset'] for r in records):
         row={'dataset':name}
@@ -46,6 +48,7 @@ if __name__=='__main__':
              'geometric_mean_ratio':math.exp(statistics.mean(math.log(r['pure_over_main']) for r in comparable)),
              'ratio_range':[min(r['pure_over_main'] for r in comparable),max(r['pure_over_main'] for r in comparable)],
              'maximum_cost_ratio':max(r['cost_ratio'] for r in comparable),'datasets':rows}
+    args.output.mkdir(parents=True,exist_ok=False)
     write(args.output/'summary.json',summary);write(args.output/'runs.json',records)
     files={ROOT/'CMakeLists.txt',ROOT/'code/CMakeLists.txt',ROOT/'code/build.ps1',ROOT/'code/cmake/msvc.ps1',
            ROOT/'benchmarks/__init__.py',ROOT/'benchmarks/common.py',ROOT/'benchmarks/run.py',

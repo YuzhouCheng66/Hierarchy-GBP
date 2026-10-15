@@ -87,14 +87,26 @@ def fingerprint(method, executable, library_root):
     relevant = {name: value for name, value in expected.items()
                 if not name.endswith(".exe") or name == executable.name}
     actual = {executable.name: core.sha256(executable)}
+    paths = {executable.name: str(executable.resolve())}
+    conflicts = {}
+    runtime_root = library_root if library_root is not None else executable.parent
     for name in relevant:
-        path = executable.parent / name
-        if not path.is_file() and library_root:
-            path = library_root / name
+        if name == executable.name:
+            continue
+        path = runtime_root / name
         if path.is_file():
             actual[name] = core.sha256(path)
-    matches = executable.name in expected and all(actual.get(name) == value for name, value in relevant.items())
-    return {"sha256": actual, "archived_bundle_match": matches,
+            paths[name] = str(path.resolve())
+            adjacent = executable.parent / name
+            # Conflicting adjacent copies make loader selection ambiguous in strict replay.
+            if adjacent.resolve() != path.resolve() and adjacent.is_file():
+                adjacent_hash = core.sha256(adjacent)
+                if adjacent_hash != actual[name]:
+                    conflicts[name] = {"adjacent_path": str(adjacent.resolve()),
+                                       "adjacent_sha256": adjacent_hash}
+    matches = (executable.name in expected and not conflicts
+               and all(actual.get(name) == value for name, value in relevant.items()))
+    return {"sha256": actual, "paths": paths, "conflicts": conflicts, "archived_bundle_match": matches,
             "scope": PINS["runtime_scope"],
             "identity": "archived bundle fingerprint" if matches else "rebuilt or unverified runtime; not an archived-binary replay"}
 
@@ -246,7 +258,9 @@ def run(args):
             fingerprints[executable] = fingerprint(args.method, executable, library_root)
         identity = fingerprints[executable]
         if args.require_archived_runtime and not identity["archived_bundle_match"]:
-            raise ValueError(f"archived runtime mismatch: {executable}")
+            detail = ("; conflicting library copies: " + ", ".join(sorted(identity["conflicts"]))
+                      if identity["conflicts"] else "")
+            raise ValueError(f"archived runtime mismatch: {executable}{detail}")
         for repeat in range(1, args.repeats + 1):
             run_dir = out / f"{name}_r{repeat}"
             command = solver_command(args.method, name, item["space"], executable, input_path, run_dir)
