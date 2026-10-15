@@ -38,7 +38,7 @@ if($ProfileClock) {$env:HGBP_RESIDENT_CLOCK='1'}
 $policy=@($config.profiles.SE2.arguments | ForEach-Object {$_.Replace('{threads}','16').Replace('{affinity_mask}','0xFFFF')})
 # Pin the cleaned numerical tree, including private implementation fragments.
 # Historical cohorts keep their original source locks; this is a new certification.
-$reference='3dd8f91b458e90cd65c1086e658137bfc08bb412'
+$reference='8881978244a7a46cb75445d57bf617c17546077b'
 $sources=@(git -C $root ls-tree -r --name-only $reference -- code/src code/include code/apps `
     code/CMakeLists.txt code/cmake/openblas_banded.def benchmarks/configs/pgo.json benchmarks/configs/datasets.json)
 if($LASTEXITCODE -or !$sources.Count) { throw 'Reference source unavailable' }

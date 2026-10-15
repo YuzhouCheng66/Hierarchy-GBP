@@ -112,7 +112,7 @@ not any numerical policy. The latest [cleanup revalidation](../../docs/recertifi
 uses the production reference and nine timing pairs per dataset.
 
 The current runner pins numerical commit
-`3dd8f91b458e90cd65c1086e658137bfc08bb412`, checking the cleaned CPU tree (including
+`8881978244a7a46cb75445d57bf617c17546077b`, checking the cleaned CPU tree (including
 private `.inc` files), CUDA sources and build settings. Historical evidence retains
 its original locks. The runner hash and numerical reference are recorded separately;
 updating a layout does not bypass numerical equivalence checks.

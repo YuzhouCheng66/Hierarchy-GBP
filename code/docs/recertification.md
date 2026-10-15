@@ -151,3 +151,19 @@ targets and documented optional variants remain available. The additional
 `pure_gbp` compiled suite passed 22/22 tests. An obsolete, unbuilt standalone
 CMake cache was not treated as an executable test result. No further tracked
 solver code was removed on the basis of benchmark coverage alone.
+
+Final publication checks at `8881978244a7a46cb75445d57bf617c17546077b`
+also exercised the independent RootBA library/prefix build interface. The BA
+executable was relinked and all ten inputs rerun at 1/16 threads (20 additional
+runs): single-thread cost histories are unchanged, maximum parallel history
+change is `1.767531e-6`, and all work counters match. This one-repeat interface
+check is not a new timing distribution. PGO executables remain byte-identical;
+all nine input hashes were rechecked. All three final CUDA shadows pass.
+
+Reproduction fixes cover JSON writing without Python 3.10-only arguments,
+explicit BA dependency paths, selected-runtime fingerprinting, removal of
+inherited numerical environment overrides, and rejection of mixed-thread
+archives. The obsolete CUDA report CLI was removed; shared trajectory checks
+remain. Final tooling tests: 122 run (121 pass, one permission skip), plus
+16/16 CUDA Python tests. Compiled main/pure-GBP/CUDA suites pass 22/22, 22/22
+and 4/4 respectively. No numerical C++ kernel or solver policy was changed.

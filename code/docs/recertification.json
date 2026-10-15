@@ -1,6 +1,255 @@
 {
   "schema_version": 1,
   "date": "2026-10-15",
+  "final_publication_check": {
+    "source_commit": "8881978244a7a46cb75445d57bf617c17546077b",
+    "scope": "Final packaging-interface checks, not a fresh baseline comparison or timing distribution.",
+    "cpp_solver_and_policy_changes": false,
+    "pgo_binaries_unchanged": true,
+    "ba": "Relinked with explicit RootBA library/prefix paths; all ten canonical inputs rerun at both thread budgets.",
+    "ba_native_runs": 20,
+    "ba_max_cost_history_relative_change_1t": 0,
+    "ba_max_cost_history_relative_change_16t": 0.00000176753035538181,
+    "ba_work_counters_equal": true,
+    "ba_rows": [
+      {
+        "dataset": "Ladybug49",
+        "threads": 1,
+        "seconds": 0.1650972,
+        "cost": 26705.214410713448,
+        "time_over_previous_median": 0.9788619158745518,
+        "max_cost_history_relative_change": 0,
+        "work_counters_equal": true
+      },
+      {
+        "dataset": "Venice89",
+        "threads": 1,
+        "seconds": 2.3148473,
+        "cost": 576781.2701308135,
+        "time_over_previous_median": 0.8912500423516077,
+        "max_cost_history_relative_change": 0,
+        "work_counters_equal": true
+      },
+      {
+        "dataset": "Final93",
+        "threads": 1,
+        "seconds": 1.4130851,
+        "cost": 291092.14843252307,
+        "time_over_previous_median": 0.95072685519842,
+        "max_cost_history_relative_change": 0,
+        "work_counters_equal": true
+      },
+      {
+        "dataset": "Trafalgar257",
+        "threads": 1,
+        "seconds": 1.2817009,
+        "cost": 197378.48228648986,
+        "time_over_previous_median": 0.9320211165862556,
+        "max_cost_history_relative_change": 0,
+        "work_counters_equal": true
+      },
+      {
+        "dataset": "Dubrovnik356",
+        "threads": 1,
+        "seconds": 6.2867449,
+        "cost": 1021101.7907564436,
+        "time_over_previous_median": 1.0172072432948607,
+        "max_cost_history_relative_change": 0,
+        "work_counters_equal": true
+      },
+      {
+        "dataset": "Final394",
+        "threads": 1,
+        "seconds": 2.7567841,
+        "cost": 598296.0938795459,
+        "time_over_previous_median": 0.9904694075296733,
+        "max_cost_history_relative_change": 0,
+        "work_counters_equal": true
+      },
+      {
+        "dataset": "Ladybug1723",
+        "threads": 1,
+        "seconds": 4.2346816,
+        "cost": 759599.6847505283,
+        "time_over_previous_median": 1.0301968660830942,
+        "max_cost_history_relative_change": 0,
+        "work_counters_equal": true
+      },
+      {
+        "dataset": "Venice1778",
+        "threads": 1,
+        "seconds": 25.4392658,
+        "cost": 3363149.1650143634,
+        "time_over_previous_median": 1.0016265127984296,
+        "max_cost_history_relative_change": 0,
+        "work_counters_equal": true
+      },
+      {
+        "dataset": "Final3068",
+        "threads": 1,
+        "seconds": 10.9687624,
+        "cost": 3240217.0790154375,
+        "time_over_previous_median": 1.019457893915529,
+        "max_cost_history_relative_change": 0,
+        "work_counters_equal": true
+      },
+      {
+        "dataset": "Final4585",
+        "threads": 1,
+        "seconds": 48.3510283,
+        "cost": 10331431.91401479,
+        "time_over_previous_median": 0.9986662852716964,
+        "max_cost_history_relative_change": 0,
+        "work_counters_equal": true
+      },
+      {
+        "dataset": "Ladybug49",
+        "threads": 16,
+        "seconds": 0.0643519,
+        "cost": 26705.214410738176,
+        "time_over_previous_median": 0.9558026723067509,
+        "max_cost_history_relative_change": 1.7824457595121993e-12,
+        "work_counters_equal": true
+      },
+      {
+        "dataset": "Venice89",
+        "threads": 16,
+        "seconds": 0.5715724,
+        "cost": 576781.2701310298,
+        "time_over_previous_median": 1.0273211236301198,
+        "max_cost_history_relative_change": 2.106402132595487e-12,
+        "work_counters_equal": true
+      },
+      {
+        "dataset": "Final93",
+        "threads": 16,
+        "seconds": 0.3595542,
+        "cost": 291092.14843252534,
+        "time_over_previous_median": 0.9835809148960092,
+        "max_cost_history_relative_change": 3.399315535659523e-15,
+        "work_counters_equal": true
+      },
+      {
+        "dataset": "Trafalgar257",
+        "threads": 16,
+        "seconds": 0.4262411,
+        "cost": 197378.48228646832,
+        "time_over_previous_median": 0.9835548502784817,
+        "max_cost_history_relative_change": 2.1454250141147009e-13,
+        "work_counters_equal": true
+      },
+      {
+        "dataset": "Dubrovnik356",
+        "threads": 16,
+        "seconds": 1.5455211,
+        "cost": 1021101.7907286258,
+        "time_over_previous_median": 1.015007323649072,
+        "max_cost_history_relative_change": 4.171987903278692e-10,
+        "work_counters_equal": true
+      },
+      {
+        "dataset": "Final394",
+        "threads": 16,
+        "seconds": 0.7814344,
+        "cost": 598296.0938795345,
+        "time_over_previous_median": 1.0029465874235983,
+        "max_cost_history_relative_change": 1.3767771374012983e-13,
+        "work_counters_equal": true
+      },
+      {
+        "dataset": "Ladybug1723",
+        "threads": 16,
+        "seconds": 1.2073351,
+        "cost": 759599.4189441351,
+        "time_over_previous_median": 1.0143721934495122,
+        "max_cost_history_relative_change": 0.00000176753035538181,
+        "work_counters_equal": true
+      },
+      {
+        "dataset": "Venice1778",
+        "threads": 16,
+        "seconds": 5.5778304,
+        "cost": 3363149.167513348,
+        "time_over_previous_median": 0.9959904362726105,
+        "max_cost_history_relative_change": 0.0000011155477095307344,
+        "work_counters_equal": true
+      },
+      {
+        "dataset": "Final3068",
+        "threads": 16,
+        "seconds": 2.9156436,
+        "cost": 3240216.4377468387,
+        "time_over_previous_median": 0.9944384789411633,
+        "max_cost_history_relative_change": 6.907310487112379e-7,
+        "work_counters_equal": true
+      },
+      {
+        "dataset": "Final4585",
+        "threads": 16,
+        "seconds": 10.7517578,
+        "cost": 10331431.914023863,
+        "time_over_previous_median": 0.9913328157731685,
+        "max_cost_history_relative_change": 6.180298973001838e-10,
+        "work_counters_equal": true
+      }
+    ],
+    "cuda_shadow_rows": [
+      {
+        "dataset": "FR079",
+        "validation": {
+          "passed": true,
+          "policy_mismatches": [],
+          "max_outer_cost_relative_error": 0,
+          "final_cost_relative_error": 0,
+          "max_outer_pose_relative_error": 0,
+          "final_pose_relative_error": 0
+        },
+        "shadow_calls": 60,
+        "fallback_batches": 0
+      },
+      {
+        "dataset": "FRH",
+        "validation": {
+          "passed": true,
+          "policy_mismatches": [],
+          "max_outer_cost_relative_error": 0,
+          "final_cost_relative_error": 0,
+          "max_outer_pose_relative_error": 0,
+          "final_pose_relative_error": 0
+        },
+        "shadow_calls": 60,
+        "fallback_batches": 0
+      },
+      {
+        "dataset": "M3500",
+        "validation": {
+          "passed": true,
+          "policy_mismatches": [],
+          "max_outer_cost_relative_error": 0,
+          "final_cost_relative_error": 0,
+          "max_outer_pose_relative_error": 0,
+          "final_pose_relative_error": 0
+        },
+        "shadow_calls": 60,
+        "fallback_batches": 0
+      }
+    ],
+    "canonical_pgo_hashes_rechecked": 9,
+    "tests": {
+      "main_cpp": "22/22",
+      "pure_gbp_cpp": "22/22",
+      "cuda_cpp": "4/4",
+      "python_main": "122 run, 121 pass, one symlink-privilege skip",
+      "python_cuda": "16/16"
+    },
+    "disk_cleanup": {
+      "deleted_logical_bytes": 14201175669,
+      "deleted_c_bytes": 2429008073,
+      "deleted_e_bytes": 11772167596,
+      "scope": "Only verified H-GBP intermediates; inputs, sources, active dependency/runtime trees, current verification builds and compact evidence preserved.",
+      "archives_directory": "E:/HGBP_evidence/cleanup_20261015"
+    }
+  },
   "scope": "Cleanup revalidation, not a new comparison against competing solvers.",
   "source": {
     "numerical_commit": "3dd8f91b458e90cd65c1086e658137bfc08bb412",
