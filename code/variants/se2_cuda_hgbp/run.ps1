@@ -1,5 +1,6 @@
 param(
     [Parameter(Mandatory=$true)][string]$DataDirectory,
+    [string]$ReferenceBinary='',
     [string[]]$Datasets=@('FR079','FRH','M3500'),
     [ValidateSet('reference','transportsegment')][string[]]$Variants=@('reference','transportsegment'),
     [ValidateRange(0,100)][int]$Repeats=9,
@@ -20,6 +21,10 @@ if(($SanitizerLaunchCount -or $SanitizerLaunchSkip) -and !$Sanitizer) { throw 'L
 $root=(Resolve-Path "$PSScriptRoot/../../..").Path
 $config=Get-Content "$root/benchmarks/configs/pgo.json" -Raw | ConvertFrom-Json
 $manifest=Get-Content "$root/benchmarks/configs/datasets.json" -Raw | ConvertFrom-Json
+if($ReferenceBinary) {
+    if(!(Test-Path -LiteralPath $ReferenceBinary -PathType Leaf)) { throw 'ReferenceBinary must name an existing CPU executable' }
+    $ReferenceBinary=(Resolve-Path -LiteralPath $ReferenceBinary).Path
+}
 if(![IO.Path]::IsPathRooted($OutputDirectory)) { $OutputDirectory=Join-Path $PSScriptRoot $OutputDirectory }
 if(Test-Path $OutputDirectory) { throw "Refuse overwrite: $OutputDirectory" }
 New-Item -ItemType Directory -Path $OutputDirectory | Out-Null
@@ -31,16 +36,20 @@ foreach($p in $config.profiles.SE2.environment.PSObject.Properties) {
 }
 if($ProfileClock) {$env:HGBP_RESIDENT_CLOCK='1'}
 $policy=@($config.profiles.SE2.arguments | ForEach-Object {$_.Replace('{threads}','16').Replace('{affinity_mask}','0xFFFF')})
-# Compare numerical sources to the pinned revision across the directory rename.
-$reference='7b9be582c77e1c6e878af5db023ce56d7c39af07'
-$sources=@(git -C $root ls-tree -r --name-only $reference -- src include configs)
+# Pin the cleaned numerical tree, including private implementation fragments.
+# Historical cohorts keep their original source locks; this is a new certification.
+$reference='3dd8f91b458e90cd65c1086e658137bfc08bb412'
+$sources=@(git -C $root ls-tree -r --name-only $reference -- code/src code/include code/apps `
+    code/CMakeLists.txt code/cmake/openblas_banded.def benchmarks/configs/pgo.json benchmarks/configs/datasets.json)
 if($LASTEXITCODE -or !$sources.Count) { throw 'Reference source unavailable' }
+$cudaSources=@(git -C $root ls-tree -r --name-only $reference -- code/variants/se2_cuda_hgbp)
+if($LASTEXITCODE) { throw 'CUDA reference source unavailable' }
+$sources+=@($cudaSources | Where-Object { $_ -match '\.(cpp|cu|cuh|h)$|/CMakeLists\.txt$' })
 foreach($path in $sources) {
-    $current=if($path.StartsWith('configs/')) {'benchmarks/'+$path} else {'code/'+$path}
     $expected=(git -C $root rev-parse "${reference}:$path").Trim()
     if($LASTEXITCODE) { throw 'Reference source unavailable' }
-    $actual=(git -C $root hash-object "--path=$current" (Join-Path $root $current)).Trim()
-    if($LASTEXITCODE -or $actual -ne $expected) { throw "Production source changed: $current" }
+    $actual=(git -C $root hash-object "--path=$path" (Join-Path $root $path)).Trim()
+    if($LASTEXITCODE -or $actual -ne $expected) { throw "Numerical source changed: $path" }
 }
 $records=@()
 foreach($dataset in $Datasets) {
@@ -65,6 +74,7 @@ foreach($dataset in $Datasets) {
                 if($Shadow) { $env:HGBP_COARSE_SHADOW='1' }
             }
             $exe="$PSScriptRoot/build/pgo/$name"
+            if($variant -eq 'reference' -and $ReferenceBinary) { $exe=$ReferenceBinary }
             $tag="$dataset.$variant.$repeat"; $json="$OutputDirectory/$tag.json"
             $watch=[Diagnostics.Stopwatch]::StartNew()
             if($NsightSystems) {
@@ -108,7 +118,9 @@ foreach($dataset in $Datasets) {
                 nsight_cuda_graph_trace=$(if($NsightSystems){$NsightGraphTrace}else{''});
                 nsight_duration_seconds=$NsightDurationSeconds;phase=$phase;phase_eta_threads=$env:HGBP_PHASE_ETA_THREADS;phase_static=($env:HGBP_PHASE_STATIC -eq '1');
                 lower=$lower;upper=$upper;device_upper=$env:HGBP_DEVICE_UPPER;cycle_fused=$env:HGBP_CYCLE_FUSED;cycle_parallel_rhs=$env:HGBP_CYCLE_PARALLEL_RHS;cuda_context_ms=$context;sha256=(Get-FileHash $exe).Hash.ToLowerInvariant();
-                dataset_sha256=$manifest.datasets.$dataset.sha256;reference_commit=(git -C $root rev-parse HEAD).Trim()}
+                dataset_sha256=$manifest.datasets.$dataset.sha256;reference_commit=(git -C $root rev-parse HEAD).Trim();
+                numerical_reference_commit=$reference;runner_sha256=(Get-FileHash -LiteralPath $PSCommandPath).Hash.ToLowerInvariant();
+                reference_binary_override=$ReferenceBinary}
             if(!$exitCode) {
                 $r=Get-Content $json -Raw|ConvertFrom-Json
                 if($r.mg_history.Count -ne 21) {throw 'Incomplete outer20'}

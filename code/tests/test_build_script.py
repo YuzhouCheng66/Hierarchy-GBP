@@ -90,6 +90,18 @@ class BuildScriptTests(unittest.TestCase):
                                         capture_output=True, text=True, timeout=30)
                 self.assertEqual(result.returncode, 0, result.stderr)
 
+    def test_cuda_missing_reference_rejected_without_launch_or_output(self):
+        output = self.root/'cuda-output'
+        command = ('& ' + ps_literal(ROOT/'code/variants/se2_cuda_hgbp/run.ps1') +
+                   ' -DataDirectory ' + ps_literal(self.root) +
+                   ' -ReferenceBinary ' + ps_literal(self.root/'missing.exe') +
+                   ' -OutputDirectory ' + ps_literal(output))
+        result = subprocess.run([POWERSHELL, '-NoProfile', '-NonInteractive', '-Command', command],
+                                cwd=self.root, capture_output=True, text=True, timeout=30)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('ReferenceBinary', result.stderr)
+        self.assertFalse(output.exists())
+
 
 if __name__ == '__main__':
     unittest.main()

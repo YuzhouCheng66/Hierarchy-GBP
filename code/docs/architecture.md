@@ -58,6 +58,10 @@ checks and `ctest --test-dir build --output-on-failure` after building for
 compiled numerical tests. Test coverage does not certify an unbuilt external
 baseline, BA dependency stack or optional CUDA backend.
 
+The [cleanup revalidation](recertification.md) records the subsequently rebuilt
+BA suite, sampled PGO timings and native SE2 CUDA checks, with explicit scope
+and numerical/performance comparisons against retained executables.
+
 Historical validation JSON, archived runs, licenses and source/runtime locks
 are retained as evidence, not executable configuration. Paths embedded in
 those records describe the original measurement environment, not required

@@ -104,6 +104,19 @@ profiler or another benchmark concurrently with timing. The output directory
 must not exist. Run the script in a child PowerShell if its controlled process
 environment must not affect an interactive shell.
 
+To compare with the production CPU executable rather than the CPU target from
+this independent build, pass `-ReferenceBinary <main-build>/pgo/se2_benchmark.exe`
+to both shadow and timing commands. The override is explicit, dataset-independent
+and recorded with the executable hash. It changes only the reference executable,
+not any numerical policy. The latest [cleanup revalidation](../../docs/recertification.md)
+uses the production reference and nine timing pairs per dataset.
+
+The current runner pins numerical commit
+`3dd8f91b458e90cd65c1086e658137bfc08bb412`, checking the cleaned CPU tree (including
+private `.inc` files), CUDA sources and build settings. Historical evidence retains
+its original locks. The runner hash and numerical reference are recorded separately;
+updating a layout does not bypass numerical equivalence checks.
+
 Sanitizers and Nsight are separate diagnostics, never speedup samples:
 
 ```powershell

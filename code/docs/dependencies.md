@@ -49,5 +49,10 @@ preflight check, not a numerical or binary-compatibility certification; run the
 build and tests afterward. Main and CUDA build scripts share the x64 MSVC setup
 in `cmake/msvc.ps1`; the optional CUDA build still requires its own validation.
 
+The [cleanup revalidation](recertification.md) documents the matching BA
+dependency recovery, full BA rerun and separate native SE2 CUDA certification.
+Its package hashes describe the tested environment, not a requirement to use
+the original workstation's absolute paths.
+
 Dataset checksums and preprocessing are specified in `benchmarks/configs/datasets.json`.
 Absolute paths in local validation records are not required by the release.
