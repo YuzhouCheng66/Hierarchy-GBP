@@ -65,7 +65,7 @@ def main():
             sampling='12,000 uniform landmark-index samples and all 1,778 camera centers. One fixed initial-frame scale aligns the solvers\' global gauges, followed by a shared fixed PCA display rotation. No per-frame alignment.',
             initial_geometry_max_difference=initial_error,
             baseline_display_scale=display_scale,display_rotation=rotation.tolist(),paper='https://arxiv.org/abs/2610.06978v1'))
-    (a.output/'ba.json').write_text(json.dumps(meta,indent=2)+'\n')
+    (a.output/'ba.json').write_text(json.dumps(meta,indent=2)+'\n', newline='\n')
     print(f'BA replay: initial max difference {initial_error}; final costs {hn["final_cost"]}, {pn["cost"][-1]*2}')
 
 

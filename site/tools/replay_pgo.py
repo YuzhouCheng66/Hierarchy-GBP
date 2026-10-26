@@ -114,7 +114,7 @@ def export(args):
             interpolation='Display-only interpolation between retained geometry keyframes. Cost readouts use completed outer iterations.',
             sampling='Uniform vertex-index sampling plus endpoints of 700 uniformly sampled loop closures; no residual-based selection.',
             paper='https://arxiv.org/abs/2610.06978v1'))
-    (args.output/'pgo.json').write_text(json.dumps(metadata, indent=2)+'\n', encoding='utf-8')
+    (args.output/'pgo.json').write_text(json.dumps(metadata, indent=2)+'\n', encoding='utf-8', newline='\n')
     print('PGO export complete', flush=True)
 
 

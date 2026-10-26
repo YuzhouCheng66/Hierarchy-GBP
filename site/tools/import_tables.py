@@ -36,7 +36,7 @@ def main():
             rows.append(dict(dataset=dataset, space=space, cells=cells))
         assert len(rows) == (10 if family == 'ba' else 9), rows
         result[family] = dict(methods=methods, rows=rows)
-    (ROOT/'site/data/benchmarks.json').write_text(json.dumps(result, indent=2)+'\n')
+    (ROOT/'site/data/benchmarks.json').write_text(json.dumps(result, indent=2)+'\n', newline='\n')
 
 
 if __name__ == '__main__':
