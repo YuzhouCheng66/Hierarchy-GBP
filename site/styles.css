@@ -13,7 +13,7 @@
 .hero h2 em{font-size:28px}
 .hero-links{margin-top:16px}
 .mechanism-section{margin-top:22px;padding-bottom:16px}
-.mechanism-section .mini-heading{margin-bottom:10px}
+.mechanism-section .mini-heading{visibility:hidden;margin-bottom:10px}
 .topbar nav{font-size:14px}
 .eyebrow,.section-number{font-size:12px}
 .hero-description{font-size:18px}
