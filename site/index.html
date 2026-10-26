@@ -13,7 +13,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;450;500;550;600;650;700&family=Newsreader:ital,wght@0,400;0,450;0,500;0,600;1,400;1,500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20261026-12">
+  <link rel="stylesheet" href="styles.css?v=20261026-13">
   <script type="module" src="app.js?v=20261026-7"></script>
 </head>
 <body>
@@ -23,6 +23,7 @@
     <nav aria-label="Main navigation"><a href="#ba">Bundle adjustment</a><a href="#pgo">Pose graphs</a><a href="#results">Results</a><a class="nav-code" href="https://github.com/YuzhouCheng66/Hierarchy-GBP">Code <span aria-hidden="true">&#8599;</span></a></nav>
   </header>
   <main id="main">
+    <div class="opening">
     <section class="hero wrap">
       <h1>H-GBP<span class="title-dot">.</span></h1>
       <h2>Fast Bundle Adjustment and Pose Graph Optimization <em>via Hierarchical Message Passing.</em></h2>
@@ -39,6 +40,7 @@
       <canvas id="mechanism" aria-label="Animated mechanism illustration: GBP smooths high-frequency error; abstraction, correction and recovery reduce low-frequency error."></canvas>
       <div class="mechanism-bottom"><div class="phase-label" id="mechanism-phase">01 &nbsp; Local GBP smooths high-frequency error</div><span>Animated mechanism illustration</span></div>
     </section>
+    </div>
 
     <section id="ba" class="experiment wrap" aria-labelledby="ba-title">
       <div class="section-intro"><p class="section-number">01 / BUNDLE ADJUSTMENT</p><div><h2 id="ba-title">Bundle<br><em>adjustment.</em></h2><p>H-GBP combines Gaussian message passing and hierarchical correction on the landmark-reduced camera system. It is the fastest evaluated CPU method on all ten BA benchmarks; final costs are reported alongside runtime.</p></div></div>

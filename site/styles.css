@@ -7,7 +7,9 @@
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{animation:none!important;transition:none!important}}
 
 /* Keep research copy and numerical results readable without zooming. */
-.topbar{height:64px}
+:root{--topbar-height:64px}
+.topbar{height:var(--topbar-height)}
+.opening{display:flow-root;min-height:calc(100svh - var(--topbar-height))}
 .hero{padding-top:24px}
 .hero h1{font-size:88px;letter-spacing:-4px;margin:4px 0 6px}
 .hero h2 em{font-size:28px}
@@ -82,7 +84,7 @@ footer p,footer>a:last-child{font-size:12px}
   .scene-panel canvas[data-view]{height:390px}
 }
 @media(max-width:700px){
-  .topbar{height:56px}
+  :root{--topbar-height:56px}
   .hero{padding-top:20px}
   .hero h1{font-size:76px;margin:6px 0 8px}
   .hero h2 em{font-size:23px}
@@ -127,7 +129,7 @@ footer p,footer>a:last-child{font-size:12px}
   .citation pre{font-size:12px}
 }
 @media(min-width:701px) and (max-height:800px){
-  .topbar{height:52px}
+  :root{--topbar-height:52px}
   .hero{padding-top:12px}
   .hero h1{font-size:76px;margin:0 0 4px}
   .hero h2{font-size:32px}
