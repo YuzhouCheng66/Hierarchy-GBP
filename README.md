@@ -1,10 +1,10 @@
-# H-GBP: Fast Bundle Adjustment and Pose Graph Optimization via Hierarchical Message Passing
+# Hierarchy-GBP: Accelerating Factor Graph Inference via Abstraction and Recovery
 
 H-GBP accelerates **CPU bundle adjustment and pose graph optimization** through
 loopy Gaussian message passing and coarse-scale correction. Optimized kernels,
 packed messages and cached updates support single-threaded and parallel execution.
 
-[**Project page & animations**](https://yuzhoucheng.com/Hierarchy-GBP/) |
+[**Project**](https://yuzhoucheng.com/Hierarchy-GBP/) |
 [**Paper**](https://arxiv.org/abs/2610.06978) |
 [**Data**](https://huggingface.co/datasets/yuzhoucheng66/HGBP-Benchmarks)
 
