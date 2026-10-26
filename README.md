@@ -27,8 +27,8 @@ dataset names do not select numerical overrides. `main` is maintained;
 ## Build
 
 Validated on Windows x64 with Visual Studio 2022, CMake/Ninja, Python 3.10+,
-Eigen, SuiteSparse and OpenBLAS. BA additionally requires compiled RootBA.
-See [dependencies](code/docs/dependencies.md) for the matching library layout.
+Eigen, SuiteSparse and OpenBLAS. See [H-GBP build dependencies](code/docs/dependencies.md)
+for setup. Running comparison baselines is optional.
 
 ```powershell
 .\code\build.ps1 -DependencyRoot C:\deps -PGORuntimeDir C:\deps\pgo-runtime

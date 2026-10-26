@@ -18,6 +18,8 @@ SE3 does not. Other platforms/toolchains have not been release-validated.
 RootBA reference revision: `d3900037fc4bc98328e5d8d26f1c4eed922f88cc`.
 BA reuses its BAL data handling and linearization support, not its linear
 solver as a substitute for H-GBP.
+The matching RootBA core library and headers are build dependencies for H-GBP BA;
+RootBA solver executables and comparative baseline runs are not required.
 
 PGO requires a shared OpenBLAS **LP64** runtime exporting the LAPACKE
 `dsbevx_work`, `dsbtrd_work`, and `dstemr_work` functions. A minimal BLAS-only
