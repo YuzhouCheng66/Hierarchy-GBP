@@ -80,3 +80,20 @@ The separate [`integrations/`](integrations/README.md) adapters export optimized
 models and convert supported COLMAP text reconstructions to BAL. BAL/g2o files
 provide interchange with Ceres examples and g2o/GTSAM utilities; these are
 file interfaces, not drop-in solver backends. The validated kernels are unchanged.
+
+## Citation
+
+If you use H-GBP in your research, please cite:
+
+```bibtex
+@article{cheng2026hierarchy,
+  title   = {{Hierarchy-GBP}: Accelerating Factor Graph Inference via Abstraction and Recovery},
+  author  = {Cheng, Yuzhou and Yates, Tom and Alzugaray, Ignacio and
+             Akarca, Danyal and Mediano, Pedro A. M. and Davison, Andrew J.},
+  journal = {arXiv preprint arXiv:2610.06978},
+  year    = {2026},
+  url     = {https://arxiv.org/abs/2610.06978}
+}
+```
+
+See [CITATION.cff](CITATION.cff) for citation-manager metadata.

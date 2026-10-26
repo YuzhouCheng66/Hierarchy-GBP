@@ -1,0 +1,37 @@
+cff-version: 1.2.0
+message: "If you use H-GBP in your research, please cite the paper below."
+type: software
+title: Hierarchy-GBP
+url: "https://github.com/YuzhouCheng66/Hierarchy-GBP"
+authors:
+  - family-names: Cheng
+    given-names: Yuzhou
+  - family-names: Yates
+    given-names: Tom
+  - family-names: Alzugaray
+    given-names: Ignacio
+  - family-names: Akarca
+    given-names: Danyal
+  - family-names: Mediano
+    given-names: Pedro A. M.
+  - family-names: Davison
+    given-names: Andrew J.
+preferred-citation:
+  type: article
+  title: "Hierarchy-GBP: Accelerating Factor Graph Inference via Abstraction and Recovery"
+  authors:
+    - family-names: Cheng
+      given-names: Yuzhou
+    - family-names: Yates
+      given-names: Tom
+    - family-names: Alzugaray
+      given-names: Ignacio
+    - family-names: Akarca
+      given-names: Danyal
+    - family-names: Mediano
+      given-names: Pedro A. M.
+    - family-names: Davison
+      given-names: Andrew J.
+  journal: "arXiv preprint arXiv:2610.06978"
+  year: 2026
+  url: "https://arxiv.org/abs/2610.06978"
