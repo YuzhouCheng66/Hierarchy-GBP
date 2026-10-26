@@ -1,5 +1,5 @@
 import {initMechanism} from './mechanism.js?v=20261026-6';
-import {initGallery} from './gallery.js?v=20261026-7';
+import {initGallery} from './gallery.js?v=20261026-8';
 
 initMechanism();
 const observer = new IntersectionObserver(entries => {

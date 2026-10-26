@@ -126,7 +126,7 @@ export async function initReplay(root, metadataPath) {
     }
     const play = root.querySelector('[data-play]'), scrub = root.querySelector('[data-scrub]');
     const clock = root.querySelector('[data-clock]');
-    const updateButton = () => {play.textContent = running ? 'Pause replay' : 'Play replay'; play.setAttribute('aria-label', play.textContent);};
+    const updateButton = () => {play.textContent = running ? 'Pause' : 'Play'; play.setAttribute('aria-label', play.textContent);};
     for (const u of [0, .25, .5, .75, 1]) {
       const tick = document.createElement('span'); tick.textContent = `${fmt(timeAt(u), u ? 1 : 0)} s`;
       root.querySelector('[data-ticks]').append(tick);

@@ -1,4 +1,4 @@
-import {initReplay} from './replay.js?v=20261026-7';
+import {initReplay} from './replay.js?v=20261026-8';
 
 export async function initGallery(root, loadReplay = initReplay) {
   const kind = root.dataset.scene, section = root.closest('section');

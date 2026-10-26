@@ -50,6 +50,7 @@ for (const [kind, entries] of Object.entries(gallery)) for (const entry of entri
   globalThis.document = {hidden:false, createElement:() => new Element(), querySelector:() => new Element()};
   const controller = await initReplay(root, entry.metadata);
   assert.equal(root.dataset.ready, 'true');
+  assert.equal(root.querySelector('[data-play]').textContent, 'Play');
   const meta = JSON.parse(await readFile(new URL(entry.metadata, rootURL)));
   const scale = (meta.baseline.total / meta.hgbp.total).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
   assert.equal(header.get('[data-scene-speed]').textContent, `${scale}\u00d7`);
@@ -64,8 +65,11 @@ for (const [kind, entries] of Object.entries(gallery)) for (const entry of entri
   root.querySelector('[data-reset]').emit('click');
   assert.equal(root.querySelector('[data-clock]').textContent, '0.00 s');
   root.querySelector('[data-play]').emit('click');
+  assert.equal(root.querySelector('[data-play]').textContent, 'Pause');
   for (let now = 1000; now < 2000; now += 50) {const current = nextFrames; nextFrames = []; current.forEach(callback => callback(now));}
   assert.notEqual(root.querySelector('[data-clock]').textContent, '0.00 s');
+  root.querySelector('[data-play]').emit('click');
+  assert.equal(root.querySelector('[data-play]').textContent, 'Play');
   root.querySelector('[data-motion]').emit('click');
   assert.equal(root.querySelector('[data-motion]').textContent, 'Enable smooth display motion');
   controller.dispose();
