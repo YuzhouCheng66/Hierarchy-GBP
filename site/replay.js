@@ -9,11 +9,11 @@ async function fetchJSON(url) {
 export async function initReplay(root) {
   const kind = root.dataset.scene, status = root.querySelector('[data-status]');
   try {
-    const meta = await fetchJSON(`data/${kind}.json`);
+    const meta = await fetchJSON(`data/${kind}.json?v=20261026-2`);
     const n = meta.points + meta.cameras;
     const methods = {};
     for (const name of ['hgbp', 'baseline']) {
-      const config = meta[name], response = await fetch(`data/${config.binary}`);
+      const config = meta[name], response = await fetch(`data/${config.binary}?v=20261026-2`);
       if (!response.ok) throw Error(`Missing geometry: ${response.status}`);
       const data = new Float32Array(await response.arrayBuffer());
       if (data.length !== config.frames.length * n * 3 || !data.every(Number.isFinite)) throw Error('Invalid geometry capture');
