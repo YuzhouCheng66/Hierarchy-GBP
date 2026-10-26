@@ -11,6 +11,18 @@ def main():
     for name in ['ba','pgo']:
         meta=json.loads((ROOT/f'data/{name}.json').read_text())
         n=meta['points']+meta['cameras']
+        if 'view' in meta:
+            view=json.loads((ROOT/'data'/meta['view']).read_text())
+            B=view['basis']
+            assert len(B)==3 and all(len(row)==3 for row in B)
+            for i in range(3):
+                for j in range(3):
+                    assert abs(sum(B[i][k]*B[j][k] for k in range(3))-(i==j))<1e-10
+            determinant=sum(B[0][i]*(B[1][(i+1)%3]*B[2][(i+2)%3]-B[1][(i+2)%3]*B[2][(i+1)%3]) for i in range(3))
+            assert abs(determinant-1)<1e-10, 'Display must not mirror geometry'
+            assert all(a<b for a,b in zip(view['focus_min'],view['focus_max']))
+            assert 0<=view['fit_quantile']<.5 and 0<=view['vertical_fit_quantile']<.5
+            assert -B[1][2]>.99, 'Venice tower must point upward'
         for method in ['hgbp','baseline']:
             m=meta[method]; data=(ROOT/'data'/m['binary']).read_bytes()
             assert len(data)==len(m['frames'])*n*3*4

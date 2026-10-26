@@ -10,49 +10,49 @@
 .topbar nav{font-size:14px}
 .eyebrow,.section-number{font-size:12px}
 .hero-description{font-size:18px}
-.authors{font-size:14px;gap:8px 20px}
-.button,.text-link{font-size:14px}
-.headline-results span{font-size:13px;line-height:1.55}
+.authors{font-size:20px;gap:10px 24px}
+.button,.text-link{font-size:15px}
+.headline-results span{font-size:14px;line-height:1.55}
 .headline-results p{padding:0 28px}
 .mini-heading h2{font-size:26px}
-.plain-button{font-size:13px}
-#mechanism{height:310px}
+.plain-button{font-size:14px}
+#mechanism{height:350px}
 .mechanism-bottom{font-size:12px}
-.phase-label{font-size:14px}
+.phase-label{font-size:21px}
 .section-intro{grid-template-columns:225px 1fr;gap:30px}
 .section-intro>div{grid-template-columns:.9fr 1.1fr;gap:30px}
-.section-intro p:not(.section-number){font-size:16px;line-height:1.75;max-width:430px}
+.section-intro p:not(.section-number){font-size:18px;line-height:1.7;max-width:475px}
 .dataset-heading h3{font-size:31px}
-.dataset-heading p:not(.relative-speed){font-size:14px}
-.relative-speed span{font-size:12px}
-.scene-panel figcaption{font-size:16px;padding-bottom:8px}
-.scene-panel small,.step-badge{font-size:12px}
+.dataset-heading p:not(.relative-speed){font-size:15px}
+.relative-speed span{font-size:13px}
+.scene-panel figcaption{font-size:18px;padding-bottom:8px}
+.scene-panel small,.step-badge{font-size:13px}
 .scene-stage{position:relative}
-.scene-panel canvas[data-view]{height:440px}
-.scene-panel .cost-chart{position:absolute;top:8px;left:12px;width:228px;height:146px;cursor:default;pointer-events:none;background:#ffffffed;border:1px solid #e5e9e6;border-radius:4px}
-.scene-readout{font-size:13px;padding-top:8px}
-.scene-readout strong{font-size:16px}
-.scene-readout>span:last-child{font-size:13px}
-.play-button{font-size:13px;min-width:108px}
-.clock-heading{font-size:13px}
-.clock-heading output{font-size:15px}
-.clock-ticks{font-size:11px}
-.replay-notes,.replay-notes .plain-button{font-size:12px}
-.provenance{font-size:13px}
-.provenance summary{font-size:12px}
-.figure-caption{font-size:14px;line-height:1.7}
-.result-tabs button{font-size:14px}
-.table-description{font-size:15px}
-table{font-size:15px;min-width:1100px}
-th{font-size:13px;padding:16px 11px}
-td{font-size:15px;padding:16px 11px}
-td .cell-cost{font-size:13px;margin-top:7px}
+.scene-panel canvas[data-view]{height:480px}
+.scene-panel .cost-chart{position:absolute;top:8px;left:12px;width:254px;height:162px;cursor:default;pointer-events:none;background:#ffffffed;border:1px solid #e5e9e6;border-radius:4px}
+.scene-readout{font-size:14px;padding-top:8px}
+.scene-readout strong{font-size:18px}
+.scene-readout>span:last-child{font-size:14px}
+.play-button{font-size:14px;min-width:116px}
+.clock-heading{font-size:14px}
+.clock-heading output{font-size:17px}
+.clock-ticks{font-size:12px}
+.replay-notes,.replay-notes .plain-button{font-size:13px}
+.provenance{font-size:14px}
+.provenance summary{font-size:13px}
+.figure-caption{font-size:15px;line-height:1.7}
+.result-tabs button{font-size:15px}
+.table-description{font-size:16px}
+table{font-size:17px;min-width:1100px}
+th{font-size:14px;padding:16px 11px}
+td{font-size:17px;padding:16px 11px}
+td .cell-cost{font-size:15px;margin-top:7px}
 .space-tag{font-size:12px}
-.table-footnote{font-size:13px;line-height:1.8}
-.use-section p:not(.section-number){font-size:16px}
-.citation pre{font-size:13px}
+.table-footnote{font-size:14px;line-height:1.8}
+.use-section p:not(.section-number){font-size:18px}
+.citation pre{font-size:14px}
 footer p,footer>a:last-child{font-size:12px}
-@media(min-width:1550px){#mechanism{height:330px}.scene-panel canvas[data-view]{height:480px}}
+@media(min-width:1550px){#mechanism{height:365px}.scene-panel canvas[data-view]{height:510px}}
 @media(max-width:1000px){
   .headline-results p{padding:0 15px;gap:10px}
   .headline-results span{font-size:12px}
@@ -64,7 +64,7 @@ footer p,footer>a:last-child{font-size:12px}
   .topbar nav{font-size:13px}
   .eyebrow,.section-number{font-size:10px}
   .hero-description{font-size:16px}
-  .authors{font-size:12px;gap:8px 13px}
+  .authors{font-size:16px;gap:10px 16px}
   .hero-links .text-link{font-size:13px}
   .button,.text-link{font-size:13px}
   .headline-results span{font-size:10px}
@@ -72,19 +72,19 @@ footer p,footer>a:last-child{font-size:12px}
   .mini-heading h2{font-size:23px}
   .plain-button{font-size:12px}
   #mechanism{height:190px}
-  .phase-label{font-size:13px}
+  .phase-label{font-size:20px}
   .mechanism-bottom>span{font-size:11px}
-  .section-intro p:not(.section-number){font-size:16px}
+  .section-intro p:not(.section-number){font-size:17px}
   .dataset-heading p:not(.relative-speed){font-size:12px;max-width:260px}
   .relative-speed span{font-size:10px}
   .scene-pair{grid-template-columns:1fr}
   .scene-panel+.scene-panel{border-left:0;border-top:1px solid var(--line)}
-  .scene-panel figcaption{flex-direction:row;font-size:15px;padding:16px}
+  .scene-panel figcaption{flex-direction:row;font-size:16px;padding:16px}
   .scene-panel small,.step-badge{font-size:11px}
-  .scene-panel canvas[data-view]{height:350px}
-  .scene-panel .cost-chart{width:211px;height:137px;top:4px}
+  .scene-panel canvas[data-view]{height:380px}
+  .scene-panel .cost-chart{width:200px;height:150px;top:4px}
   .scene-readout{display:flex;font-size:12px;padding:10px 16px 17px}
-  .scene-readout strong{font-size:15px}
+  .scene-readout strong{font-size:16px}
   .scene-readout>span:last-child{font-size:12px}
   .play-button{font-size:12px;min-width:95px}
   .clock-heading,.clock-ticks{font-size:10px}

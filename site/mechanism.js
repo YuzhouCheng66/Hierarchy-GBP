@@ -1,6 +1,7 @@
 const palette = ['#528acb', '#d39448', '#70a483', '#aa8bba'];
 const clamp = x => Math.max(0, Math.min(1, x));
 const ease = x => { x = clamp(x); return x * x * (3 - 2 * x); };
+export const MECHANISM_LOOP_MS = 11000 / 1.5;
 
 export function coarsePoint(cx, cy, u, v, distortion) {
   return [
@@ -11,17 +12,17 @@ export function coarsePoint(cx, cy, u, v, distortion) {
 
 export function drawMechanism(ctx, width, height, phase) {
   ctx.clearRect(0, 0, width, height);
-  const w = 1120, h = 300;
+  const w = 940, h = 300;
   const scale = Math.min(width / w, height / h);
   ctx.save();
   ctx.translate((width - w * scale) / 2, (height - h * scale) / 2);
   ctx.scale(scale, scale);
   const hi = 1 - .94 * ease((phase - .04) / .25);
-  const lo = 1 - .93 * ease((phase - .43) / .32);
+  const lo = 1 - .93 * ease((phase - .7) / .23);
   const point = (x, y, cx, high, low) => {
     const z = low * Math.sin(2 * x + .4) * Math.cos(1.7 * y) * 31
       + high * Math.sin(13 * x + 8 * y) * Math.cos(10 * y - 3 * x) * 9;
-    return [cx + x * 108 + y * 66, 190 + y * 37 - x * 17 - z];
+    return [cx + x * 108 + y * 66, 185 + y * 37 - x * 17 - z];
   };
   const line = (a, b, color, weight = 1) => {
     ctx.strokeStyle = color; ctx.lineWidth = weight;
@@ -60,12 +61,12 @@ export function drawMechanism(ctx, width, height, phase) {
       }
     }
   }
-  surface(212, hi, 1, phase < .36);
-  surface(908, hi * .3, lo, false);
-  ctx.font = '500 16px "DM Sans", sans-serif'; ctx.textAlign = 'center';
+  surface(190, hi, 1, phase < .36);
+  surface(750, hi * .3, lo, false);
+  ctx.font = '500 24px "DM Sans", sans-serif'; ctx.textAlign = 'center';
   ctx.fillStyle = '#34464c';
-  ctx.fillText('Fine graph', 212, 279);
-  ctx.fillText('Recovered fine graph', 908, 279);
+  ctx.fillText('Fine graph', 190, 279);
+  ctx.fillText('Recovered fine graph', 750, 279);
 
   function arrow(a, control, b, color, start, end) {
     ctx.strokeStyle = color; ctx.lineWidth = 1.4;
@@ -78,14 +79,14 @@ export function drawMechanism(ctx, width, height, phase) {
       dot([u * u * a[0] + 2 * u * t * control[0] + t * t * b[0], u * u * a[1] + 2 * u * t * control[1] + t * t * b[1]], 4, '#205fc4');
     }
   }
-  arrow([320, 126], [362, 42], [440, 61], '#81959c', .25, .43);
-  arrow([510, 59], [560, 46], [610, 59], '#81959c', .43, .7);
-  arrow([688, 63], [771, 42], [806, 125], '#81959c', .7, 1);
+  arrow([296, 121], [333, 47], [355, 56], '#81959c', .25, .43);
+  arrow([425, 54], [467, 43], [506, 54], '#81959c', .43, .7);
+  arrow([584, 58], [623, 48], [650, 120], '#81959c', .7, 1);
   // The lower branch contrasts slow, unaccelerated GBP; it is not a V-cycle stage.
   ctx.setLineDash([4, 5]);
-  arrow([382, 214], [560, 235], [735, 214], '#bd8b80', 2, 3);
+  arrow([366, 209], [470, 225], [574, 209], '#bd8b80', 2, 3);
   ctx.setLineDash([]);
-  ctx.save(); ctx.translate(550 + 14 * phase, 206);
+  ctx.save(); ctx.translate(460 + 14 * phase, 201);
   ctx.strokeStyle = '#96766e'; ctx.lineWidth = 1.2; ctx.beginPath();
   for (let t = 0; t <= 4 * Math.PI; t += .13) {
     const r = .3 + .48 * t, x = r * Math.cos(t), y = r * Math.sin(t);
@@ -94,9 +95,9 @@ export function drawMechanism(ctx, width, height, phase) {
   ctx.stroke(); ctx.beginPath(); ctx.moveTo(-8, 7); ctx.lineTo(12, 7); ctx.quadraticCurveTo(19, 7, 18, -1);
   ctx.moveTo(18, -1); ctx.lineTo(16, -5); ctx.moveTo(18, -1); ctx.lineTo(21, -5); ctx.stroke(); ctx.restore();
   const nodes = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
-  [475, 649].forEach((cx, n) => {
+  [390, 545].forEach((cx, n) => {
     const distortion = n ? 1 - ease((phase - .43) / .27) : 1;
-    const point = (u, v) => coarsePoint(cx, 68, u, v, distortion);
+    const point = (u, v) => coarsePoint(cx, 63, u, v, distortion);
     const curve = (a, b, color, width) => {
       ctx.strokeStyle = color; ctx.lineWidth = width; ctx.beginPath();
       for (let j = 0; j <= 32; ++j) {
@@ -114,27 +115,29 @@ export function drawMechanism(ctx, width, height, phase) {
     const p = nodes.map(([u, v]) => point(u, v));
     p.forEach((q, i) => dot(q, 5.5, palette[i]));
   });
-  ctx.font = '15px "DM Sans", sans-serif'; ctx.fillStyle = '#68797c';
-  ctx.fillText('2  Abstraction', 347, 40);
-  ctx.fillText('3  Coarse correction', 562, 21);
-  ctx.fillText('4  Recovery', 777, 40);
-  ctx.fillStyle = '#205fc4'; ctx.fillText('1  GBP smoothing', 180, 107);
-  ctx.fillStyle = '#96766e'; ctx.font = '14px "DM Sans", sans-serif';
-  ctx.fillText('Pure GBP: slow on low-frequency error', 560, 258);
+  ctx.font = '22.5px "DM Sans", sans-serif'; ctx.fillStyle = '#68797c';
+  ctx.fillText('2  Abstraction', 270, 28);
+  ctx.fillText('3  Coarse correction', 467, 20);
+  ctx.fillText('4  Recovery', 670, 28);
+  ctx.fillStyle = '#205fc4'; ctx.fillText('1  GBP smoothing', 145, 100);
+  ctx.fillStyle = '#96766e'; ctx.font = '21px "DM Sans", sans-serif';
+  ctx.fillText('Pure GBP:', 470, 238);
+  ctx.fillText('slow low-frequency correction', 470, 262);
   ctx.restore();
 }
 
 export function initMechanism() {
   const canvas = document.querySelector('#mechanism'), button = document.querySelector('#mechanism-toggle');
   const ctx = canvas.getContext('2d'), reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  let paused = reduced, visible = true, elapsed = reduced ? 9350 : 0, last = 0, width = 0, height = 0;
+  let paused = reduced, visible = true, elapsed = reduced ? MECHANISM_LOOP_MS * .85 : 0, last = 0, width = 0, height = 0;
   const labels = ['01  GBP smooths high-frequency error', '02  Abstraction represents low-frequency modes', '03  Correction reduces low-frequency error', '04  Recovery transfers the correction to the fine graph'];
   const label = document.querySelector('#mechanism-phase');
   const render = () => {
     const dpr = Math.min(devicePixelRatio || 1, 2);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    drawMechanism(ctx, width, height, (elapsed / 11000) % 1);
-    label.textContent = labels[Math.min(3, Math.floor((elapsed / 11000) % 1 * 4))];
+    const phase = (elapsed / MECHANISM_LOOP_MS) % 1;
+    drawMechanism(ctx, width, height, phase);
+    label.textContent = labels[phase < .29 ? 0 : phase < .43 ? 1 : phase < .7 ? 2 : 3];
   };
   new ResizeObserver(entries => {
     ({width, height} = entries[0].contentRect);

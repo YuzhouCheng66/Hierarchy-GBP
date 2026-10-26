@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
-import {coarsePoint, drawMechanism} from '../mechanism.js';
+import {coarsePoint, drawMechanism, MECHANISM_LOOP_MS} from '../mechanism.js';
+
+assert.equal(MECHANISM_LOOP_MS * 1.5, 11000, 'The illustration must play at 1.5x its original speed');
 
 const corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
 assert.deepEqual(corners.map(([u, v]) => coarsePoint(0, 0, u, v, 0)),
@@ -19,7 +21,7 @@ for (const phase of [0, .25, .5, .7, .85, .99]) {
   assert.equal(coarseNodes.length, 8);
   if (phase >= .7) {
     assert.deepEqual(coarseNodes.slice(4).map(([x, y]) => [x, y]),
-      [[624, 43], [674, 43], [674, 93], [624, 93]], 'Corrected graph must remain a square, not collapse to a line');
+      [[520, 38], [570, 38], [570, 88], [520, 88]], 'Corrected graph must remain a square, not collapse to a line');
   }
 }
 console.log('Mechanism: warped curves straighten into a nondegenerate square; animation phases verified.');

@@ -1,5 +1,5 @@
-import {initMechanism} from './mechanism.js?v=20261026-4';
-import {initReplay} from './replay.js?v=20261026-2';
+import {initMechanism} from './mechanism.js?v=20261026-6';
+import {initReplay} from './replay.js?v=20261026-6';
 
 initMechanism();
 const observer = new IntersectionObserver(entries => {

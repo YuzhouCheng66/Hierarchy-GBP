@@ -37,4 +37,6 @@ displayed precision from a pinned repository revision.
 
 Inset plots use the same cost and time limits for both methods, with logarithmic
 cost and the shared nonlinear display clock. Markers are completed outers.
+`data/ba-view.json` defines one proper rigid display rotation for the tower and
+square, shared by both methods and all frames; it does not modify solver states.
 Run `node site/tools/test_replay.mjs` for the replay-control and rendering tests.

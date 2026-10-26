@@ -1,5 +1,6 @@
 {
   "dataset": "Venice1778",
+  "view": "ba-view.json",
   "points": 40000,
   "cameras": 1778,
   "full_points": 993923,

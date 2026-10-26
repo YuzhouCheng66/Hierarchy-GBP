@@ -9,7 +9,8 @@ async function fetchJSON(url) {
 export async function initReplay(root) {
   const kind = root.dataset.scene, status = root.querySelector('[data-status]');
   try {
-    const meta = await fetchJSON(`data/${kind}.json?v=20261026-2`);
+    const meta = await fetchJSON(`data/${kind}.json?v=20261026-6`);
+    const display = meta.view ? await fetchJSON(`data/${meta.view}?v=20261026-6`) : null;
     const n = meta.points + meta.cameras;
     const methods = {};
     for (const name of ['hgbp', 'baseline']) {
@@ -20,6 +21,22 @@ export async function initReplay(root) {
       const canvas = root.querySelector(`[data-view="${name}"]`);
       methods[name] = {...config, data, canvas, ctx: canvas.getContext('2d'), projected: new Float32Array(n * 2)};
     }
+    const originalLast = methods.hgbp.data.subarray(methods.hgbp.data.length - n * 3);
+    const fitIndices = [];
+    for (let i = 0; i < (display ? meta.points : n); ++i) {
+      if (!display || [0, 1, 2].every(axis => originalLast[3 * i + axis] >= display.focus_min[axis] && originalLast[3 * i + axis] <= display.focus_max[axis])) fitIndices.push(i);
+    }
+    if (!fitIndices.length) throw Error('Empty display focal region');
+    if (display) {
+      // One proper rigid rotation, shared across methods and all outer states.
+      const B = display.basis;
+      for (const m of Object.values(methods)) for (let i = 0; i < m.data.length; i += 3) {
+        const x = m.data[i], y = m.data[i + 1], z = m.data[i + 2];
+        m.data[i] = B[0][0] * x + B[0][1] * y + B[0][2] * z;
+        m.data[i + 1] = B[1][0] * x + B[1][1] * y + B[1][2] * z;
+        m.data[i + 2] = B[2][0] * x + B[2][1] * y + B[2][2] * z;
+      }
+    }
     const first = methods.hgbp.data, last = first.subarray(first.length - n * 3);
     // One common display frame for both solvers, fixed throughout the replay.
     const center = [0, 0, 0];
@@ -28,7 +45,7 @@ export async function initReplay(root) {
       const lo = values[Math.floor(n * .005)], hi = values[Math.floor(n * .995)];
       center[axis] = (hi + lo) / 2;
     }
-    let yaw = kind === 'ba' ? -.5 : .4, pitch = kind === 'ba' ? -.85 : .22;
+    let yaw = display?.yaw ?? .4, pitch = display?.pitch ?? .22;
     let zoom = 1, position = 0, running = false, visible = false, lastTick = 0, lastPaint = 0, smooth = true;
     const duration = kind === 'ba' ? 18000 : 23000;
     const T = Math.max(meta.hgbp.total, meta.baseline.total), k = kind === 'ba' ? .7 : 5;
@@ -43,10 +60,10 @@ export async function initReplay(root) {
       if (!W || !H) return;
       if (canvas.width !== Math.round(W * dpr) || canvas.height !== Math.round(H * dpr)) {canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);}
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
-      const left = 44, right = W - 10, top = 27, bottom = H - 30;
+      const left = 49, right = W - 12, top = 30, bottom = H - 34;
       const x = t => left + Math.log1p(t / k) / Math.log1p(T / k) * (right - left);
       const y = cost => bottom - (Math.log10(cost) - lowCost) / (highCost - lowCost) * (bottom - top);
-      ctx.font = '11px "DM Sans", sans-serif'; ctx.lineWidth = .65; ctx.textAlign = 'right';
+      ctx.font = '12px "DM Sans", sans-serif'; ctx.lineWidth = .65; ctx.textAlign = 'right';
       for (const p of [0, .5, 1]) {
         const yy = top + p * (bottom - top), cost = 10 ** (highCost - p * (highCost - lowCost));
         ctx.strokeStyle = '#e1e5e4'; ctx.beginPath(); ctx.moveTo(left, yy); ctx.lineTo(right, yy); ctx.stroke();
@@ -54,10 +71,10 @@ export async function initReplay(root) {
       }
       ctx.textAlign = 'center';
       for (const u of [0, .5, 1]) {
-        ctx.fillText(fmt(timeAt(u), u ? 1 : 0), left + u * (right - left), bottom + 14);
+        ctx.fillText(fmt(timeAt(u), u ? 1 : 0), left + u * (right - left), bottom + 16);
       }
-      ctx.fillStyle = '#40565d'; ctx.font = '12px "DM Sans", sans-serif'; ctx.textAlign = 'left';
-      ctx.fillText('Cost (log)', 7, 16); ctx.textAlign = 'right'; ctx.fillText('Time [s]', right, H - 2);
+      ctx.fillStyle = '#40565d'; ctx.font = '14px "DM Sans", sans-serif'; ctx.textAlign = 'left';
+      ctx.fillText('Cost (log)', 7, 18); ctx.textAlign = 'right'; ctx.fillText('Time [s]', right, H - 2);
       ctx.strokeStyle = '#7c919766'; ctx.setLineDash([2, 3]); ctx.beginPath(); ctx.moveTo(x(time), top); ctx.lineTo(x(time), bottom); ctx.stroke(); ctx.setLineDash([]);
       ctx.strokeStyle = name === 'hgbp' ? '#205fc4' : '#b96c42'; ctx.fillStyle = ctx.strokeStyle; ctx.lineWidth = 1.8;
       ctx.beginPath();
@@ -71,15 +88,19 @@ export async function initReplay(root) {
       if (fit?.key === key) return fit;
       const xs = [], ys = [], sy = Math.sin(yaw), cy = Math.cos(yaw), sp = Math.sin(pitch), cp = Math.cos(pitch);
       for (const frame of [first.subarray(0, n * 3), last]) {
-        for (let i = 0; i < n; ++i) {
+        for (const i of fitIndices) {
           const x = frame[i * 3] - center[0], y = frame[i * 3 + 1] - center[1], z = frame[i * 3 + 2] - center[2];
           xs.push(cy * x + sy * z); ys.push(cp * y - sp * (-sy * x + cy * z));
         }
       }
       xs.sort((a, b) => a - b); ys.sort((a, b) => a - b);
-      const low = Math.floor(xs.length * .005), high = Math.floor(xs.length * .995);
-      fit = {key, x: (xs[low] + xs[high]) / 2, y: (ys[low] + ys[high]) / 2,
-        scale: .89 * Math.min(W / (xs[high] - xs[low]), H / (ys[high] - ys[low]))};
+      const quantile = display?.fit_quantile ?? .005;
+      const bounds = (values, q) => [values[Math.floor(values.length * q)], values[Math.min(values.length - 1, Math.floor(values.length * (1 - q)))]];
+      const [x0, x1] = bounds(xs, quantile);
+      // Keep the complete tower height; robust horizontal fitting rejects distant outliers.
+      const [y0, y1] = bounds(ys, display?.vertical_fit_quantile ?? quantile);
+      fit = {key, x: (x0 + x1) / 2, y: (y0 + y1) / 2,
+        scale: .89 * Math.min(W / (x1 - x0), H / (y1 - y0))};
       return fit;
     }
     const play = root.querySelector('[data-play]'), scrub = root.querySelector('[data-scrub]');
@@ -92,7 +113,7 @@ export async function initReplay(root) {
     const paragraphs = [
       `Geometry: ${meta.provenance.geometry}`,
       `Timing: ${meta.provenance.timing}`,
-      `Display: ${meta.provenance.sampling} A single fixed viewing frame is shared by both methods. The central 99% coordinate range sets the viewport; extreme outliers may lie outside it. Drag either view to rotate both; use the mouse wheel to zoom.`,
+      `Display: ${meta.provenance.sampling} ${display?.description ?? 'The central 99% coordinate range sets the viewport; extreme outliers may lie outside it.'} A single fixed viewing frame is shared by both methods. Drag either view to rotate both; use the mouse wheel to zoom.`,
       `Motion: ${meta.provenance.interpolation} Interpolated motion is for presentation only; cost values always use the last completed outer iteration. Switch to recorded states to remove interpolation. Both solvers use the same nonlinear clock, t = k(exp(u log(1+T/k)) − 1). This is not real-time playback.`
     ];
     paragraphs.forEach(text => {const p = document.createElement('p'); p.textContent = text; root.querySelector('[data-provenance]').append(p);});
@@ -119,7 +140,7 @@ export async function initReplay(root) {
         const y = (1 - t) * m.data[A + j + 1] + t * m.data[B + j + 1] - center[1];
         const z = (1 - t) * m.data[A + j + 2] + t * m.data[B + j + 2] - center[2];
         const xx = cy * x + sy * z, zz = -sy * x + cy * z;
-        m.projected[i * 2] = W / 2 + (xx - view.x) * scale;
+        m.projected[i * 2] = W * (display?.horizontal_center ?? .5) + (xx - view.x) * scale;
         m.projected[i * 2 + 1] = H / 2 - (cp * y - sp * zz - view.y) * scale;
       }
       const p = m.projected;
@@ -142,7 +163,7 @@ export async function initReplay(root) {
       ctx.fill();
       if (meta.cameras) {
         ctx.fillStyle = name === 'hgbp' ? '#205fc4c0' : '#b96c42c0'; ctx.beginPath();
-        for (let i = meta.points; i < n; ++i) ctx.rect(p[2 * i] - 1, p[2 * i + 1] - 1, 2.2, 2.2);
+        for (let i = meta.points; i < n; ++i) ctx.rect(p[2 * i] - .7, p[2 * i + 1] - .7, 1.4, 1.4);
         ctx.fill();
       }
       const badge = root.querySelector(`[data-step="${name}"]`);

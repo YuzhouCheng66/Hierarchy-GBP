@@ -1,0 +1,15 @@
+{
+  "description": "Tower-upright view of the tower and surrounding square. All sampled geometry is retained; the initial viewport focuses on this region rather than distant outliers.",
+  "basis": [
+    [0.9999749796460978, -0.00001092459326531749, -0.007073893018653842],
+    [-0.0070739014543671425, -0.001544313275863282, -0.9999737871638036],
+    [0.0, 0.9999988074878686, -0.0015443519160947719]
+  ],
+  "focus_min": [-250, -260, -240],
+  "focus_max": [260, 145, 45],
+  "yaw": -0.7853981633974483,
+  "pitch": 0.13962634015954636,
+  "fit_quantile": 0.002,
+  "vertical_fit_quantile": 0,
+  "horizontal_center": 0.56
+}

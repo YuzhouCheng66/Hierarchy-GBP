@@ -53,7 +53,7 @@ def main():
     power_cost=[]
     for cost,success in zip(pc['cost'],pc['step_is_successful']):
         power_cost.append(2*cost if success else power_cost[-1])
-    meta=dict(dataset='Venice1778',points=hm['points'],cameras=hm['cameras'],
+    meta=dict(dataset='Venice1778',view='ba-view.json',points=hm['points'],cameras=hm['cameras'],
         full_points=hm['landmarks'],observations=5001946,
         input_sha256=hashlib.file_digest(a.input.open('rb'),'sha256').hexdigest(),
         hgbp=dict(binary='ba-hgbp.bin',frames=list(range(21)),times=times(hc['outer_sec'],5.89),costs=hc['costs'],total=5.89),
