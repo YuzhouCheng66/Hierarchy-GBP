@@ -1,0 +1,8 @@
+# Language statistics describe the CPU solvers and their Python tooling.
+# Keep the project website, optional CUDA variant and build helpers available
+# without counting them in GitHub's language breakdown.
+site/** linguist-detectable=false
+code/variants/se2_cuda_hgbp/** linguist-detectable=false
+*.ps1 linguist-detectable=false
+*.cmake linguist-detectable=false
+CMakeLists.txt linguist-detectable=false
