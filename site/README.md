@@ -12,7 +12,8 @@ Open `http://127.0.0.1:8787/`. The preview helper sets explicit JavaScript MIME
 types because Windows registry defaults may otherwise prevent ES modules loading.
 
 `mechanism.js` illustrates frequency-selective error correction;
-`tools/render_teaser.py` renders the README GIF from the same surface model.
+`tools/render_teaser.py` independently renders the README GIF from the same
+surface model, with a white background and supersampled curves for GitHub.
 Neither illustration represents empirical solver trajectories.
 
 `data/` contains fixed, uniformly sampled real reconstruction and pose states,
