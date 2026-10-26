@@ -13,6 +13,7 @@
 .hero h2 em{font-size:28px}
 .hero-links{margin-top:16px}
 .mechanism-section{margin-top:22px;padding-bottom:16px}
+.mechanism-section .mini-heading{margin-bottom:10px}
 .topbar nav{font-size:14px}
 .eyebrow,.section-number{font-size:12px}
 .hero-description{font-size:18px}
@@ -135,5 +136,5 @@ footer p,footer>a:last-child{font-size:12px}
   .hero-links{margin-top:12px}
   .hero-links .button{min-height:40px;padding-block:8px}
   .mechanism-section{margin-top:18px;padding-bottom:14px}
-  #mechanism{height:clamp(240px,calc(100svh - 400px),320px)}
+  #mechanism{height:clamp(240px,calc(100svh - 410px),320px)}
 }
