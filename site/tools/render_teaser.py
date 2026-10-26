@@ -78,9 +78,19 @@ def frame(phase):
     shell=[xy((snailx+(.3+.48*t)*math.cos(t),201+(.3+.48*t)*math.sin(t))) for t in np.arange(0,4*math.pi,.1)]
     d.line(shell,fill='#96766e',width=2)
     for a,b in [((snailx-8,208),(snailx+16,208)),((snailx+16,208),(snailx+18,200)),((snailx+18,200),(snailx+16,196)),((snailx+18,200),(snailx+21,196))]: line(a,b,'#96766e',1.2)
-    for cx, flat in [(475,1),(649,lo)]:
-        nodes=[(cx+x,62+y*flat) for x,y in [(-26,-15),(27,-13),(28,18),(-25,16)]]
-        for a,b in [(0,1),(1,2),(2,3),(3,0),(0,2)]: line(nodes[a],nodes[b],'#879ba2',1.2)
+    for cx, distortion in [(475,1),(649,1-ease((phase-.43)/.27))]:
+        def point(u,v):
+            return (cx+25*(u+distortion*(.24*v+.1*math.sin(math.pi*v)+.12*math.sin(math.pi*u))),
+                    63+25*(v+distortion*(.2*u+.3*math.cos(math.pi*u/2)-.12*math.sin(math.pi*v))))
+        def curve(a,b,color,width):
+            points=[xy(point(a[0]*(1-t)+b[0]*t,a[1]*(1-t)+b[1]*t)) for t in np.linspace(0,1,33)]
+            d.line(points,fill=color,width=max(1,round(width*S)))
+        for v in np.linspace(-1,1,7):
+            curve((-1,v),(1,v),'#dce2e2',.6)
+            curve((v,-1),(v,1),'#dce2e2',.6)
+        corners=[(-1,-1),(1,-1),(1,1),(-1,1)]
+        nodes=[point(u,v) for u,v in corners]
+        for a,b in [(0,1),(1,2),(2,3),(3,0),(0,2)]: curve(corners[a],corners[b],'#7e929c',1.3)
         for i,p in enumerate(nodes): dot(p,5.6,COLORS[i])
     text((347,29),'2  Abstraction',15)
     text((562,10),'3  Coarse correction',15)

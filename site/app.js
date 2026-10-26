@@ -1,4 +1,4 @@
-import {initMechanism} from './mechanism.js?v=20261026-2';
+import {initMechanism} from './mechanism.js?v=20261026-3';
 import {initReplay} from './replay.js?v=20261026-2';
 
 initMechanism();

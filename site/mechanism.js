@@ -2,6 +2,13 @@ const palette = ['#528acb', '#d39448', '#70a483', '#aa8bba'];
 const clamp = x => Math.max(0, Math.min(1, x));
 const ease = x => { x = clamp(x); return x * x * (3 - 2 * x); };
 
+export function coarsePoint(cx, cy, u, v, distortion) {
+  return [
+    cx + 25 * (u + distortion * (.24 * v + .1 * Math.sin(Math.PI * v) + .12 * Math.sin(Math.PI * u))),
+    cy + 25 * (v + distortion * (.2 * u + .3 * Math.cos(Math.PI * u / 2) - .12 * Math.sin(Math.PI * v)))
+  ];
+}
+
 export function drawMechanism(ctx, width, height, phase) {
   ctx.clearRect(0, 0, width, height);
   const w = 1120, h = 300;
@@ -86,11 +93,25 @@ export function drawMechanism(ctx, width, height, phase) {
   }
   ctx.stroke(); ctx.beginPath(); ctx.moveTo(-8, 7); ctx.lineTo(12, 7); ctx.quadraticCurveTo(19, 7, 18, -1);
   ctx.moveTo(18, -1); ctx.lineTo(16, -5); ctx.moveTo(18, -1); ctx.lineTo(21, -5); ctx.stroke(); ctx.restore();
-  const nodes = [[-26, -15], [27, -13], [28, 18], [-25, 16]];
+  const nodes = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
   [475, 649].forEach((cx, n) => {
-    const correction = n ? lo : 1;
-    const p = nodes.map(([x, y]) => [cx + x, 67 + y * correction]);
-    [[0, 1], [1, 2], [2, 3], [3, 0], [0, 2]].forEach(([a, b]) => line(p[a], p[b], '#8d9ba4', 1.2));
+    const distortion = n ? 1 - ease((phase - .43) / .27) : 1;
+    const point = (u, v) => coarsePoint(cx, 68, u, v, distortion);
+    const curve = (a, b, color, width) => {
+      ctx.strokeStyle = color; ctx.lineWidth = width; ctx.beginPath();
+      for (let j = 0; j <= 32; ++j) {
+        const t = j / 32, p = point(a[0] * (1 - t) + b[0] * t, a[1] * (1 - t) + b[1] * t);
+        if (!j) ctx.moveTo(...p); else ctx.lineTo(...p);
+      }
+      ctx.stroke();
+    };
+    for (let j = 0; j <= 6; ++j) {
+      const v = -1 + j / 3;
+      curve([-1, v], [1, v], '#9eafb54d', .6);
+      curve([v, -1], [v, 1], '#9eafb54d', .6);
+    }
+    [[0, 1], [1, 2], [2, 3], [3, 0], [0, 2]].forEach(([a, b]) => curve(nodes[a], nodes[b], '#7e929c', 1.3));
+    const p = nodes.map(([u, v]) => point(u, v));
     p.forEach((q, i) => dot(q, 5.5, palette[i]));
   });
   ctx.font = '15px "DM Sans", sans-serif'; ctx.fillStyle = '#68797c';
@@ -106,7 +127,7 @@ export function drawMechanism(ctx, width, height, phase) {
 export function initMechanism() {
   const canvas = document.querySelector('#mechanism'), button = document.querySelector('#mechanism-toggle');
   const ctx = canvas.getContext('2d'), reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  let paused = reduced, visible = true, elapsed = 0, last = 0, width = 0, height = 0;
+  let paused = reduced, visible = true, elapsed = reduced ? 9350 : 0, last = 0, width = 0, height = 0;
   const labels = ['01  Local GBP smooths high-frequency error', '02  Abstraction transfers coordinated modes', '03  Coarse correction removes low-frequency error', '04  Recovery brings global correction to the fine graph'];
   const label = document.querySelector('#mechanism-phase');
   const render = () => {
