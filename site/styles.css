@@ -12,6 +12,9 @@
 .hero-description{font-size:18px}
 .authors{font-size:20px;gap:10px 24px}
 .button,.text-link{font-size:15px}
+.hero-links .button{gap:9px;padding:10px 16px}
+.brand-icon{display:block;width:20px;height:20px;object-fit:contain;flex-shrink:0}
+.primary .brand-icon.arxiv{filter:brightness(0) invert(1)}
 .headline-results span{font-size:14px;line-height:1.55}
 .headline-results p{padding:0 28px}
 .mini-heading h2{font-size:26px}
@@ -73,6 +76,7 @@ footer p,footer>a:last-child{font-size:12px}
   .authors{font-size:16px;gap:10px 16px}
   .hero-links .text-link{font-size:13px}
   .button,.text-link{font-size:13px}
+  .hero-links .button{padding:9px 12px;gap:7px}
   .headline-results span{font-size:10px}
   .headline-results p{padding:0 7px}
   .mini-heading h2{font-size:23px}
