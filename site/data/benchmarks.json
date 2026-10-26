@@ -1,0 +1,941 @@
+{
+  "source": "Paper Tables 1 and 2, arXiv:2610.06978v1; README ff6bed40b; displayed precision retained.",
+  "ba": {
+    "methods": [
+      "Ceres Sparse-1",
+      "H-GBP-1",
+      "Ceres Sparse-16",
+      "Ceres Iterative-16",
+      "RootBA-QR-16",
+      "PowerBA-16",
+      "H-GBP-16"
+    ],
+    "rows": [
+      {
+        "dataset": "Ladybug49",
+        "space": null,
+        "cells": [
+          {
+            "time": 0.98,
+            "cost": 26690.0,
+            "time_text": "0.98",
+            "cost_text": "26,690"
+          },
+          {
+            "time": 0.18,
+            "cost": 26705.0,
+            "time_text": "0.18",
+            "cost_text": "26,705"
+          },
+          {
+            "time": 0.33,
+            "cost": 26690.0,
+            "time_text": "0.33",
+            "cost_text": "26,690"
+          },
+          {
+            "time": 0.54,
+            "cost": 26691.0,
+            "time_text": "0.54",
+            "cost_text": "26,691"
+          },
+          {
+            "time": 0.63,
+            "cost": 26691.0,
+            "time_text": "0.63",
+            "cost_text": "26,691"
+          },
+          {
+            "time": 0.23,
+            "cost": 27299.0,
+            "time_text": "0.23",
+            "cost_text": "27,299"
+          },
+          {
+            "time": 0.07,
+            "cost": 26705.0,
+            "time_text": "0.07",
+            "cost_text": "26,705"
+          }
+        ]
+      },
+      {
+        "dataset": "Venice89",
+        "space": null,
+        "cells": [
+          {
+            "time": 19.22,
+            "cost": 567243.0,
+            "time_text": "19.22",
+            "cost_text": "567,243"
+          },
+          {
+            "time": 2.68,
+            "cost": 576781.0,
+            "time_text": "2.68",
+            "cost_text": "576,781"
+          },
+          {
+            "time": 5.91,
+            "cost": 567243.0,
+            "time_text": "5.91",
+            "cost_text": "567,243"
+          },
+          {
+            "time": 5.03,
+            "cost": 567055.0,
+            "time_text": "5.03",
+            "cost_text": "567,055"
+          },
+          {
+            "time": 6.22,
+            "cost": 572780.0,
+            "time_text": "6.22",
+            "cost_text": "572,780"
+          },
+          {
+            "time": 1.91,
+            "cost": 580416.0,
+            "time_text": "1.91",
+            "cost_text": "580,416"
+          },
+          {
+            "time": 0.59,
+            "cost": 576781.0,
+            "time_text": "0.59",
+            "cost_text": "576,781"
+          }
+        ]
+      },
+      {
+        "dataset": "Final93",
+        "space": null,
+        "cells": [
+          {
+            "time": 7.39,
+            "cost": 291090.0,
+            "time_text": "7.39",
+            "cost_text": "291,090"
+          },
+          {
+            "time": 1.59,
+            "cost": 291092.0,
+            "time_text": "1.59",
+            "cost_text": "291,092"
+          },
+          {
+            "time": 1.69,
+            "cost": 291090.0,
+            "time_text": "1.69",
+            "cost_text": "291,090"
+          },
+          {
+            "time": 4.29,
+            "cost": 291090.0,
+            "time_text": "4.29",
+            "cost_text": "291,090"
+          },
+          {
+            "time": 6.84,
+            "cost": 291090.0,
+            "time_text": "6.84",
+            "cost_text": "291,090"
+          },
+          {
+            "time": 1.79,
+            "cost": 291159.0,
+            "time_text": "1.79",
+            "cost_text": "291,159"
+          },
+          {
+            "time": 0.38,
+            "cost": 291092.0,
+            "time_text": "0.38",
+            "cost_text": "291,092"
+          }
+        ]
+      },
+      {
+        "dataset": "Trafalgar257",
+        "space": null,
+        "cells": [
+          {
+            "time": 7.21,
+            "cost": 193577.0,
+            "time_text": "7.21",
+            "cost_text": "193,577"
+          },
+          {
+            "time": 1.31,
+            "cost": 197378.0,
+            "time_text": "1.31",
+            "cost_text": "197,378"
+          },
+          {
+            "time": 2.38,
+            "cost": 193577.0,
+            "time_text": "2.38",
+            "cost_text": "193,577"
+          },
+          {
+            "time": 14.41,
+            "cost": 193671.0,
+            "time_text": "14.41",
+            "cost_text": "193,671"
+          },
+          {
+            "time": 22.72,
+            "cost": 193398.0,
+            "time_text": "22.72",
+            "cost_text": "193,398"
+          },
+          {
+            "time": 1.11,
+            "cost": 205427.0,
+            "time_text": "1.11",
+            "cost_text": "205,427"
+          },
+          {
+            "time": 0.45,
+            "cost": 197378.0,
+            "time_text": "0.45",
+            "cost_text": "197,378"
+          }
+        ]
+      },
+      {
+        "dataset": "Dubrovnik356",
+        "space": null,
+        "cells": [
+          {
+            "time": 50.15,
+            "cost": 987859.0,
+            "time_text": "50.15",
+            "cost_text": "987,859"
+          },
+          {
+            "time": 6.83,
+            "cost": 1021102.0,
+            "time_text": "6.83",
+            "cost_text": "1,021,102"
+          },
+          {
+            "time": 13.96,
+            "cost": 987859.0,
+            "time_text": "13.96",
+            "cost_text": "987,859"
+          },
+          {
+            "time": 49.54,
+            "cost": 987859.0,
+            "time_text": "49.54",
+            "cost_text": "987,859"
+          },
+          {
+            "time": 119.17,
+            "cost": 987866.0,
+            "time_text": "119.17",
+            "cost_text": "987,866"
+          },
+          {
+            "time": 4.14,
+            "cost": 1059446.0,
+            "time_text": "4.14",
+            "cost_text": "1,059,446"
+          },
+          {
+            "time": 1.63,
+            "cost": 1021102.0,
+            "time_text": "1.63",
+            "cost_text": "1,021,102"
+          }
+        ]
+      },
+      {
+        "dataset": "Final394",
+        "space": null,
+        "cells": [
+          {
+            "time": 38.57,
+            "cost": 596506.0,
+            "time_text": "38.57",
+            "cost_text": "596,506"
+          },
+          {
+            "time": 2.87,
+            "cost": 598296.0,
+            "time_text": "2.87",
+            "cost_text": "598,296"
+          },
+          {
+            "time": 8.62,
+            "cost": 596506.0,
+            "time_text": "8.62",
+            "cost_text": "596,506"
+          },
+          {
+            "time": 8.01,
+            "cost": 596536.0,
+            "time_text": "8.01",
+            "cost_text": "596,536"
+          },
+          {
+            "time": 29.59,
+            "cost": 596578.0,
+            "time_text": "29.59",
+            "cost_text": "596,578"
+          },
+          {
+            "time": 2.5,
+            "cost": 611101.0,
+            "time_text": "2.50",
+            "cost_text": "611,101"
+          },
+          {
+            "time": 0.83,
+            "cost": 598296.0,
+            "time_text": "0.83",
+            "cost_text": "598,296"
+          }
+        ]
+      },
+      {
+        "dataset": "Ladybug1723",
+        "space": null,
+        "cells": [
+          {
+            "time": 60.56,
+            "cost": 778095.0,
+            "time_text": "60.56",
+            "cost_text": "778,095"
+          },
+          {
+            "time": 4.79,
+            "cost": 759600.0,
+            "time_text": "4.79",
+            "cost_text": "759,600"
+          },
+          {
+            "time": 19.05,
+            "cost": 778095.0,
+            "time_text": "19.05",
+            "cost_text": "778,095"
+          },
+          {
+            "time": 5.51,
+            "cost": 770444.0,
+            "time_text": "5.51",
+            "cost_text": "770,444"
+          },
+          {
+            "time": 9.18,
+            "cost": 763070.0,
+            "time_text": "9.18",
+            "cost_text": "763,070"
+          },
+          {
+            "time": 2.72,
+            "cost": 797704.0,
+            "time_text": "2.72",
+            "cost_text": "797,704"
+          },
+          {
+            "time": 1.22,
+            "cost": 759599.0,
+            "time_text": "1.22",
+            "cost_text": "759,599"
+          }
+        ]
+      },
+      {
+        "dataset": "Venice1778",
+        "space": null,
+        "cells": [
+          {
+            "time": 330.93,
+            "cost": 3277387.0,
+            "time_text": "330.93",
+            "cost_text": "3,277,387"
+          },
+          {
+            "time": 25.63,
+            "cost": 3363149.0,
+            "time_text": "25.63",
+            "cost_text": "3,363,149"
+          },
+          {
+            "time": 87.54,
+            "cost": 3277387.0,
+            "time_text": "87.54",
+            "cost_text": "3,277,387"
+          },
+          {
+            "time": 35.27,
+            "cost": 6932878.0,
+            "time_text": "35.27",
+            "cost_text": "6,932,878"
+          },
+          {
+            "time": 85.45,
+            "cost": 3369978.0,
+            "time_text": "85.45",
+            "cost_text": "3,369,978"
+          },
+          {
+            "time": 20.32,
+            "cost": 3391089.0,
+            "time_text": "20.32",
+            "cost_text": "3,391,089"
+          },
+          {
+            "time": 5.89,
+            "cost": 3363149.0,
+            "time_text": "5.89",
+            "cost_text": "3,363,149"
+          }
+        ]
+      },
+      {
+        "dataset": "Final3068",
+        "space": null,
+        "cells": [
+          {
+            "time": 586.17,
+            "cost": 3348655.0,
+            "time_text": "586.17",
+            "cost_text": "3,348,655"
+          },
+          {
+            "time": 12.4,
+            "cost": 3240217.0,
+            "time_text": "12.40",
+            "cost_text": "3,240,217"
+          },
+          {
+            "time": 142.78,
+            "cost": 3348655.0,
+            "time_text": "142.78",
+            "cost_text": "3,348,655"
+          },
+          {
+            "time": 13.17,
+            "cost": 3452711.0,
+            "time_text": "13.17",
+            "cost_text": "3,452,711"
+          },
+          {
+            "time": 102.23,
+            "cost": 3254156.0,
+            "time_text": "102.23",
+            "cost_text": "3,254,156"
+          },
+          {
+            "time": 6.15,
+            "cost": 3520615.0,
+            "time_text": "6.15",
+            "cost_text": "3,520,615"
+          },
+          {
+            "time": 3.03,
+            "cost": 3240217.0,
+            "time_text": "3.03",
+            "cost_text": "3,240,217"
+          }
+        ]
+      },
+      {
+        "dataset": "Final4585",
+        "space": null,
+        "cells": [
+          {
+            "time": null,
+            "cost": null,
+            "time_text": ">2000",
+            "cost_text": "--"
+          },
+          {
+            "time": 48.55,
+            "cost": 10331432.0,
+            "time_text": "48.55",
+            "cost_text": "10,331,432"
+          },
+          {
+            "time": 526.06,
+            "cost": 10783988.0,
+            "time_text": "526.06",
+            "cost_text": "10,783,988"
+          },
+          {
+            "time": 72.54,
+            "cost": 13021324.0,
+            "time_text": "72.54",
+            "cost_text": "13,021,324"
+          },
+          {
+            "time": 1278.84,
+            "cost": 10158450.0,
+            "time_text": "1,278.84",
+            "cost_text": "10,158,450"
+          },
+          {
+            "time": 33.72,
+            "cost": 10441192.0,
+            "time_text": "33.72",
+            "cost_text": "10,441,192"
+          },
+          {
+            "time": 11.2,
+            "cost": 10331432.0,
+            "time_text": "11.20",
+            "cost_text": "10,331,432"
+          }
+        ]
+      }
+    ]
+  },
+  "pgo": {
+    "methods": [
+      "g2o-Cholesky-1",
+      "H-GBP-1",
+      "g2o-PCG-16",
+      "Cycle-PGO-16",
+      "AMM-PGO-16",
+      "Schwarz-PGO-16",
+      "H-GBP-16"
+    ],
+    "rows": [
+      {
+        "dataset": "FR079",
+        "space": "SE2",
+        "cells": [
+          {
+            "time": 0.02,
+            "cost": 18.79,
+            "time_text": "0.02",
+            "cost_text": "18.79"
+          },
+          {
+            "time": 0.29,
+            "cost": 18.79,
+            "time_text": "0.29",
+            "cost_text": "18.79"
+          },
+          {
+            "time": 1.09,
+            "cost": 18.79,
+            "time_text": "1.09",
+            "cost_text": "18.79"
+          },
+          {
+            "time": 0.04,
+            "cost": 18.79,
+            "time_text": "0.04",
+            "cost_text": "18.79"
+          },
+          {
+            "time": 0.17,
+            "cost": 129.13,
+            "time_text": "0.17",
+            "cost_text": "129.13"
+          },
+          {
+            "time": 0.14,
+            "cost": 18.79,
+            "time_text": "0.14",
+            "cost_text": "18.79"
+          },
+          {
+            "time": 0.11,
+            "cost": 18.79,
+            "time_text": "0.11",
+            "cost_text": "18.79"
+          }
+        ]
+      },
+      {
+        "dataset": "FRH",
+        "space": "SE2",
+        "cells": [
+          {
+            "time": 0.04,
+            "cost": 9.66e-05,
+            "time_text": "0.04",
+            "cost_text": "9.66e-5"
+          },
+          {
+            "time": 0.35,
+            "cost": 9.66e-05,
+            "time_text": "0.35",
+            "cost_text": "9.66e-5"
+          },
+          {
+            "time": 0.41,
+            "cost": 9.66e-05,
+            "time_text": "0.41",
+            "cost_text": "9.66e-5"
+          },
+          {
+            "time": 0.09,
+            "cost": 9.66e-05,
+            "time_text": "0.09",
+            "cost_text": "9.66e-5"
+          },
+          {
+            "time": 0.38,
+            "cost": 0.000102,
+            "time_text": "0.38",
+            "cost_text": "1.02e-4"
+          },
+          {
+            "time": 0.13,
+            "cost": 9.66e-05,
+            "time_text": "0.13",
+            "cost_text": "9.66e-5"
+          },
+          {
+            "time": 0.12,
+            "cost": 9.66e-05,
+            "time_text": "0.12",
+            "cost_text": "9.66e-5"
+          }
+        ]
+      },
+      {
+        "dataset": "M3500",
+        "space": "SE2",
+        "cells": [
+          {
+            "time": 0.13,
+            "cost": 68.96,
+            "time_text": "0.13",
+            "cost_text": "68.96"
+          },
+          {
+            "time": 0.9,
+            "cost": 68.96,
+            "time_text": "0.90",
+            "cost_text": "68.96"
+          },
+          {
+            "time": 1.87,
+            "cost": 68.96,
+            "time_text": "1.87",
+            "cost_text": "68.96"
+          },
+          {
+            "time": 0.23,
+            "cost": 68.96,
+            "time_text": "0.23",
+            "cost_text": "68.96"
+          },
+          {
+            "time": 0.91,
+            "cost": 70.45,
+            "time_text": "0.91",
+            "cost_text": "70.45"
+          },
+          {
+            "time": 1.47,
+            "cost": 68.96,
+            "time_text": "1.47",
+            "cost_text": "68.96"
+          },
+          {
+            "time": 0.27,
+            "cost": 68.96,
+            "time_text": "0.27",
+            "cost_text": "68.96"
+          }
+        ]
+      },
+      {
+        "dataset": "ParkingGarage",
+        "space": "SE3",
+        "cells": [
+          {
+            "time": 0.38,
+            "cost": 0.63,
+            "time_text": "0.38",
+            "cost_text": "0.63"
+          },
+          {
+            "time": 7.56,
+            "cost": 0.63,
+            "time_text": "7.56",
+            "cost_text": "0.63"
+          },
+          {
+            "time": 19.72,
+            "cost": 0.63,
+            "time_text": "19.72",
+            "cost_text": "0.63"
+          },
+          {
+            "time": 0.85,
+            "cost": 0.63,
+            "time_text": "0.85",
+            "cost_text": "0.63"
+          },
+          {
+            "time": 1.37,
+            "cost": 0.65,
+            "time_text": "1.37",
+            "cost_text": "0.65"
+          },
+          {
+            "time": 49.78,
+            "cost": 0.63,
+            "time_text": "49.78",
+            "cost_text": "0.63"
+          },
+          {
+            "time": 1.77,
+            "cost": 0.63,
+            "time_text": "1.77",
+            "cost_text": "0.63"
+          }
+        ]
+      },
+      {
+        "dataset": "Sphere",
+        "space": "SE3",
+        "cells": [
+          {
+            "time": 2.02,
+            "cost": 675.7,
+            "time_text": "2.02",
+            "cost_text": "675.70"
+          },
+          {
+            "time": 4.76,
+            "cost": 675.7,
+            "time_text": "4.76",
+            "cost_text": "675.70"
+          },
+          {
+            "time": 1.35,
+            "cost": 675.7,
+            "time_text": "1.35",
+            "cost_text": "675.70"
+          },
+          {
+            "time": 1.08,
+            "cost": 675.7,
+            "time_text": "1.08",
+            "cost_text": "675.70"
+          },
+          {
+            "time": 1.08,
+            "cost": 695.09,
+            "time_text": "1.08",
+            "cost_text": "695.09"
+          },
+          {
+            "time": 2.72,
+            "cost": 675.7,
+            "time_text": "2.72",
+            "cost_text": "675.70"
+          },
+          {
+            "time": 1.18,
+            "cost": 675.7,
+            "time_text": "1.18",
+            "cost_text": "675.70"
+          }
+        ]
+      },
+      {
+        "dataset": "Cubicle",
+        "space": "SE3",
+        "cells": [
+          {
+            "time": 4.22,
+            "cost": 1378.53,
+            "time_text": "4.22",
+            "cost_text": "1,378.53"
+          },
+          {
+            "time": 22.63,
+            "cost": 1378.53,
+            "time_text": "22.63",
+            "cost_text": "1,378.53"
+          },
+          {
+            "time": 93.53,
+            "cost": 1378.53,
+            "time_text": "93.53",
+            "cost_text": "1,378.53"
+          },
+          {
+            "time": 4.17,
+            "cost": 1609.14,
+            "time_text": "4.17",
+            "cost_text": "1,609.14"
+          },
+          {
+            "time": 7.67,
+            "cost": 233482.27,
+            "time_text": "7.67",
+            "cost_text": "233,482.27"
+          },
+          {
+            "time": 6.21,
+            "cost": 1378.53,
+            "time_text": "6.21",
+            "cost_text": "1,378.53"
+          },
+          {
+            "time": 4.86,
+            "cost": 1378.53,
+            "time_text": "4.86",
+            "cost_text": "1,378.53"
+          }
+        ]
+      },
+      {
+        "dataset": "Grid",
+        "space": "SE3",
+        "cells": [
+          {
+            "time": 493.9,
+            "cost": 42179.98,
+            "time_text": "493.90",
+            "cost_text": "42,179.98"
+          },
+          {
+            "time": 16.16,
+            "cost": 42179.98,
+            "time_text": "16.16",
+            "cost_text": "42,179.98"
+          },
+          {
+            "time": 4.38,
+            "cost": 42179.98,
+            "time_text": "4.38",
+            "cost_text": "42,179.98"
+          },
+          {
+            "time": 621.95,
+            "cost": 42179.98,
+            "time_text": "621.95",
+            "cost_text": "42,179.98"
+          },
+          {
+            "time": 7.94,
+            "cost": 42192.23,
+            "time_text": "7.94",
+            "cost_text": "42,192.23"
+          },
+          {
+            "time": 44.55,
+            "cost": 42179.98,
+            "time_text": "44.55",
+            "cost_text": "42,179.98"
+          },
+          {
+            "time": 3.9,
+            "cost": 42179.98,
+            "time_text": "3.90",
+            "cost_text": "42,179.98"
+          }
+        ]
+      },
+      {
+        "dataset": "Globe10k",
+        "space": "SE3",
+        "cells": [
+          {
+            "time": 93.45,
+            "cost": 3039.93,
+            "time_text": "93.45",
+            "cost_text": "3,039.93"
+          },
+          {
+            "time": 20.44,
+            "cost": 3039.93,
+            "time_text": "20.44",
+            "cost_text": "3,039.93"
+          },
+          {
+            "time": 7.04,
+            "cost": 3039.93,
+            "time_text": "7.04",
+            "cost_text": "3,039.93"
+          },
+          {
+            "time": 42.04,
+            "cost": 3039.93,
+            "time_text": "42.04",
+            "cost_text": "3,039.93"
+          },
+          {
+            "time": 12.78,
+            "cost": 3040.0,
+            "time_text": "12.78",
+            "cost_text": "3,040.00"
+          },
+          {
+            "time": 13.33,
+            "cost": 3039.93,
+            "time_text": "13.33",
+            "cost_text": "3,039.93"
+          },
+          {
+            "time": 5.34,
+            "cost": 3039.93,
+            "time_text": "5.34",
+            "cost_text": "3,039.93"
+          }
+        ]
+      },
+      {
+        "dataset": "Globe100k",
+        "space": "SE3",
+        "cells": [
+          {
+            "time": 1288.89,
+            "cost": 20090.74,
+            "time_text": "1,288.89",
+            "cost_text": "20,090.74"
+          },
+          {
+            "time": 177.88,
+            "cost": 20090.74,
+            "time_text": "177.88",
+            "cost_text": "20,090.74"
+          },
+          {
+            "time": 662.81,
+            "cost": 20090.74,
+            "time_text": "662.81",
+            "cost_text": "20,090.74"
+          },
+          {
+            "time": null,
+            "cost": null,
+            "time_text": "OOM",
+            "cost_text": "--"
+          },
+          {
+            "time": 132.07,
+            "cost": 20112.14,
+            "time_text": "132.07",
+            "cost_text": "20,112.14"
+          },
+          {
+            "time": null,
+            "cost": null,
+            "time_text": ">2000",
+            "cost_text": "--"
+          },
+          {
+            "time": 42.71,
+            "cost": 20090.74,
+            "time_text": "42.71",
+            "cost_text": "20,090.74"
+          }
+        ]
+      }
+    ]
+  }
+}

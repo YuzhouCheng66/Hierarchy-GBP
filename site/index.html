@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>H-GBP | Fast Bundle Adjustment &amp; Pose Graph Optimization</title>
+  <meta name="description" content="Fast CPU bundle adjustment and large-scale pose graph optimization through hierarchical Gaussian message passing. Explore the method, recorded solver replays, code, and benchmarks.">
+  <meta property="og:title" content="H-GBP: Fast Bundle Adjustment and Pose Graph Optimization">
+  <meta property="og:description" content="Local messages. Global correction. Hierarchical Gaussian belief propagation for efficient CPU optimization.">
+  <meta property="og:image" content="https://raw.githubusercontent.com/YuzhouCheng66/Hierarchy-GBP/main/code/docs/assets/teaser.gif">
+  <meta name="theme-color" content="#f8f8f4">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;450;500;550;600;650;700&family=Newsreader:ital,wght@0,400;0,450;0,500;0,600;1,400;1,500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="topbar">
+    <a class="wordmark" href="#" aria-label="H-GBP home"><svg viewBox="0 0 32 28" aria-hidden="true"><path d="M5 21 16 5 27 21Z"/><path d="M5 21H27"/><circle cx="5" cy="21" r="3"/><circle cx="16" cy="5" r="3"/><circle cx="27" cy="21" r="3"/></svg>H-GBP</a>
+    <nav aria-label="Main navigation"><a href="#ba">Bundle adjustment</a><a href="#pgo">Pose graphs</a><a href="#results">Results</a><a class="nav-code" href="https://github.com/YuzhouCheng66/Hierarchy-GBP">Code <span aria-hidden="true">&#8599;</span></a></nav>
+  </header>
+  <main id="main">
+    <section class="hero wrap">
+      <p class="eyebrow"><span class="live-dot"></span>HIERARCHICAL GAUSSIAN BELIEF PROPAGATION</p>
+      <h1>H-GBP<span class="title-dot">.</span></h1>
+      <h2>Fast Bundle Adjustment and<br class="desktop"> Pose Graph Optimization<br class="mobile"> <em>via Hierarchical Message Passing.</em></h2>
+      <p class="hero-description">Fast CPU optimization through local Gaussian messages<br>and coarse-scale correction.</p>
+      <p class="authors"><a href="https://yuzhoucheng.com/">Yuzhou Cheng</a><span>Tom Yates</span><span>Ignacio Alzugaray</span><span>Danyal Akarca</span><span>Pedro A. M. Mediano</span><span>Andrew J. Davison</span></p>
+      <div class="hero-links"><a class="button primary" href="https://arxiv.org/abs/2610.06978">Read the paper <span aria-hidden="true">&#8599;</span></a><a class="button" href="https://github.com/YuzhouCheng66/Hierarchy-GBP">Explore the code <span aria-hidden="true">&#8599;</span></a><a class="text-link" href="https://huggingface.co/datasets/yuzhoucheng66/HGBP-Benchmarks">Benchmark data <span aria-hidden="true">&#8599;</span></a></div>
+      <div class="headline-results"><p><strong>10 / 10</strong><span>Lowest BA runtime<br>among evaluated CPU baselines</span></p><p><strong>2.0&ndash;4.4&times;</strong><span>BA speedup over the<br>fastest other measured method</span></p><p><strong>99,856</strong><span>Poses in the largest<br>evaluated pose graph</span></p></div>
+    </section>
+
+    <section class="mechanism-section wrap" aria-labelledby="mechanism-title">
+      <div class="mini-heading"><div><span class="section-number">THE IDEA</span><h2 id="mechanism-title">Local refinement. Global correction.</h2></div><button class="plain-button" id="mechanism-toggle" type="button" aria-pressed="false">Pause animation</button></div>
+      <canvas id="mechanism" aria-label="Animated mechanism illustration: local GBP removes high-frequency error from a rough surface; abstraction and coarse correction remove its low-frequency deformation, followed by recovery to a smoother fine surface."></canvas>
+      <div class="mechanism-bottom"><div class="phase-label" id="mechanism-phase">01 &nbsp; Local GBP smooths high-frequency error</div><span>Animated mechanism illustration</span></div>
+    </section>
+
+    <section id="ba" class="experiment wrap" aria-labelledby="ba-title">
+      <div class="section-intro"><p class="section-number">01 / BUNDLE ADJUSTMENT</p><div><h2 id="ba-title">Bundle<br><em>adjustment.</em></h2><p>H-GBP combines Gaussian message passing and hierarchical correction on the landmark-reduced camera system. It is the fastest evaluated CPU method on all ten BA benchmarks; final costs are reported alongside runtime.</p></div></div>
+      <div class="dataset-heading"><div><h3>Venice1778</h3><p>1,778 cameras <span>&middot;</span> 993,923 points <span>&middot;</span> 5,001,946 observations</p></div><p class="relative-speed"><strong>3.45&times;</strong><span>vs. PowerBA<br>16-thread CPU</span></p></div>
+      <div class="replay" id="ba-replay" data-scene="ba">
+        <div class="scene-pair">
+          <figure class="scene-panel hgbp"><figcaption><span><i class="legend-dot blue"></i><strong>H-GBP</strong><small>16 threads</small></span><span class="step-badge" data-step="hgbp">Loading capture</span></figcaption><canvas data-view="hgbp" aria-label="Recorded H-GBP bundle adjustment point cloud and camera centers"></canvas><div class="scene-readout"><span>Reprojection cost <strong data-cost="hgbp">&mdash;</strong></span><span data-finish="hgbp">5.89 s total</span></div></figure>
+          <figure class="scene-panel baseline"><figcaption><span><i class="legend-dot ochre"></i><strong>PowerBA</strong><small>16 threads</small></span><span class="step-badge" data-step="baseline">Loading capture</span></figcaption><canvas data-view="baseline" aria-label="Recorded PowerBA bundle adjustment point cloud and camera centers"></canvas><div class="scene-readout"><span>Reprojection cost <strong data-cost="baseline">&mdash;</strong></span><span data-finish="baseline">20.32 s total</span></div></figure>
+        </div>
+        <div class="transport"><button type="button" class="play-button" data-play disabled aria-label="Play bundle adjustment replay">Play replay</button><div class="timeline"><div class="clock-heading"><label for="ba-time">Shared solver-time clock</label><output for="ba-time" data-clock>0.00 s</output></div><input id="ba-time" data-scrub type="range" min="0" max="1000" value="0" aria-label="Bundle adjustment replay time"><div class="clock-ticks" data-ticks></div></div><button type="button" class="plain-button reset" data-reset aria-label="Restart bundle adjustment replay">Restart</button></div>
+        <div class="replay-notes"><span>Early iterations are slowed on a shared nonlinear clock.</span><button type="button" class="plain-button" data-motion>Show recorded states only</button></div>
+        <p class="load-status" data-status role="status">Loading recorded reconstruction states...</p>
+        <details class="provenance"><summary>What is shown, and how is it timed?</summary><div data-provenance></div></details>
+      </div>
+      <p class="figure-caption">Recorded camera centers and sampled landmarks. Cost updates at each completed outer iteration.</p>
+    </section>
+
+    <section id="pgo" class="experiment wrap" aria-labelledby="pgo-title">
+      <div class="section-intro"><p class="section-number">02 / POSE GRAPH OPTIMIZATION</p><div><h2 id="pgo-title">Pose graph<br><em>optimization.</em></h2><p>Local GBP reduces high-frequency error; coarse correction addresses long-range error. H-GBP achieves the lowest measured runtime on the three largest pose graphs: Grid, Globe10k and Globe100k.</p></div></div>
+      <div class="dataset-heading"><div><h3>Globe100k</h3><p>99,856 poses <span>&middot;</span> 200,395 factors <span>&middot;</span> SE3</p></div><p class="relative-speed"><strong>30.2&times;</strong><span>vs. g2o-Cholesky<br>fixed 20-outer comparison</span></p></div>
+      <div class="replay" id="pgo-replay" data-scene="pgo">
+        <div class="scene-pair">
+          <figure class="scene-panel hgbp"><figcaption><span><i class="legend-dot blue"></i><strong>H-GBP</strong><small>16 threads</small></span><span class="step-badge" data-step="hgbp">Loading capture</span></figcaption><canvas data-view="hgbp" aria-label="Recorded H-GBP Globe100k pose graph"></canvas><div class="scene-readout"><span>PGO cost <strong data-cost="hgbp">&mdash;</strong></span><span data-finish="hgbp">42.71 s total</span></div></figure>
+          <figure class="scene-panel baseline"><figcaption><span><i class="legend-dot ochre"></i><strong>g2o-Cholesky</strong><small>1 thread</small></span><span class="step-badge" data-step="baseline">Loading capture</span></figcaption><canvas data-view="baseline" aria-label="Recorded g2o Globe100k pose graph keyframes"></canvas><div class="scene-readout"><span>PGO cost <strong data-cost="baseline">&mdash;</strong></span><span data-finish="baseline">1,288.89 s total</span></div></figure>
+        </div>
+        <div class="transport"><button type="button" class="play-button" data-play disabled aria-label="Play pose graph replay">Play replay</button><div class="timeline"><div class="clock-heading"><label for="pgo-time">Shared solver-time clock</label><output for="pgo-time" data-clock>0.00 s</output></div><input id="pgo-time" data-scrub type="range" min="0" max="1000" value="0" aria-label="Pose graph replay time"><div class="clock-ticks" data-ticks></div></div><button type="button" class="plain-button reset" data-reset aria-label="Restart pose graph replay">Restart</button></div>
+        <div class="replay-notes"><span>A shared nonlinear clock makes the early correction visible.</span><button type="button" class="plain-button" data-motion>Show recorded states only</button></div>
+        <p class="load-status" data-status role="status">Loading recorded pose graph states...</p>
+        <details class="provenance"><summary>What is shown, and how is it timed?</summary><div data-provenance></div></details>
+      </div>
+      <p class="figure-caption">Black: odometry. Red: sampled loop closures. The 30.2&times; comparison uses fixed 20-outer runtimes, not time to a matched cost; speedup over AMM-PGO, the fastest other evaluated method, is 3.09&times;.</p>
+    </section>
+
+    <section id="results" class="results wrap" aria-labelledby="results-title"><div class="results-heading"><div><p class="section-number">03 / BENCHMARKS</p><h2 id="results-title">Runtime<br><em>and final cost.</em></h2></div><div class="result-tabs" role="tablist" aria-label="Benchmark family"><button type="button" id="ba-tab" role="tab" aria-controls="benchmark-table" aria-selected="true" data-table="ba">Bundle adjustment</button><button type="button" id="pgo-tab" role="tab" aria-controls="benchmark-table" aria-selected="false" data-table="pgo">Pose graphs</button></div></div><p class="table-description">Runtime [s], with final cost below. Blue marks the lowest runtime.</p><div class="table-scroll" tabindex="0" role="region" aria-label="Scrollable benchmark table"><div id="benchmark-table" role="tabpanel" aria-labelledby="ba-tab"><p>Loading benchmark data...</p></div></div><p class="table-footnote">Paper Tables 1 and 2. Native solver timing boundaries and stopping policies follow the <a href="https://arxiv.org/abs/2610.06978v1">paper</a> and reproduction code; these are not identical end-to-end application timings or matched-cost comparisons. OOM: out of memory; &gt;2000: timeout.</p></section>
+
+    <section class="use-section wrap" aria-labelledby="use-title"><div><p class="section-number">CODE &amp; DATA</p><h2 id="use-title">Use H-GBP.</h2><p>Standard BAL for bundle adjustment; g2o for SE2 and SE3 pose graphs. Isolated adapters support model export and COLMAP text input.</p></div><div class="use-links"><a class="button primary" href="https://github.com/YuzhouCheng66/Hierarchy-GBP/tree/main/integrations">Interfaces &amp; integration <span aria-hidden="true">&#8599;</span></a><a class="text-link" href="https://huggingface.co/datasets/yuzhoucheng66/HGBP-Benchmarks">Download the benchmarks <span aria-hidden="true">&#8599;</span></a></div></section>
+    <section class="citation wrap"><div class="mini-heading"><h2>Cite the paper</h2><button type="button" class="plain-button" id="copy-citation">Copy BibTeX</button></div><pre id="bibtex">@article{cheng2026hierarchy,
+  title={Hierarchy-GBP: Accelerating Factor Graph Inference
+         via Abstraction and Recovery},
+  author={Cheng, Yuzhou and Yates, Tom and Alzugaray, Ignacio
+          and Akarca, Danyal and Mediano, Pedro A. M.
+          and Davison, Andrew J.},
+  journal={arXiv preprint arXiv:2610.06978},
+  year={2026}
+}</pre></section>
+  </main>
+  <footer class="wrap"><a class="wordmark" href="#">H-GBP</a><p>Hierarchy-GBP: Accelerating Factor Graph Inference via Abstraction and Recovery</p><a href="https://github.com/YuzhouCheng66/Hierarchy-GBP">Source &amp; reproducibility <span aria-hidden="true">&#8599;</span></a></footer>
+</body>
+</html>
