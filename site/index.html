@@ -13,7 +13,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;450;500;550;600;650;700&family=Newsreader:ital,wght@0,400;0,450;0,500;0,600;1,400;1,500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20261026-9">
+  <link rel="stylesheet" href="styles.css?v=20261026-10">
   <script type="module" src="app.js?v=20261026-7"></script>
 </head>
 <body>
@@ -74,15 +74,17 @@
 
     <section id="results" class="results wrap" aria-labelledby="results-title"><div class="results-heading"><div><p class="section-number">03 / BENCHMARKS</p><h2 id="results-title">Runtime<br><em>and final cost.</em></h2></div><div class="result-tabs" role="tablist" aria-label="Benchmark family"><button type="button" id="ba-tab" role="tab" aria-controls="benchmark-table" aria-selected="true" data-table="ba">Bundle adjustment</button><button type="button" id="pgo-tab" role="tab" aria-controls="benchmark-table" aria-selected="false" data-table="pgo">Pose graphs</button></div></div><p class="table-description">Runtime [s], with final cost below. Blue marks the lowest runtime.</p><div class="table-scroll" tabindex="0" role="region" aria-label="Scrollable benchmark table"><div id="benchmark-table" role="tabpanel" aria-labelledby="ba-tab"><p>Loading benchmark data...</p></div></div><p class="table-footnote">Paper Tables 1 and 2. Native solver timing boundaries and stopping policies follow the <a href="https://arxiv.org/abs/2610.06978v1">paper</a> and reproduction code; these are not identical end-to-end application timings or matched-cost comparisons. OOM: out of memory; &gt;2000: timeout.</p></section>
 
-    <section class="use-section wrap" aria-labelledby="use-title"><div><p class="section-number">CODE &amp; DATA</p><h2 id="use-title">Use H-GBP.</h2><p>Standard BAL for bundle adjustment; g2o for SE2 and SE3 pose graphs. Isolated adapters support model export and COLMAP text input.</p></div><div class="use-links"><a class="button primary" href="https://github.com/YuzhouCheng66/Hierarchy-GBP/tree/main/integrations">Interfaces &amp; integration <span aria-hidden="true">&#8599;</span></a><a class="text-link" href="https://huggingface.co/datasets/yuzhoucheng66/HGBP-Benchmarks">Download the benchmarks <span aria-hidden="true">&#8599;</span></a></div></section>
+    <section class="use-section wrap" aria-labelledby="use-title">
+      <div class="use-topline">
+        <div class="use-heading"><p class="section-number">CODE &amp; DATA</p><h2 id="use-title">Use H-GBP.</h2></div>
+        <div class="use-links"><a class="button primary" href="https://github.com/YuzhouCheng66/Hierarchy-GBP/tree/main/integrations">Interfaces &amp; integration <span aria-hidden="true">&#8599;</span></a><a class="text-link" href="https://huggingface.co/datasets/yuzhoucheng66/HGBP-Benchmarks">Download the benchmarks <span aria-hidden="true">&#8599;</span></a></div>
+      </div>
+      <p>Standard BAL for bundle adjustment; g2o for SE2 and SE3 pose graphs. Isolated adapters support model export and COLMAP text input.</p>
+    </section>
     <section class="citation wrap"><div class="mini-heading"><h2>Cite the paper</h2><button type="button" class="plain-button" id="copy-citation">Copy BibTeX</button></div><pre id="bibtex">@article{cheng2026hierarchy,
-  title={Hierarchy-GBP: Accelerating Factor Graph Inference
-         via Abstraction and Recovery},
-  author={Cheng, Yuzhou and Yates, Tom and Alzugaray, Ignacio
-          and Akarca, Danyal and Mediano, Pedro A. M.
-          and Davison, Andrew J.},
-  journal={arXiv preprint arXiv:2610.06978},
-  year={2026}
+  title={Hierarchy-GBP: Accelerating Factor Graph Inference via Abstraction and Recovery},
+  author={Cheng, Yuzhou and Yates, Tom and Alzugaray, Ignacio and Akarca, Danyal and Mediano, Pedro A. M. and Davison, Andrew J.},
+  journal={arXiv preprint arXiv:2610.06978}, year={2026}
 }</pre></section>
   </main>
   <footer class="wrap"><a class="wordmark" href="#">H-GBP</a><p>Hierarchy-GBP: Accelerating Factor Graph Inference via Abstraction and Recovery</p><a href="https://github.com/YuzhouCheng66/Hierarchy-GBP">Source &amp; reproducibility <span aria-hidden="true">&#8599;</span></a></footer>
