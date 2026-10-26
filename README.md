@@ -8,7 +8,7 @@ packed messages and cached updates support single-threaded and parallel executio
 [**Paper**](https://arxiv.org/abs/2610.06978) |
 [**Data**](https://huggingface.co/datasets/yuzhoucheng66/HGBP-Benchmarks)
 
-[![H-GBP mechanism: GBP smooths high-frequency error; abstraction, correction and recovery reduce low-frequency error.](https://raw.githubusercontent.com/YuzhouCheng66/Hierarchy-GBP/821c50294788e0949793ac0fb21ffdc45d849439/code/docs/assets/teaser.gif)](https://yuzhoucheng.com/Hierarchy-GBP/)
+[![H-GBP mechanism: GBP smooths high-frequency error; abstraction, correction and recovery reduce low-frequency error.](https://raw.githubusercontent.com/YuzhouCheng66/Hierarchy-GBP/8c88204504344d255ca12e26211200908c97b7cb/code/docs/assets/teaser.gif)](https://yuzhoucheng.com/Hierarchy-GBP/)
 
 ## Layout
 
