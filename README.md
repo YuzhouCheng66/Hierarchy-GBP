@@ -79,7 +79,7 @@ file interfaces, not drop-in solver backends. The validated kernels are unchange
 
 ## Citation
 
-If you find this work useful, please consider citing:
+If you find this code/work useful, please consider citing:
 
 ```bibtex
 @article{cheng2026hierarchy,
