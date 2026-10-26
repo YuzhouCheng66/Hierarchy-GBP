@@ -1,11 +1,11 @@
-# Hierarchy-GBP
+# H-GBP: Fast Bundle Adjustment and Pose Graph Optimization via Hierarchical Message Passing
 
 [**Paper (arXiv)**](https://arxiv.org/abs/2610.06978)
 
 ![Hierarchy-GBP: abstraction, coarse correction, recovery, and GBP refinement.](code/docs/assets/teaser.png)
 
-High-performance CPU solvers for SE2/SE3 pose-graph optimization and bundle
-adjustment, built around **hierarchical Gaussian belief propagation (H-GBP)**.
+High-performance CPU solvers for bundle adjustment and SE2/SE3 pose-graph
+optimization, built around **hierarchical Gaussian belief propagation (H-GBP)**.
 
 H-GBP combines **loopy Gaussian message passing** with **coarse-scale correction**
 to couple local refinement and coordinated global updates. PGO uses a
