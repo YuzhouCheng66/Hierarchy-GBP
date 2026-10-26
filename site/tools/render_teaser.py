@@ -57,32 +57,38 @@ def frame(phase):
                 t=(phase*8+i*.113)%1; a=np.array(q); b=np.array(nodes[i+1])
                 dot((1-t)*a+t*b,2.1,'#205fc4')
     surface(212,hi,1,phase<.36)
-    surface(908,hi*.3,lo,phase>.72)
-    def arrow(a,c,b,offset):
+    surface(908,hi*.3,lo,False)
+    def arrow(a,c,b,start,end,dashed=False):
         pts=[]
         for t in np.linspace(0,1,50):
             u=1-t; pts.append(xy((u*u*a[0]+2*u*t*c[0]+t*t*b[0],u*u*a[1]+2*u*t*c[1]+t*t*b[1])))
-        d.line(pts,fill='#8b9fa4',width=2)
+        if dashed:
+            for i in range(0,len(pts)-1,3): d.line(pts[i:i+2],fill='#bd8b80',width=2)
+        else: d.line(pts,fill='#8b9fa4',width=2)
         angle=math.atan2(b[1]-c[1],b[0]-c[0])
         for da in [-.45,.45]: line(b,(b[0]-7*math.cos(angle+da),b[1]-7*math.sin(angle+da)),'#8b9fa4',1.4)
-        t=(phase*3+offset)%1;u=1-t
-        dot((u*u*a[0]+2*u*t*c[0]+t*t*b[0],u*u*a[1]+2*u*t*c[1]+t*t*b[1]),3.4,'#205fc4')
-    arrow((320,121),(362,37),(440,56),0)
-    arrow((510,54),(560,41),(610,54),.33)
-    arrow((688,58),(771,37),(806,120),.66)
-    arrow((382,199),(560,230),(735,199),.5)
+        if start<=phase<=end:
+            t=(phase-start)/(end-start);u=1-t
+            dot((u*u*a[0]+2*u*t*c[0]+t*t*b[0],u*u*a[1]+2*u*t*c[1]+t*t*b[1]),4,'#205fc4')
+    arrow((320,121),(362,37),(440,56),.25,.43)
+    arrow((510,54),(560,41),(610,54),.43,.7)
+    arrow((688,58),(771,37),(806,120),.7,1)
+    arrow((382,209),(560,230),(735,209),2,3,True)
+    snailx=550+14*phase
+    shell=[xy((snailx+(.3+.48*t)*math.cos(t),201+(.3+.48*t)*math.sin(t))) for t in np.arange(0,4*math.pi,.1)]
+    d.line(shell,fill='#96766e',width=2)
+    for a,b in [((snailx-8,208),(snailx+16,208)),((snailx+16,208),(snailx+18,200)),((snailx+18,200),(snailx+16,196)),((snailx+18,200),(snailx+21,196))]: line(a,b,'#96766e',1.2)
     for cx, flat in [(475,1),(649,lo)]:
         nodes=[(cx+x,62+y*flat) for x,y in [(-26,-15),(27,-13),(28,18),(-25,16)]]
         for a,b in [(0,1),(1,2),(2,3),(3,0),(0,2)]: line(nodes[a],nodes[b],'#879ba2',1.2)
         for i,p in enumerate(nodes): dot(p,5.6,COLORS[i])
-    text((355,43),'Abstraction',12)
-    text((562,10),'Coarse correction',12)
-    text((763,43),'Recovery',12)
-    text((560,242),'Local GBP refinement',12)
+    text((347,29),'2  Abstraction',15)
+    text((562,10),'3  Coarse correction',15)
+    text((777,29),'4  Recovery',15)
+    text((180,96),'1  GBP smoothing',15,'#205fc4')
+    text((560,249),'Pure GBP: slow long-range correction',14,'#96766e')
     text((212,270),'Fine graph',17,'#263f49',True)
     text((908,270),'Recovered fine graph',17,'#263f49',True)
-    text((212,294),'GBP removes high-frequency error',12,'#205fc4')
-    text((908,294),'Coarse correction removes low-frequency error',12,'#205fc4')
     labels=['LOCAL GBP: resolve local detail','ABSTRACTION: transfer coordinated modes','COARSE CORRECTION: resolve long-range error','RECOVERY: bring the correction back']
     label=labels[min(3,int(phase*4))]
     d.rounded_rectangle((W*.27,H-31,W*.73,H-7),radius=10,fill='#eaf1fb')

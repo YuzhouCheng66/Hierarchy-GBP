@@ -5,3 +5,96 @@
 @media(max-width:1000px){.wrap{width:calc(100% - 56px)}.topbar{width:calc(100% - 48px)}.section-intro{grid-template-columns:170px 1fr;gap:20px}.section-intro>div{gap:25px}.section-intro h2{font-size:36px}.headline-results p{padding:0 20px;gap:12px}.headline-results strong{font-size:29px}.headline-results span{font-size:9px}.method-text{grid-template-columns:170px 1fr;gap:20px}.scene-panel canvas{height:300px}.scene-panel figcaption{padding:17px 16px 0}.scene-readout{padding:0 16px 15px}.results-heading h2{font-size:37px}}
 @media(max-width:700px){html{scroll-padding-top:20px}.wrap{width:calc(100% - 36px)}.topbar{width:calc(100% - 36px);height:64px}.wordmark{font-size:18px}.topbar nav{gap:18px;font-size:10px}.topbar nav>a:first-child,.topbar nav>a:nth-child(2){display:none}.nav-code{padding-left:17px}.hero{padding-top:43px}.eyebrow{font-size:8px;letter-spacing:1.3px}.hero h1{font-size:87px;letter-spacing:-5px;margin:24px 0 10px}.hero h2{font-size:28px;letter-spacing:-.6px;line-height:1.18}.hero h2 em{font-size:23px;margin-top:8px}.desktop{display:none}.mobile{display:block}.hero-description{font-size:12px;margin-top:20px}.authors{font-size:9px;gap:6px 12px;margin-top:22px}.hero-links{flex-wrap:wrap;gap:8px;margin-top:24px}.hero-links .text-link{width:100%;justify-content:center;margin-top:7px;font-size:10px}.button{font-size:10px;min-height:39px;padding:10px 15px}.headline-results{margin-top:28px;padding:19px 0}.headline-results p{flex:1;flex-direction:column;gap:5px;padding:0 8px}.headline-results strong{font-size:26px}.headline-results span{text-align:center;font-size:8px;line-height:1.6}.mini-heading{gap:15px}.mini-heading>div{display:block}.mini-heading>div .section-number{display:block;font-size:8px;margin-bottom:7px}.mini-heading h2{font-size:21px}.plain-button{font-size:9px;white-space:nowrap}#mechanism{height:235px;width:100%}.mechanism-section{margin-top:26px;padding-bottom:14px}.mechanism-bottom{display:block}.mechanism-bottom>span{display:block;font-size:8px;margin-top:7px}.phase-label{font-size:10px}.experiment{padding-top:58px}.section-intro{display:block}.section-number{font-size:9px;letter-spacing:1.25px}.section-intro>.section-number{margin:0 0 17px}.section-intro>div{display:block}.section-intro h2,.results-heading h2{font-size:37px;letter-spacing:-.8px}.section-intro p:not(.section-number){font-size:11px;line-height:1.85;margin-top:18px;max-width:100%}.dataset-heading{margin-top:26px;align-items:start;gap:10px}.dataset-heading h3{font-size:24px}.dataset-heading p:not(.relative-speed){font-size:8px;line-height:1.7;max-width:225px}.dataset-heading p span{margin:0 2px}.relative-speed strong{font-size:27px}.relative-speed{display:block;text-align:right;flex-shrink:0}.relative-speed span{display:block;font-size:7px;line-height:1.5}.scene-panel figcaption{padding:14px 10px 0;align-items:start;flex-direction:column;gap:8px;font-size:10px}.scene-panel small{font-size:8px}.step-badge{font-size:8px;min-height:14px}.scene-panel canvas{height:210px}.scene-readout{display:block;padding:0 10px 13px;font-size:8px}.scene-readout strong{font-size:10px}.scene-readout>span:last-child{display:block;font-size:8px;margin-top:8px}.transport{gap:12px;padding:13px 11px}.play-button{min-width:68px;font-size:8px;padding:9px 7px}.transport .reset{display:none}.clock-heading{font-size:8px}.clock-heading output{font-size:10px}.clock-ticks{font-size:7px}.replay-notes{display:block;font-size:8px;padding:9px 11px}.replay-notes .plain-button{display:block;font-size:8px;margin-top:3px}.provenance{padding:10px 11px;font-size:9px}.provenance summary{font-size:8px}.figure-caption{font-size:9px;padding-top:10px}.method-text{margin-top:58px;padding:25px 0;display:block}.method-text h2{font-size:35px;margin-top:19px}.method-columns{display:block;margin-top:16px}.method-columns p{font-size:11px}.method-columns p+p{margin-top:12px}.method-text .text-link{margin-top:20px;font-size:11px}.results{padding-top:58px}.results-heading{display:block}.result-tabs{margin-top:23px;width:fit-content}.result-tabs button{font-size:10px;padding:9px 14px}.table-description{font-size:9px;margin-top:15px}.table-footnote{font-size:8px}.use-section{margin-top:50px;display:block;padding:25px 0}.use-section h2{font-size:31px}.use-links{margin-top:21px;gap:17px}.citation{padding-top:23px}.citation pre{font-size:8px}.citation h2{font-size:23px}footer{display:block;padding-bottom:24px}footer p{margin:12px 0;line-height:1.7}footer>a:last-child{font-size:9px}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{animation:none!important;transition:none!important}}
+
+/* Keep research copy and numerical results readable without zooming. */
+.topbar nav{font-size:14px}
+.eyebrow,.section-number{font-size:12px}
+.hero-description{font-size:18px}
+.authors{font-size:14px;gap:8px 20px}
+.button,.text-link{font-size:14px}
+.headline-results span{font-size:13px;line-height:1.55}
+.headline-results p{padding:0 28px}
+.mini-heading h2{font-size:26px}
+.plain-button{font-size:13px}
+#mechanism{height:310px}
+.mechanism-bottom{font-size:12px}
+.phase-label{font-size:14px}
+.section-intro{grid-template-columns:225px 1fr;gap:30px}
+.section-intro>div{grid-template-columns:.9fr 1.1fr;gap:30px}
+.section-intro p:not(.section-number){font-size:16px;line-height:1.75;max-width:430px}
+.dataset-heading h3{font-size:31px}
+.dataset-heading p:not(.relative-speed){font-size:14px}
+.relative-speed span{font-size:12px}
+.scene-panel figcaption{font-size:16px;padding-bottom:8px}
+.scene-panel small,.step-badge{font-size:12px}
+.scene-stage{position:relative}
+.scene-panel canvas[data-view]{height:440px}
+.scene-panel .cost-chart{position:absolute;top:8px;left:12px;width:228px;height:146px;cursor:default;pointer-events:none;background:#ffffffed;border:1px solid #e5e9e6;border-radius:4px}
+.scene-readout{font-size:13px;padding-top:8px}
+.scene-readout strong{font-size:16px}
+.scene-readout>span:last-child{font-size:13px}
+.play-button{font-size:13px;min-width:108px}
+.clock-heading{font-size:13px}
+.clock-heading output{font-size:15px}
+.clock-ticks{font-size:11px}
+.replay-notes,.replay-notes .plain-button{font-size:12px}
+.provenance{font-size:13px}
+.provenance summary{font-size:12px}
+.figure-caption{font-size:14px;line-height:1.7}
+.result-tabs button{font-size:14px}
+.table-description{font-size:15px}
+table{font-size:15px;min-width:1100px}
+th{font-size:13px;padding:16px 11px}
+td{font-size:15px;padding:16px 11px}
+td .cell-cost{font-size:13px;margin-top:7px}
+.space-tag{font-size:12px}
+.table-footnote{font-size:13px;line-height:1.8}
+.use-section p:not(.section-number){font-size:16px}
+.citation pre{font-size:13px}
+footer p,footer>a:last-child{font-size:12px}
+@media(min-width:1550px){#mechanism{height:330px}.scene-panel canvas[data-view]{height:480px}}
+@media(max-width:1000px){
+  .headline-results p{padding:0 15px;gap:10px}
+  .headline-results span{font-size:12px}
+  .section-intro{grid-template-columns:160px 1fr;gap:20px}
+  .section-intro>div{gap:24px}
+  .scene-panel canvas[data-view]{height:390px}
+}
+@media(max-width:700px){
+  .topbar nav{font-size:13px}
+  .eyebrow,.section-number{font-size:10px}
+  .hero-description{font-size:16px}
+  .authors{font-size:12px;gap:8px 13px}
+  .hero-links .text-link{font-size:13px}
+  .button,.text-link{font-size:13px}
+  .headline-results span{font-size:10px}
+  .headline-results p{padding:0 7px}
+  .mini-heading h2{font-size:23px}
+  .plain-button{font-size:12px}
+  #mechanism{height:190px}
+  .phase-label{font-size:13px}
+  .mechanism-bottom>span{font-size:11px}
+  .section-intro p:not(.section-number){font-size:16px}
+  .dataset-heading p:not(.relative-speed){font-size:12px;max-width:260px}
+  .relative-speed span{font-size:10px}
+  .scene-pair{grid-template-columns:1fr}
+  .scene-panel+.scene-panel{border-left:0;border-top:1px solid var(--line)}
+  .scene-panel figcaption{flex-direction:row;font-size:15px;padding:16px}
+  .scene-panel small,.step-badge{font-size:11px}
+  .scene-panel canvas[data-view]{height:350px}
+  .scene-panel .cost-chart{width:211px;height:137px;top:4px}
+  .scene-readout{display:flex;font-size:12px;padding:10px 16px 17px}
+  .scene-readout strong{font-size:15px}
+  .scene-readout>span:last-child{font-size:12px}
+  .play-button{font-size:12px;min-width:95px}
+  .clock-heading,.clock-ticks{font-size:10px}
+  .clock-heading output{font-size:14px}
+  .replay-notes,.replay-notes .plain-button{font-size:12px}
+  .provenance{font-size:13px}
+  .provenance summary{font-size:12px}
+  .figure-caption{font-size:13px}
+  .result-tabs button{font-size:13px}
+  .table-description{font-size:14px}
+  .table-footnote{font-size:12px}
+  .citation pre{font-size:11px}
+}

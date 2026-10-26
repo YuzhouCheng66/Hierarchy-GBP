@@ -1,6 +1,6 @@
 {
   "dataset": "Venice1778",
-  "points": 12000,
+  "points": 40000,
   "cameras": 1778,
   "full_points": 993923,
   "observations": 5001946,
@@ -157,24 +157,24 @@
     "timing": "Archived native outer-time fractions calibrated to paper Table 2 totals (H-GBP 5.89 s, PowerBA 20.32 s). Geometry capture overhead is not included; this is not a new runtime measurement.",
     "geometry": "Actual accepted camera/landmark states captured after each of 20 outer iterations. Rejected PowerBA trials retain the preceding accepted geometry. Capture final costs reproduce the reported configurations.",
     "interpolation": "Linear display interpolation between recorded outer states; never used to compute costs or report convergence.",
-    "sampling": "12,000 uniform landmark-index samples and all 1,778 camera centers. One fixed initial-frame scale aligns the solvers' global gauges, followed by a shared fixed PCA display rotation. No per-frame alignment.",
-    "initial_geometry_max_difference": 9.751325562223502e-08,
-    "baseline_display_scale": 1.364496417520183,
+    "sampling": "40,000 uniform landmark-index samples and all 1,778 camera centers. One fixed initial-frame scale aligns the solvers' global gauges, followed by a shared fixed PCA display rotation. No per-frame alignment.",
+    "initial_geometry_max_difference": 9.906036965419597e-08,
+    "baseline_display_scale": 1.364496417945337,
     "display_rotation": [
       [
-        -0.36044293144527784,
-        -0.9327767901995737,
-        0.0028901273527335686
+        -0.35353671212054066,
+        -0.9353079512422792,
+        0.014519969902465343
       ],
       [
-        -0.05782508284954611,
-        0.019252073724535985,
-        -0.9981410809353296
+        -0.05951562300289949,
+        0.006999921903410668,
+        -0.9982028309476602
       ],
       [
-        0.9309871926963216,
-        -0.3599400190619062,
-        -0.06087716906309642
+        0.9335254060825421,
+        -0.35376551193738015,
+        -0.0581401647925821
       ]
     ],
     "paper": "https://arxiv.org/abs/2610.06978v1"

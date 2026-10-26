@@ -54,25 +54,38 @@ export function drawMechanism(ctx, width, height, phase) {
     }
   }
   surface(212, hi, 1, phase < .36);
-  surface(908, hi * .3, lo, phase > .72);
-  ctx.font = '500 13px "DM Sans", sans-serif'; ctx.textAlign = 'center';
+  surface(908, hi * .3, lo, false);
+  ctx.font = '500 16px "DM Sans", sans-serif'; ctx.textAlign = 'center';
   ctx.fillStyle = '#34464c';
   ctx.fillText('Fine graph', 212, 279);
   ctx.fillText('Recovered fine graph', 908, 279);
 
-  function arrow(a, control, b, color, offset) {
+  function arrow(a, control, b, color, start, end) {
     ctx.strokeStyle = color; ctx.lineWidth = 1.4;
     ctx.beginPath(); ctx.moveTo(...a); ctx.quadraticCurveTo(...control, ...b); ctx.stroke();
     const angle = Math.atan2(b[1] - control[1], b[0] - control[0]);
     line(b, [b[0] - 6 * Math.cos(angle - .45), b[1] - 6 * Math.sin(angle - .45)], color, 1.4);
     line(b, [b[0] - 6 * Math.cos(angle + .45), b[1] - 6 * Math.sin(angle + .45)], color, 1.4);
-    const t = (phase * 3 + offset) % 1, u = 1 - t;
-    dot([u * u * a[0] + 2 * u * t * control[0] + t * t * b[0], u * u * a[1] + 2 * u * t * control[1] + t * t * b[1]], 3.3, '#205fc4');
+    if (phase >= start && phase <= end) {
+      const t = (phase - start) / (end - start), u = 1 - t;
+      dot([u * u * a[0] + 2 * u * t * control[0] + t * t * b[0], u * u * a[1] + 2 * u * t * control[1] + t * t * b[1]], 4, '#205fc4');
+    }
   }
-  arrow([320, 126], [362, 42], [440, 61], '#81959c', 0);
-  arrow([510, 59], [560, 46], [610, 59], '#81959c', .33);
-  arrow([688, 63], [771, 42], [806, 125], '#81959c', .66);
-  arrow([382, 204], [560, 235], [735, 204], '#adb7b7', .5);
+  arrow([320, 126], [362, 42], [440, 61], '#81959c', .25, .43);
+  arrow([510, 59], [560, 46], [610, 59], '#81959c', .43, .7);
+  arrow([688, 63], [771, 42], [806, 125], '#81959c', .7, 1);
+  // The lower branch contrasts slow, unaccelerated GBP; it is not a V-cycle stage.
+  ctx.setLineDash([4, 5]);
+  arrow([382, 214], [560, 235], [735, 214], '#bd8b80', 2, 3);
+  ctx.setLineDash([]);
+  ctx.save(); ctx.translate(550 + 14 * phase, 206);
+  ctx.strokeStyle = '#96766e'; ctx.lineWidth = 1.2; ctx.beginPath();
+  for (let t = 0; t <= 4 * Math.PI; t += .13) {
+    const r = .3 + .48 * t, x = r * Math.cos(t), y = r * Math.sin(t);
+    if (!t) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.stroke(); ctx.beginPath(); ctx.moveTo(-8, 7); ctx.lineTo(12, 7); ctx.quadraticCurveTo(19, 7, 18, -1);
+  ctx.moveTo(18, -1); ctx.lineTo(16, -5); ctx.moveTo(18, -1); ctx.lineTo(21, -5); ctx.stroke(); ctx.restore();
   const nodes = [[-26, -15], [27, -13], [28, 18], [-25, 16]];
   [475, 649].forEach((cx, n) => {
     const correction = n ? lo : 1;
@@ -80,11 +93,13 @@ export function drawMechanism(ctx, width, height, phase) {
     [[0, 1], [1, 2], [2, 3], [3, 0], [0, 2]].forEach(([a, b]) => line(p[a], p[b], '#8d9ba4', 1.2));
     p.forEach((q, i) => dot(q, 5.5, palette[i]));
   });
-  ctx.font = '11px "DM Sans", sans-serif'; ctx.fillStyle = '#68797c';
-  ctx.fillText('Abstraction', 355, 57);
-  ctx.fillText('Coarse correction', 562, 25);
-  ctx.fillText('Recovery', 763, 57);
-  ctx.fillText('Local GBP refinement', 560, 250);
+  ctx.font = '15px "DM Sans", sans-serif'; ctx.fillStyle = '#68797c';
+  ctx.fillText('2  Abstraction', 347, 40);
+  ctx.fillText('3  Coarse correction', 562, 21);
+  ctx.fillText('4  Recovery', 777, 40);
+  ctx.fillStyle = '#205fc4'; ctx.fillText('1  GBP smoothing', 180, 107);
+  ctx.fillStyle = '#96766e'; ctx.font = '14px "DM Sans", sans-serif';
+  ctx.fillText('Pure GBP: slow long-range correction', 560, 258);
   ctx.restore();
 }
 

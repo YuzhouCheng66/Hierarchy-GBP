@@ -19,16 +19,21 @@ Neither illustration represents empirical solver trajectories.
 with costs and clocks in `ba.json` and `pgo.json`. Geometry capture tools live in
 `tools/`; optional native observers are built through `integrations/`. Captures
 do not change solver updates. They add I/O and are not performance runs.
-The published clock uses archived native iteration-time fractions, scaled to
-the corresponding paper totals. Geometry and clocks need not come from the same
-execution. This is stated in each replay's provenance.
+The BA clock uses archived native iteration-time fractions, scaled to the paper
+totals. Its geometry and clocks come from separate verified executions. The PGO
+demo uses fresh native clocks from continuous runs on Globe10k initialized by
+integrating the odometry chain. It does not replace the paper's benchmark rows.
 
-PowerBA rejected steps retain their preceding accepted state. g2o's first four
+PowerBA rejected steps retain their preceding accepted state. g2o's first eight
 GN states are checkpointed through 17-digit g2o files and checked against
-archived continuous-run costs; its final state is from that continuous run.
+the new continuous-run costs; its final state is from that continuous run.
 Uncaptured g2o iterations are not presented as recorded geometry.
 
 Display interpolation, a common nonlinear time axis, fixed initial-gauge
 alignment and geometry sampling are presentation only. Cost readouts always
 use completed iterations. `tools/import_tables.py` preserves the paper tables'
 displayed precision from a pinned repository revision.
+
+Inset plots use the same cost and time limits for both methods, with logarithmic
+cost and the shared nonlinear display clock. Markers are completed outers.
+Run `node site/tools/test_replay.mjs` for the replay-control and rendering tests.

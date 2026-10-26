@@ -29,10 +29,42 @@ export async function initReplay(root) {
       center[axis] = (hi + lo) / 2;
     }
     let yaw = kind === 'ba' ? -.5 : .4, pitch = kind === 'ba' ? -.85 : .22;
-    let zoom = 1, position = 0, running = false, visible = false, lastTick = 0, smooth = true;
+    let zoom = 1, position = 0, running = false, visible = false, lastTick = 0, lastPaint = 0, smooth = true;
     const duration = kind === 'ba' ? 18000 : 23000;
     const T = Math.max(meta.hgbp.total, meta.baseline.total), k = kind === 'ba' ? .7 : 5;
     const timeAt = u => k * Math.expm1(u * Math.log1p(T / k));
+    if (kind === 'pgo') document.querySelector('[data-pgo-speed]').textContent = `${fmt(meta.baseline.total / meta.hgbp.total, 1)}\u00d7`;
+    const logs = [...meta.hgbp.costs, ...meta.baseline.costs].map(Math.log10);
+    const lowCost = Math.min(...logs) - .06, highCost = Math.max(...logs) + .06;
+    const short = value => value >= 1e6 ? `${Number((value / 1e6).toPrecision(2))}M` : value >= 1e3 ? `${Number((value / 1e3).toPrecision(2))}k` : String(Number(value.toPrecision(2)));
+    function drawCurve(name, time, outer) {
+      const m = methods[name], canvas = root.querySelector(`[data-curve="${name}"]`), ctx = canvas.getContext('2d');
+      const W = canvas.clientWidth, H = canvas.clientHeight, dpr = Math.min(devicePixelRatio || 1, 2);
+      if (!W || !H) return;
+      if (canvas.width !== Math.round(W * dpr) || canvas.height !== Math.round(H * dpr)) {canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);}
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
+      const left = 44, right = W - 10, top = 27, bottom = H - 30;
+      const x = t => left + Math.log1p(t / k) / Math.log1p(T / k) * (right - left);
+      const y = cost => bottom - (Math.log10(cost) - lowCost) / (highCost - lowCost) * (bottom - top);
+      ctx.font = '11px "DM Sans", sans-serif'; ctx.lineWidth = .65; ctx.textAlign = 'right';
+      for (const p of [0, .5, 1]) {
+        const yy = top + p * (bottom - top), cost = 10 ** (highCost - p * (highCost - lowCost));
+        ctx.strokeStyle = '#e1e5e4'; ctx.beginPath(); ctx.moveTo(left, yy); ctx.lineTo(right, yy); ctx.stroke();
+        ctx.fillStyle = '#68777b'; ctx.fillText(short(cost), left - 6, yy + 4);
+      }
+      ctx.textAlign = 'center';
+      for (const u of [0, .5, 1]) {
+        ctx.fillText(fmt(timeAt(u), u ? 1 : 0), left + u * (right - left), bottom + 14);
+      }
+      ctx.fillStyle = '#40565d'; ctx.font = '12px "DM Sans", sans-serif'; ctx.textAlign = 'left';
+      ctx.fillText('Cost (log)', 7, 16); ctx.textAlign = 'right'; ctx.fillText('Time [s]', right, H - 2);
+      ctx.strokeStyle = '#7c919766'; ctx.setLineDash([2, 3]); ctx.beginPath(); ctx.moveTo(x(time), top); ctx.lineTo(x(time), bottom); ctx.stroke(); ctx.setLineDash([]);
+      ctx.strokeStyle = name === 'hgbp' ? '#205fc4' : '#b96c42'; ctx.fillStyle = ctx.strokeStyle; ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      for (let i = 0; i <= outer; ++i) {if (!i) ctx.moveTo(x(m.times[i]), y(m.costs[i])); else ctx.lineTo(x(m.times[i]), y(m.costs[i]));}
+      ctx.stroke();
+      for (let i = 0; i <= outer; ++i) {ctx.beginPath(); ctx.arc(x(m.times[i]), y(m.costs[i]), 2.1, 0, 2 * Math.PI); ctx.fill();}
+    }
     let fit = null;
     function fitView(W, H) {
       const key = `${W},${H},${yaw},${pitch}`;
@@ -118,6 +150,7 @@ export async function initReplay(root) {
       badge.classList.toggle('complete', outer >= 20);
       root.querySelector(`[data-cost="${name}"]`).textContent = fmt(m.costs[Math.min(outer, m.costs.length - 1)], 1);
       root.querySelector(`[data-finish="${name}"]`).textContent = `${fmt(m.total)} s ${outer >= 20 ? '· finished' : 'total'}`;
+      drawCurve(name, time, outer);
     }
     function render() {
       const time = timeAt(position); scrub.value = Math.round(position * 1000); clock.textContent = `${fmt(time)} s`;
@@ -146,7 +179,8 @@ export async function initReplay(root) {
     function frame(now) {
       if (running && visible && !document.hidden) {
         if (lastTick) position = Math.min(1, position + Math.min(now - lastTick, 80) / duration);
-        render(); if (position >= 1) {running = false; updateButton();}
+        if (now - lastPaint >= 33 || position >= 1) {render(); lastPaint = now;}
+        if (position >= 1) {running = false; updateButton();}
       }
       lastTick = now; requestAnimationFrame(frame);
     }

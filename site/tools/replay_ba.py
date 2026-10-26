@@ -62,7 +62,7 @@ def main():
         provenance=dict(timing='Archived native outer-time fractions calibrated to paper Table 2 totals (H-GBP 5.89 s, PowerBA 20.32 s). Geometry capture overhead is not included; this is not a new runtime measurement.',
             geometry='Actual accepted camera/landmark states captured after each of 20 outer iterations. Rejected PowerBA trials retain the preceding accepted geometry. Capture final costs reproduce the reported configurations.',
             interpolation='Linear display interpolation between recorded outer states; never used to compute costs or report convergence.',
-            sampling='12,000 uniform landmark-index samples and all 1,778 camera centers. One fixed initial-frame scale aligns the solvers\' global gauges, followed by a shared fixed PCA display rotation. No per-frame alignment.',
+            sampling=f'{hm["points"]:,} uniform landmark-index samples and all 1,778 camera centers. One fixed initial-frame scale aligns the solvers\' global gauges, followed by a shared fixed PCA display rotation. No per-frame alignment.',
             initial_geometry_max_difference=initial_error,
             baseline_display_scale=display_scale,display_rotation=rotation.tolist(),paper='https://arxiv.org/abs/2610.06978v1'))
     (a.output/'ba.json').write_text(json.dumps(meta,indent=2)+'\n', newline='\n')

@@ -36,7 +36,7 @@ public:
             binary_.open(prefix_+".bin", std::ios::binary);
             cameras_ = problem.cameras().size();
             landmarks_ = problem.landmarks().size();
-            const size_t n = std::min<size_t>(12000, landmarks_);
+            const size_t n = std::min<size_t>(40000, landmarks_);
             for (size_t i=0; i<n; ++i) indices_.push_back(i*landmarks_/n);
         }
         if (!outers_.empty() && outer <= outers_.back()) return;
