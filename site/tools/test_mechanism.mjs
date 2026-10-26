@@ -10,13 +10,17 @@ const a = coarsePoint(0, 0, -1, -1, 1), b = coarsePoint(0, 0, 1, -1, 1);
 const midpoint = coarsePoint(0, 0, 0, -1, 1);
 assert(Math.abs(midpoint[1] - (a[1] + b[1]) / 2) > 5, 'Uncorrected edges must be curved');
 
-let arcs = [];
+let arcs = [], labels = [];
 const ctx = new Proxy({}, {get(target, key) {
   if (key === 'arc') return (...values) => arcs.push(values);
+  if (key === 'fillText') return text => labels.push([text, parseFloat(target.font.replace('500 ', ''))]);
   return target[key] ?? ((...args) => {for (const value of args) if (typeof value === 'number') assert(Number.isFinite(value));});
 }});
 for (const phase of [0, .25, .5, .7, .85, .99]) {
-  arcs = []; drawMechanism(ctx, 1120, 300, phase);
+  arcs = []; labels = []; drawMechanism(ctx, 1120, 300, phase);
+  assert.equal(labels.find(([text]) => text === 'Fine graph')[1], 24);
+  assert.equal(labels.find(([text]) => text === '2  Abstraction')[1], 22.5);
+  assert.equal(labels.find(([text]) => text === 'Pure GBP:')[1], 21);
   const coarseNodes = arcs.filter(([, , radius]) => radius === 5.5);
   assert.equal(coarseNodes.length, 8);
   if (phase >= .7) {

@@ -39,4 +39,10 @@ Inset plots use the same cost and time limits for both methods, with logarithmic
 cost and the shared nonlinear display clock. Markers are completed outers.
 `data/ba-view.json` defines one proper rigid display rotation for the tower and
 square, shared by both methods and all frames; it does not modify solver states.
-Run `node site/tools/test_replay.mjs` for the replay-control and rendering tests.
+`data/gallery.json` registers four large BA scenes and three PGO scenes. Captures
+are lazy-loaded by the dataset selector; switching disposes the previous replay.
+The URL parameters `?ba=final4585&pgo=globe100k` select shareable initial scenes.
+Per-scene provenance distinguishes new native clocks, archived clocks and the
+paper-calibrated replays. These visualizations do not replace benchmark timings.
+Run `node site/tools/test_replay.mjs` and `node site/tools/test_gallery.mjs` for
+replay controls, final costs, finite rendering, dataset switching and cleanup.

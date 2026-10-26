@@ -13,8 +13,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;450;500;550;600;650;700&family=Newsreader:ital,wght@0,400;0,450;0,500;0,600;1,400;1,500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20261026-6">
-  <script type="module" src="app.js?v=20261026-6"></script>
+  <link rel="stylesheet" href="styles.css?v=20261026-7">
+  <script type="module" src="app.js?v=20261026-7"></script>
 </head>
 <body>
   <a class="skip" href="#main">Skip to content</a>
@@ -39,7 +39,7 @@
 
     <section id="ba" class="experiment wrap" aria-labelledby="ba-title">
       <div class="section-intro"><p class="section-number">01 / BUNDLE ADJUSTMENT</p><div><h2 id="ba-title">Bundle<br><em>adjustment.</em></h2><p>H-GBP combines Gaussian message passing and hierarchical correction on the landmark-reduced camera system. It is the fastest evaluated CPU method on all ten BA benchmarks; final costs are reported alongside runtime.</p></div></div>
-      <div class="dataset-heading"><div><h3>Venice1778</h3><p>1,778 cameras <span>&middot;</span> 993,923 points <span>&middot;</span> 5,001,946 observations</p></div><p class="relative-speed"><strong>3.45&times;</strong><span>vs. PowerBA<br>16-thread CPU</span></p></div>
+      <div class="dataset-heading"><div><label class="dataset-select"><span class="visually-hidden">Bundle adjustment dataset</span><select data-scene-select disabled aria-label="Bundle adjustment dataset"><option>Venice1778</option></select></label><p data-dataset-summary>1,778 cameras <span>&middot;</span> 993,923 points <span>&middot;</span> 5,001,946 observations</p></div><p class="relative-speed"><strong data-scene-speed>3.45&times;</strong><span data-comparison-note>vs. PowerBA<br>16-thread CPU</span></p></div>
       <div class="replay" id="ba-replay" data-scene="ba">
         <div class="scene-pair">
           <figure class="scene-panel hgbp"><figcaption><span><i class="legend-dot blue"></i><strong>H-GBP</strong><small>16 threads</small></span><span class="step-badge" data-step="hgbp">Loading capture</span></figcaption><div class="scene-stage"><canvas data-view="hgbp" aria-label="Recorded H-GBP bundle adjustment point cloud and camera centers"></canvas><canvas class="cost-chart" data-curve="hgbp" aria-label="Reprojection cost versus shared solver time; logarithmic cost scale"></canvas></div><div class="scene-readout"><span>Reprojection cost <strong data-cost="hgbp">&mdash;</strong></span><span data-finish="hgbp">5.89 s total</span></div></figure>
@@ -50,12 +50,12 @@
         <p class="load-status" data-status role="status">Loading recorded reconstruction states...</p>
         <details class="provenance"><summary>What is shown, and how is it timed?</summary><div data-provenance></div></details>
       </div>
-      <p class="figure-caption">Venice1778: all 1,778 camera centers and 40,000 sampled landmarks. Both cost curves use identical axes; each marker is a completed outer iteration.</p>
+      <p class="figure-caption" data-scene-caption>Venice1778: all 1,778 camera centers and 40,000 sampled landmarks. Both cost curves use identical axes; each marker is a completed outer iteration.</p>
     </section>
 
     <section id="pgo" class="experiment wrap" aria-labelledby="pgo-title">
       <div class="section-intro"><p class="section-number">02 / POSE GRAPH OPTIMIZATION</p><div><h2 id="pgo-title">Pose graph<br><em>optimization.</em></h2><p>GBP smooths high-frequency error; hierarchical correction reduces low-frequency error. H-GBP achieves the lowest measured runtime on the three largest pose graphs: Grid, Globe10k and Globe100k.</p></div></div>
-      <div class="dataset-heading"><div><h3>Globe10k</h3><p>10,000 poses <span>&middot;</span> 20,899 factors <span>&middot;</span> odometry initialization</p></div><p class="relative-speed"><strong data-pgo-speed>&mdash;</strong><span>vs. g2o-Cholesky<br>same odometry start, 20 outer</span></p></div>
+      <div class="dataset-heading"><div><label class="dataset-select"><span class="visually-hidden">Pose graph dataset</span><select data-scene-select disabled aria-label="Pose graph dataset"><option>Globe10k</option></select></label><p data-dataset-summary>10,000 poses <span>&middot;</span> 20,899 factors <span>&middot;</span> odometry initialization</p></div><p class="relative-speed"><strong data-scene-speed>&mdash;</strong><span data-comparison-note>vs. g2o-Cholesky<br>same odometry start, 20 outer</span></p></div>
       <div class="replay" id="pgo-replay" data-scene="pgo">
         <div class="scene-pair">
           <figure class="scene-panel hgbp"><figcaption><span><i class="legend-dot blue"></i><strong>H-GBP</strong><small>16 threads</small></span><span class="step-badge" data-step="hgbp">Loading capture</span></figcaption><div class="scene-stage"><canvas data-view="hgbp" aria-label="H-GBP Globe10k pose graph from integrated odometry"></canvas><canvas class="cost-chart" data-curve="hgbp" aria-label="PGO cost versus shared solver time; logarithmic cost scale"></canvas></div><div class="scene-readout"><span>PGO cost <strong data-cost="hgbp">&mdash;</strong></span><span data-finish="hgbp">&mdash;</span></div></figure>
@@ -66,7 +66,7 @@
         <p class="load-status" data-status role="status">Loading recorded pose graph states...</p>
         <details class="provenance"><summary>What is shown, and how is it timed?</summary><div data-provenance></div></details>
       </div>
-      <p class="figure-caption">Black: odometry. Red: sampled loop closures. Both runs start from integrated odometry, with unchanged measurements. Demo timings are measured separately from the paper table.</p>
+      <p class="figure-caption" data-scene-caption>Black: odometry. Red: sampled loop closures. Both runs start from integrated odometry, with unchanged measurements. Demo timings are measured separately from the paper table.</p>
     </section>
 
     <section id="results" class="results wrap" aria-labelledby="results-title"><div class="results-heading"><div><p class="section-number">03 / BENCHMARKS</p><h2 id="results-title">Runtime<br><em>and final cost.</em></h2></div><div class="result-tabs" role="tablist" aria-label="Benchmark family"><button type="button" id="ba-tab" role="tab" aria-controls="benchmark-table" aria-selected="true" data-table="ba">Bundle adjustment</button><button type="button" id="pgo-tab" role="tab" aria-controls="benchmark-table" aria-selected="false" data-table="pgo">Pose graphs</button></div></div><p class="table-description">Runtime [s], with final cost below. Blue marks the lowest runtime.</p><div class="table-scroll" tabindex="0" role="region" aria-label="Scrollable benchmark table"><div id="benchmark-table" role="tabpanel" aria-labelledby="ba-tab"><p>Loading benchmark data...</p></div></div><p class="table-footnote">Paper Tables 1 and 2. Native solver timing boundaries and stopping policies follow the <a href="https://arxiv.org/abs/2610.06978v1">paper</a> and reproduction code; these are not identical end-to-end application timings or matched-cost comparisons. OOM: out of memory; &gt;2000: timeout.</p></section>

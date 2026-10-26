@@ -6,11 +6,22 @@ async function fetchJSON(url) {
   return response.json();
 }
 
-export async function initReplay(root) {
+export async function initReplay(root, metadataPath) {
   const kind = root.dataset.scene, status = root.querySelector('[data-status]');
+  const events = new AbortController();
+  const listen = (element, type, callback, options = {}) => element.addEventListener(type, callback, {...options, signal: events.signal});
+  let disposed = false, frameRequest;
+  const observers = [];
+  const dispose = () => {disposed = true; events.abort(); cancelAnimationFrame(frameRequest); observers.forEach(observer => observer.disconnect());};
+  root.dataset.ready = 'false';
+  root.querySelector('[data-play]').disabled = true;
+  root.querySelector('[data-ticks]').replaceChildren();
+  root.querySelector('[data-provenance]').replaceChildren();
+  root.querySelector('[data-motion]').textContent = 'Show recorded states only';
+  status.hidden = false; status.textContent = 'Loading recorded states...';
   try {
-    const meta = await fetchJSON(`data/${kind}.json?v=20261026-6`);
-    const display = meta.view ? await fetchJSON(`data/${meta.view}?v=20261026-6`) : null;
+    const meta = await fetchJSON(`${metadataPath ?? `data/${kind}.json`}?v=20261026-7`);
+    const display = meta.view ? await fetchJSON(`data/${meta.view}?v=20261026-7`) : null;
     const n = meta.points + meta.cameras;
     const methods = {};
     for (const name of ['hgbp', 'baseline']) {
@@ -49,8 +60,18 @@ export async function initReplay(root) {
     let zoom = 1, position = 0, running = false, visible = false, lastTick = 0, lastPaint = 0, smooth = true;
     const duration = kind === 'ba' ? 18000 : 23000;
     const T = Math.max(meta.hgbp.total, meta.baseline.total), k = kind === 'ba' ? .7 : 5;
-    const timeAt = u => k * Math.expm1(u * Math.log1p(T / k));
-    if (kind === 'pgo') document.querySelector('[data-pgo-speed]').textContent = `${fmt(meta.baseline.total / meta.hgbp.total, 1)}\u00d7`;
+    const timeAt = u => u <= 0 ? 0 : u >= 1 ? T : k * Math.expm1(u * Math.log1p(T / k));
+    const section = root.closest?.('section');
+    if (section) {
+      section.querySelector('[data-scene-speed]').textContent = `${fmt(meta.baseline.total / meta.hgbp.total, 2)}\u00d7`;
+      section.querySelector('[data-dataset-summary]').textContent = kind === 'ba'
+        ? `${fmt(meta.cameras, 0)} cameras · ${fmt(meta.full_points, 0)} points · ${fmt(meta.observations, 0)} observations`
+        : `${fmt(meta.nodes, 0)} poses · ${fmt(meta.factors, 0)} factors${meta.initialization?.startsWith('Integrated') ? ' · odometry initialization' : ''}`;
+      section.querySelector('[data-scene-caption]').textContent = kind === 'ba'
+        ? `${meta.dataset}: all ${fmt(meta.cameras, 0)} camera centers and ${fmt(meta.points, 0)} sampled landmarks. Both cost curves use identical axes; each marker is a completed outer iteration.`
+        : `${meta.dataset}: black odometry, red sampled loop closures.${meta.points < meta.nodes ? ` ${fmt(meta.points, 0)} of ${fmt(meta.nodes, 0)} poses shown.` : ''} Geometry is recorded, with display interpolation between keyframes. Timing provenance is provided below the replay.`;
+      section.querySelector('[data-comparison-note]').innerHTML = kind === 'ba' ? 'vs. PowerBA<br>replay clocks · 16 threads' : 'vs. g2o-Cholesky<br>replay clocks · 20 outer';
+    }
     const logs = [...meta.hgbp.costs, ...meta.baseline.costs].map(Math.log10);
     const lowCost = Math.min(...logs) - .06, highCost = Math.max(...logs) + .06;
     const short = value => value >= 1e6 ? `${Number((value / 1e6).toPrecision(2))}M` : value >= 1e3 ? `${Number((value / 1e3).toPrecision(2))}k` : String(Number(value.toPrecision(2)));
@@ -156,7 +177,7 @@ export async function initReplay(root) {
         meta.loop_edges.forEach(([a, b]) => {ctx.moveTo(p[2 * a], p[2 * a + 1]); ctx.lineTo(p[2 * b], p[2 * b + 1]);});
         ctx.stroke();
       }
-      ctx.fillStyle = kind === 'pgo' ? '#172d3c88' : '#354d5d70';
+      ctx.fillStyle = kind === 'pgo' ? '#172d3c88' : '#354d5d99';
       const size = W < 300 ? .8 : 1.15;
       ctx.beginPath();
       for (let i = 0; i < meta.points; ++i) ctx.rect(p[2 * i], p[2 * i + 1], size, size);
@@ -178,37 +199,42 @@ export async function initReplay(root) {
       renderMethod('hgbp', time); renderMethod('baseline', time);
     }
     play.disabled = false; status.hidden = true;
-    play.addEventListener('click', () => {if (position >= .9999) position = 0; running = !running; lastTick = 0; updateButton(); render();});
-    scrub.addEventListener('input', () => {position = Number(scrub.value) / 1000; running = false; updateButton(); render();});
-    root.querySelector('[data-reset]').addEventListener('click', () => {position = 0; running = false; updateButton(); render();});
-    root.querySelector('[data-motion]').addEventListener('click', event => {smooth = !smooth; event.target.textContent = smooth ? 'Show recorded states only' : 'Enable smooth display motion'; render();});
+    listen(play, 'click', () => {if (position >= .9999) position = 0; running = !running; lastTick = 0; updateButton(); render();});
+    listen(scrub, 'input', () => {position = Number(scrub.value) / 1000; running = false; updateButton(); render();});
+    listen(root.querySelector('[data-reset]'), 'click', () => {position = 0; running = false; updateButton(); render();});
+    listen(root.querySelector('[data-motion]'), 'click', event => {smooth = !smooth; event.target.textContent = smooth ? 'Show recorded states only' : 'Enable smooth display motion'; render();});
     for (const m of Object.values(methods)) {
       let drag = null;
-      m.canvas.addEventListener('pointerdown', e => {drag = [e.clientX, e.clientY]; m.canvas.setPointerCapture(e.pointerId);});
-      m.canvas.addEventListener('pointermove', e => {
+      listen(m.canvas, 'pointerdown', e => {drag = [e.clientX, e.clientY]; m.canvas.setPointerCapture(e.pointerId);});
+      listen(m.canvas, 'pointermove', e => {
         if (!drag) return; yaw += (e.clientX - drag[0]) * .008; pitch = clamp(pitch + (e.clientY - drag[1]) * .008, -1.55, 1.55);
         drag = [e.clientX, e.clientY]; render();
       });
-      m.canvas.addEventListener('pointerup', () => {drag = null;});
-      m.canvas.addEventListener('pointercancel', () => {drag = null;});
-      m.canvas.addEventListener('wheel', e => {e.preventDefault(); zoom = clamp(zoom * Math.exp(-e.deltaY * .001), .25, 4); render();}, {passive: false});
+      listen(m.canvas, 'pointerup', () => {drag = null;});
+      listen(m.canvas, 'pointercancel', () => {drag = null;});
+      listen(m.canvas, 'wheel', e => {e.preventDefault(); zoom = clamp(zoom * Math.exp(-e.deltaY * .001), .25, 4); render();}, {passive: false});
     }
-    new ResizeObserver(render).observe(root);
-    new IntersectionObserver(entries => {visible = entries[0].isIntersecting; lastTick = 0;}).observe(root);
+    const resize = new ResizeObserver(render);
+    const visibility = new IntersectionObserver(entries => {visible = entries[0].isIntersecting; lastTick = 0;});
+    observers.push(resize, visibility); resize.observe(root); visibility.observe(root);
     // Start at the original input; users choose when to run either comparison.
     render(); updateButton();
     function frame(now) {
+      if (disposed) return;
       if (running && visible && !document.hidden) {
         if (lastTick) position = Math.min(1, position + Math.min(now - lastTick, 80) / duration);
         if (now - lastPaint >= 33 || position >= 1) {render(); lastPaint = now;}
         if (position >= 1) {running = false; updateButton();}
       }
-      lastTick = now; requestAnimationFrame(frame);
+      lastTick = now; frameRequest = requestAnimationFrame(frame);
     }
-    requestAnimationFrame(frame);
+    frameRequest = requestAnimationFrame(frame);
     root.dataset.ready = 'true';
+    return {meta, dispose};
   } catch (error) {
     status.hidden = false; status.textContent = `Replay unavailable: ${error.message}. The complete benchmark results remain available below.`;
     console.error(error);
+    dispose();
+    return {meta: null, dispose};
   }
 }

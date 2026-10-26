@@ -1,0 +1,35 @@
+{
+  "description": "Upright overview focused on the central reconstruction. All sampled geometry remains in the replay; distant outliers may lie outside the viewport.",
+  "basis": [
+    [
+      1.0,
+      0.0,
+      0.0
+    ],
+    [
+      0.0,
+      1.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ]
+  ],
+  "focus_min": [
+    -153.34550620327386,
+    -13.797261934857996,
+    -99.76731263310806
+  ],
+  "focus_max": [
+    90.47141199582254,
+    19.50080874170916,
+    94.47723346029481
+  ],
+  "yaw": 0.4,
+  "pitch": 0.75,
+  "fit_quantile": 0.01,
+  "vertical_fit_quantile": 0.01,
+  "horizontal_center": 0.5
+}

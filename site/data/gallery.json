@@ -1,0 +1,13 @@
+{
+  "ba": [
+    {"id": "venice1778", "label": "Venice1778", "metadata": "data/ba.json"},
+    {"id": "ladybug1723", "label": "Ladybug1723", "metadata": "data/ba-ladybug1723.json"},
+    {"id": "final3068", "label": "Final3068", "metadata": "data/ba-final3068.json"},
+    {"id": "final4585", "label": "Final4585", "metadata": "data/ba-final4585.json"}
+  ],
+  "pgo": [
+    {"id": "globe10k", "label": "Globe10k", "metadata": "data/pgo.json"},
+    {"id": "grid", "label": "Grid", "metadata": "data/pgo-grid.json"},
+    {"id": "globe100k", "label": "Globe100k", "metadata": "data/pgo-globe100k.json"}
+  ]
+}

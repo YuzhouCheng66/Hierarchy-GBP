@@ -1,9 +1,15 @@
 import {initMechanism} from './mechanism.js?v=20261026-6';
-import {initReplay} from './replay.js?v=20261026-6';
+import {initGallery} from './gallery.js?v=20261026-7';
 
 initMechanism();
 const observer = new IntersectionObserver(entries => {
-  for (const entry of entries) if (entry.isIntersecting) {observer.unobserve(entry.target); initReplay(entry.target);}
+  for (const entry of entries) if (entry.isIntersecting) {
+    observer.unobserve(entry.target);
+    initGallery(entry.target).catch(error => {
+      const status = entry.target.querySelector('[data-status]');
+      status.hidden = false; status.textContent = `Replay unavailable: ${error.message}`;
+    });
+  }
 }, {rootMargin: '600px'});
 document.querySelectorAll('[data-scene]').forEach(root => observer.observe(root));
 
