@@ -64,7 +64,7 @@ See [algorithm policies](code/docs/policies.md),
 [Globe generators](benchmarks/datasets/README.md) and
 [validation](code/docs/recertification.md).
 
-## GBP at Every Level
+## Local Message Passing at Every Level
 
 The optional [`pure_gbp`](code/variants/pure_gbp/README.md) variant uses GBP on
 the fine graph and both coarse levels, without a coarse direct or Krylov solve.
