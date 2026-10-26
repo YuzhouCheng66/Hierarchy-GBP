@@ -120,7 +120,7 @@ export function drawMechanism(ctx, width, height, phase) {
   ctx.fillText('4  Recovery', 777, 40);
   ctx.fillStyle = '#205fc4'; ctx.fillText('1  GBP smoothing', 180, 107);
   ctx.fillStyle = '#96766e'; ctx.font = '14px "DM Sans", sans-serif';
-  ctx.fillText('Pure GBP: slow long-range correction', 560, 258);
+  ctx.fillText('Pure GBP: slow on low-frequency error', 560, 258);
   ctx.restore();
 }
 
@@ -128,7 +128,7 @@ export function initMechanism() {
   const canvas = document.querySelector('#mechanism'), button = document.querySelector('#mechanism-toggle');
   const ctx = canvas.getContext('2d'), reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
   let paused = reduced, visible = true, elapsed = reduced ? 9350 : 0, last = 0, width = 0, height = 0;
-  const labels = ['01  Local GBP smooths high-frequency error', '02  Abstraction transfers coordinated modes', '03  Coarse correction removes low-frequency error', '04  Recovery brings global correction to the fine graph'];
+  const labels = ['01  GBP smooths high-frequency error', '02  Abstraction represents low-frequency modes', '03  Correction reduces low-frequency error', '04  Recovery transfers the correction to the fine graph'];
   const label = document.querySelector('#mechanism-phase');
   const render = () => {
     const dpr = Math.min(devicePixelRatio || 1, 2);

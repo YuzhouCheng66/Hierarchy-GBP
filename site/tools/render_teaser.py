@@ -96,10 +96,10 @@ def frame(phase):
     text((562,10),'3  Coarse correction',15)
     text((777,29),'4  Recovery',15)
     text((180,96),'1  GBP smoothing',15,'#205fc4')
-    text((560,249),'Pure GBP: slow long-range correction',14,'#96766e')
+    text((560,249),'Pure GBP: slow on low-frequency error',14,'#96766e')
     text((212,270),'Fine graph',17,'#263f49',True)
     text((908,270),'Recovered fine graph',17,'#263f49',True)
-    labels=['LOCAL GBP: resolve local detail','ABSTRACTION: transfer coordinated modes','COARSE CORRECTION: resolve long-range error','RECOVERY: bring the correction back']
+    labels=['GBP SMOOTHING: high-frequency error','ABSTRACTION: low-frequency modes','CORRECTION: reduce low-frequency error','RECOVERY: transfer the correction to the fine graph']
     label=labels[min(3,int(phase*4))]
     d.rounded_rectangle((W*.27,H-31,W*.73,H-7),radius=10,fill='#eaf1fb')
     d.text((W/2,H-20),label,font=font(10),fill='#205fc4',anchor='mm')
